@@ -1,0 +1,67 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+*.egg
+
+# Node/React
+gui/node_modules/
+gui/dist/
+gui/.vite/
+gui/test-results/
+*.log
+npm-debug.log*
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Analytics data (contains PII)
+analytics/
+
+# Workflow artifacts (keep structure, ignore contents)
+workflow/drafts/*
+workflow/audits/*
+workflow/final/*
+workflow/analysis/*
+workflow/input/*
+workflow/sessions/*
+!workflow/*/.gitkeep
+
+# Workflow runs (logs, state files)
+workflow/runs/*
+!workflow/runs/.gitkeep
+
+# Environment
+.env
+.env.local
+*.env
+
+# Docker postgres data
+data/postgres/
+
+# Workflow data (database and runtime files)
+workflow/data/
+workflow/.db_backup/
+workflow/*.db
+workflow/content/*.db
+workflow/history/*.db

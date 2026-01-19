@@ -1,0 +1,161 @@
+services:
+  # =============================================================================
+  # PostgreSQL Database with pgvector (Phase 0B - Multi-tenancy Foundation)
+  # =============================================================================
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: orchestrator
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orchestrator_dev}
+      POSTGRES_DB: orchestrator
+    ports:
+      - "5433:5432"
+    volumes:
+      - ./data/postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orchestrator"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # =============================================================================
+  # Redis (Caching & Session Management)
+  # =============================================================================
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    environment:
+      DATABASE_URL: postgres://orchestrator:${POSTGRES_PASSWORD:-orchestrator_dev}@postgres:5432/orchestrator
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 100
+      DEFAULT_POOL_SIZE: 20
+    ports:
+      - "6433:5432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # =============================================================================
+  # Ollama (Local LLM)
+  # =============================================================================
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      # Persist models on host
+      - ~/.ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount local directories for file storage
+      - ./workflow:/app/workflow
+      - ./workflow_config.yaml:/app/workflow_config.yaml
+      - ./prompts:/app/prompts
+      # Mount content tracker from parent directory
+      - ../linkedin_content_tracker.md:/app/linkedin_content_tracker.md:ro
+      # Mount posts and images for finished posts viewer
+      - ../posts:/app/posts:ro
+      - ../images/prompts:/app/images/prompts:ro
+      # Mount source for hot reload
+      - ./api:/app/api
+      - ./runner:/app/runner
+      # Mount CLI auth credentials (authenticate on host first)
+      - ~/.claude:/root/.claude
+      - ~/.gemini:/root/.gemini
+      - ~/.codex:/root/.codex
+    environment:
+      - PYTHONUNBUFFERED=1
+      - HOME=/root
+      - OLLAMA_HOST=http://ollama:11434
+      - WATERMARK_SERVICE_URL=http://watermark:8001
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://orchestrator:${POSTGRES_PASSWORD:-orchestrator_dev}@postgres:5432/orchestrator
+      # Stripe billing (required for payments)
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+      # App settings
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:5173}
+      - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-production}
+    depends_on:
+      ollama:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      # watermark service is optional - API works without it (watermark removal will fail gracefully)
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  watermark:
+    build:
+      context: ../watermark_remover
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    volumes:
+      # Mount assets for watermark detection
+      - ../watermark_remover/assets:/app/assets
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 60s  # LaMA model loading can take time
+
+  gui:
+    build:
+      context: .
+      dockerfile: Dockerfile.gui
+    ports:
+      - "5173:5173"
+    volumes:
+      # Mount source for hot reload
+      - ./gui/src:/app/src
+      - ./gui/public:/app/public
+      - ./gui/index.html:/app/index.html
+      - ./gui/vite.config.ts:/app/vite.config.ts
+      - ./gui/tailwind.config.js:/app/tailwind.config.js
+    depends_on:
+      api:
+        condition: service_healthy
+    environment:
+      # Use Docker service name for API proxy target
+      - VITE_API_TARGET=http://api:8000
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: orchestrator-network

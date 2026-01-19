@@ -1,0 +1,40 @@
+# API Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install system dependencies and Node.js
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    gnupg \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install CLI tools (authenticate on host first, credentials mounted at runtime)
+RUN npm install -g \
+    @anthropic-ai/claude-code \
+    @google/gemini-cli \
+    @openai/codex
+
+# Install Python dependencies
+COPY requirements-api.txt .
+RUN pip install --no-cache-dir -r requirements-api.txt
+
+# Copy application code
+COPY runner/ ./runner/
+COPY api/ ./api/
+COPY prompts/ ./prompts/
+COPY data/image_defaults.py ./data/image_defaults.py
+COPY data/__init__.py ./data/__init__.py
+COPY workflow_config.yaml .
+
+# Create workflow directories
+RUN mkdir -p workflow/runs workflow/drafts workflow/audits workflow/final workflow/input workflow/sessions
+
+# Ensure CLI tools can find auth
+ENV HOME=/root
+
+EXPOSE 8000
+
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

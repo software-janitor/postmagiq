@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "workflow-orchestrator"
+version = "0.1.0"
+description = "Multi-agent workflow orchestration for LinkedIn content"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    # API-based agents (Phase 0A)
+    "anthropic>=0.40.0",
+    "openai>=1.50.0",
+    "google-generativeai>=0.8.0",
+    # SQLModel + PostgreSQL (Phase 0B)
+    "sqlmodel>=0.0.14",
+    "psycopg2-binary>=2.9",
+    "alembic>=1.13",
+    # Vector search + embeddings (Market Upgrade)
+    "pgvector>=0.3.0",
+    "tiktoken>=0.7.0",
+    # Redis caching (Market Upgrade)
+    "redis>=5.0.0",
+    # Authentication (Phase 2)
+    "python-jose[cryptography]>=3.3.0",
+    "passlib[bcrypt]>=1.7.4",
+    "email-validator>=2.0.0",
+    # Billing (Phase 5)
+    "stripe>=7.0.0",
+    # Observability (Phase 11)
+    "structlog>=24.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "e2e: marks tests as end-to-end (deselect with '-m \"not e2e\"')",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["runner*", "tests*"]

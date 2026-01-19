@@ -1,0 +1,65 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg-primary: #09090b;
+  --bg-secondary: #18181b;
+  --bg-tertiary: #27272a;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --border-color: #7c2d12;
+  --accent-primary: #ea580c;
+  --accent-secondary: #dc2626;
+}
+
+body {
+  @apply bg-zinc-950 text-zinc-100 antialiased;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+}
+
+/* React Flow customizations */
+.react-flow__node {
+  @apply cursor-pointer;
+}
+
+.react-flow__edge-path {
+  @apply stroke-zinc-600;
+  stroke-width: 2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  @apply stroke-amber-500;
+}
+
+/* Ensure form elements have proper contrast */
+input, textarea, select {
+  @apply text-white;
+}
+
+option {
+  @apply bg-zinc-800 text-white;
+}
+
+/* Fix for native browser dark mode conflicts */
+input::placeholder {
+  @apply text-zinc-500;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-zinc-900;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-zinc-700 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-amber-800;
+}
