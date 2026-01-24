@@ -32,6 +32,8 @@ dependencies = [
     "stripe>=7.0.0",
     # Observability (Phase 11)
     "structlog>=24.0.0",
+    # YouTube audio download (G2)
+    "yt-dlp>=2024.1.0",
 ]
 
 [project.optional-dependencies]

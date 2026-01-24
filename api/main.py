@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 # Note: deprecated routes moved to api/routes/deprecated/ - see README.md there
 from api.routes import runs, workflow, config, ws, workflow_personas, auth, health, portal, workflow_configs
-from api.routes.v1 import workspaces_router, content_router, usage_router, billing_router, webhook_router, approvals_router, notifications_router, api_keys_router, webhooks_router, audit_router, domains_router, privacy_router, voice_profiles_router, voice_router, onboarding_router, finished_posts_router
+from api.routes.v1 import workspaces_router, content_router, usage_router, billing_router, webhook_router, approvals_router, notifications_router, api_keys_router, webhooks_router, audit_router, domains_router, privacy_router, voice_profiles_router, voice_router, onboarding_router, finished_posts_router, transcription_router
 from api.middleware import (
     UsageEnforcementMiddleware,
     MetricsMiddleware,
@@ -90,6 +90,7 @@ app.include_router(voice_profiles_router, prefix="/api", tags=["voice-profiles"]
 app.include_router(voice_router, prefix="/api", tags=["voice"])
 app.include_router(onboarding_router, prefix="/api", tags=["onboarding-v1"])
 app.include_router(finished_posts_router, prefix="/api", tags=["finished-posts-v1"])
+app.include_router(transcription_router, prefix="/api", tags=["transcription"])
 
 # Client portal routes (public login + authenticated review)
 app.include_router(portal.router, prefix="/api", tags=["portal"])
