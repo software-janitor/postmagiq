@@ -19,6 +19,7 @@ Multi-tenancy implementation tracking for Postmagiq. Reference: `MULTI_TENANCY_P
 | Phase 9 | White-labeling | Week 15-16 | 🟢 Complete | Claude |
 | Phase 10 | Polish & Launch | Week 17-18 | 🟡 In Progress | Claude |
 | Phase 11 | Dynamic Workflow Configuration | Week 19 | 🟢 Complete | Claude |
+| Phase 12 | Launch Simplification | Week 20 | 🟢 Complete | Claude |
 
 Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 
@@ -587,6 +588,50 @@ Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 | 22 | accounts | 1 |
 | 23 | credit_reservations | 4 |
 | 24 | workflow_configs | 11 |
+
+---
+
+## Phase 12: Launch Simplification
+
+**Goal:** Reduce feature surface for MVP launch. See LAUNCH_SIMPLIFICATION_PLAN.md.
+
+### 12.1 Phase 2 - Security for What Stays
+- [x] WebSocket auth (JWT verification, run ownership checks)
+- [x] Voice v1 routes (`api/routes/v1/voice.py`)
+- [x] Onboarding v1 routes (`api/routes/v1/onboarding.py`)
+- [x] Finished Posts v1 routes (`api/routes/v1/finished_posts.py`)
+- [x] Content service workspace methods (get_goal_for_workspace, get_chapters_for_workspace, delete_strategy_for_workspace)
+- [x] GUI client v1 functions (voice.ts, onboarding.ts, finished_posts.ts)
+- [x] Remove unauthenticated publish/unpublish endpoints
+
+### 12.2 Phase 3 - Deprecate Routes
+- [x] Create `api/routes/deprecated/` directory with README.md
+- [x] Move voice.py, onboarding.py, finished_posts.py to deprecated/
+- [x] Move ai_assistant.py, eval.py, watermark.py to deprecated/
+- [x] Move image_prompts.py, image_config.py, characters.py to deprecated/
+- [x] Move platforms.py, analytics.py, content.py, posts.py to deprecated/
+
+### 12.3 Phase 3 - Deprecate Services
+- [x] Create `api/services/deprecated/` directory
+- [x] Move analytics_service.py, eval_service.py, watermark_service.py
+- [x] Move image_config_service.py, image_prompt_service.py, image_vision_service.py
+- [x] Move posts_service.py, scene_generator_service.py, strategy_chat_service.py
+
+### 12.4 Phase 4 - Unwire Runtime
+- [x] Remove deprecated router imports from api/main.py
+- [x] Remove deprecated router registrations from api/main.py
+- [x] Keep only MVP routes: runs, workflow, config, ws, workflow_personas, auth, workflow_configs, all v1, portal, health
+
+### 12.5 Phase 5 - Tests
+- [x] Create `tests/deprecated/` directory
+- [x] Move test_ai_assistant.py, test_content_api.py, test_platforms.py
+- [x] Move test_image_vision_service.py
+- [x] Add `ignore = ["tests/deprecated"]` to pyproject.toml pytest config
+
+### 12.6 Phase 6 - Validation
+- [ ] OpenAPI exposes only MVP endpoints
+- [ ] Smoke test: auth/login, workspace, voice analysis, strategy builder, finished posts, workflow
+- [ ] Verify legacy routes return 404
 
 ---
 

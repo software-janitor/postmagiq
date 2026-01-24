@@ -12,8 +12,8 @@ from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
 
-# Note: voice, onboarding, finished_posts moved to deprecated/ - use v1 routes
-from api.routes import runs, workflow, config, ws, eval, posts, content, image_prompts, image_config, ai_assistant, platforms, analytics, watermark, workflow_personas, characters, auth, health, portal, workflow_configs
+# Note: deprecated routes moved to api/routes/deprecated/ - see README.md there
+from api.routes import runs, workflow, config, ws, workflow_personas, auth, health, portal, workflow_configs
 from api.routes.v1 import workspaces_router, content_router, usage_router, billing_router, webhook_router, approvals_router, notifications_router, api_keys_router, webhooks_router, audit_router, domains_router, privacy_router, voice_profiles_router, voice_router, onboarding_router, finished_posts_router
 from api.middleware import (
     UsageEnforcementMiddleware,
@@ -64,23 +64,12 @@ app.add_middleware(
 # Register global error handlers
 register_error_handlers(app)
 
-# Register routes
+# Register core routes (MVP)
 app.include_router(runs.router, prefix="/api/runs", tags=["runs"])
 app.include_router(workflow.router, prefix="/api/workflow", tags=["workflow"])
 app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(ws.router, prefix="/api/ws", tags=["websocket"])
-app.include_router(eval.router, prefix="/api/eval", tags=["evaluation"])
-app.include_router(posts.router, prefix="/api", tags=["posts"])
-app.include_router(content.router, prefix="/api", tags=["content"])
-# Note: legacy voice, onboarding, finished_posts deprecated - use v1 routes
-app.include_router(image_prompts.router, prefix="/api", tags=["image-prompts"])
-app.include_router(image_config.router, prefix="/api", tags=["image-config"])
-app.include_router(ai_assistant.router, prefix="/api", tags=["ai-assistant"])
-app.include_router(platforms.router, prefix="/api", tags=["platforms"])
-app.include_router(analytics.router, prefix="/api", tags=["analytics"])
-app.include_router(watermark.router, prefix="/api", tags=["watermark"])
 app.include_router(workflow_personas.router, prefix="/api", tags=["workflow-personas"])
-app.include_router(characters.router, prefix="/api", tags=["characters"])
 app.include_router(auth.router, prefix="/api", tags=["auth"])
 app.include_router(workflow_configs.router, prefix="/api/workflow-configs", tags=["workflow-configs"])
 
