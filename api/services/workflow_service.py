@@ -60,6 +60,7 @@ class WorkflowService:
         user_id: str,
         input_path: Optional[str] = None,
         content: Optional[str] = None,
+        config: Optional[str] = None,
     ) -> dict:
         """Start workflow execution in background.
 
@@ -68,6 +69,7 @@ class WorkflowService:
             user_id: User ID who is executing the workflow
             input_path: Optional path to input file
             content: Optional input content
+            config: Optional workflow config slug (e.g., "groq-production")
         """
         if self.running:
             return {"error": "Workflow already running", "run_id": self.current_run_id}
@@ -88,8 +90,11 @@ class WorkflowService:
 
         # Import here to avoid circular imports
         from runner.runner import WorkflowRunner
+        from runner.config import resolve_workflow_config
 
-        runner = WorkflowRunner(self.config_path, working_dir=WORKING_DIR)
+        # Use provided config or fall back to default
+        config_path = resolve_workflow_config(config) if config else self.config_path
+        runner = WorkflowRunner(config_path, working_dir=WORKING_DIR)
 
         # Generate run_id
         self.current_run_id = runner._generate_run_id(story)

@@ -20,7 +20,9 @@ router = APIRouter()
 
 
 @router.get("/status", response_model=WorkflowStatus)
-async def get_status():
+async def get_status(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+):
     """Get current workflow execution status."""
     return workflow_service.get_status()
 
@@ -36,27 +38,37 @@ async def execute_workflow(
         user_id=str(current_user.user_id),
         input_path=request.input_path,
         content=request.content,
+        config=request.config,
     )
 
 
 @router.post("/step")
-async def execute_step(request: WorkflowStepRequest):
+async def execute_step(
+    request: WorkflowStepRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+):
     """Execute a single workflow step. If run_id is provided, continues an existing run."""
     return await workflow_service.execute_step(
         request.story,
         request.step,
         run_id=request.run_id,
+        user_id=str(current_user.user_id),
     )
 
 
 @router.post("/abort")
-async def abort_workflow():
+async def abort_workflow(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+):
     """Abort the currently running workflow."""
     return await workflow_service.abort()
 
 
 @router.post("/approve")
-async def submit_approval(request: ApprovalRequest):
+async def submit_approval(
+    request: ApprovalRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+):
     """Submit human approval decision."""
     return await workflow_service.submit_approval(
         request.decision,
@@ -65,13 +77,17 @@ async def submit_approval(request: ApprovalRequest):
 
 
 @router.post("/pause")
-async def pause_workflow():
+async def pause_workflow(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+):
     """Pause the running workflow at the next checkpoint."""
     return await workflow_service.pause()
 
 
 @router.post("/resume")
-async def resume_workflow():
+async def resume_workflow(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+):
     """Resume a paused workflow."""
     return await workflow_service.resume()
 
@@ -96,8 +112,12 @@ async def get_workflow_run(
     store = WorkflowStore(current_user.user_id)
     run = store.get_workflow_run(run_id)
     if not run:
-        return {"error": "Run not found"}
-    # TODO: Verify run.user_id matches current_user.user_id for strict isolation
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    # Verify ownership - return 404 to prevent enumeration
+    if str(run.user_id) != str(current_user.user_id):
+        raise HTTPException(status_code=404, detail="Run not found")
+
     return run.model_dump()
 
 
@@ -108,6 +128,14 @@ async def get_workflow_outputs(
 ):
     """Get all outputs for a workflow run."""
     store = WorkflowStore(current_user.user_id)
+
+    # First verify run ownership
+    run = store.get_workflow_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    if str(run.user_id) != str(current_user.user_id):
+        raise HTTPException(status_code=404, detail="Run not found")
+
     outputs = store.get_workflow_outputs(run_id)
     return [output.model_dump() for output in outputs]
 

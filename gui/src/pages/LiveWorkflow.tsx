@@ -4,6 +4,7 @@ import { useWorkflowStore } from '../stores/workflowStore'
 import { Play, Square, SkipForward, Pause, PlayCircle, AlertCircle, CheckCircle2, Zap, Circle } from 'lucide-react'
 import StateMachineCanvas from '../components/workflow/StateMachineCanvas'
 import ApprovalDialog from '../components/workflow/ApprovalDialog'
+import WorkflowConfigSelector from '../components/WorkflowConfigSelector'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { startWorkflow, abortWorkflow, stepWorkflow, pauseWorkflow, resumeWorkflow } from '../api/workflow'
 import { apiGet } from '../api/client'
@@ -26,6 +27,7 @@ export default function LiveWorkflow() {
   } = useWorkflowStore()
   const eventLogRef = useRef<HTMLDivElement>(null)
   const [story, setStory] = useState('post_03')
+  const [selectedConfig, setSelectedConfig] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [localError, setLocalError] = useState<string | null>(null)
 
@@ -50,13 +52,13 @@ export default function LiveWorkflow() {
     setLoading(true)
     setLocalError(null)
     try {
-      await startWorkflow(story)
+      await startWorkflow(story, undefined, selectedConfig || undefined)
     } catch (e) {
       setLocalError(e instanceof Error ? e.message : 'Failed to start workflow')
     } finally {
       setLoading(false)
     }
-  }, [story])
+  }, [story, selectedConfig])
 
   const handleAbort = useCallback(async () => {
     setLoading(true)
@@ -115,13 +117,20 @@ export default function LiveWorkflow() {
         <h1 className="text-2xl font-bold text-white">Live Workflow</h1>
         <div className="flex items-center gap-4">
           {!running && (
-            <input
-              type="text"
-              value={story}
-              onChange={(e) => setStory(e.target.value)}
-              placeholder="Story ID (e.g., post_03)"
-              className="px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
-            />
+            <>
+              <input
+                type="text"
+                value={story}
+                onChange={(e) => setStory(e.target.value)}
+                placeholder="Story ID (e.g., post_03)"
+                className="px-3 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-blue-500 focus:outline-none"
+              />
+              <WorkflowConfigSelector
+                value={selectedConfig}
+                onChange={setSelectedConfig}
+                className="w-48"
+              />
+            </>
           )}
           {running ? (
             <>
