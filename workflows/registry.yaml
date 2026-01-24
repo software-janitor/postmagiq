@@ -1,0 +1,70 @@
+# ============================================================================
+# WORKFLOW CONFIGURATION REGISTRY
+# ============================================================================
+# Metadata about available workflow configurations.
+# Used by the dynamic workflow configuration system.
+
+workflows:
+  groq-production:
+    name: "Groq Production"
+    description: "Fast cloud inference via Groq API"
+    config_file: "configs/groq-production.yaml"
+    environment: production
+    enabled: true
+    tier_required: null  # Available to all tiers
+    features:
+      - Fast inference (Groq LPU)
+      - Llama 70B, Llama 8B, Mixtral models
+      - Low cost ($0.0005-0.0008/1K tokens)
+
+  ollama-local:
+    name: "Ollama Local"
+    description: "Local testing with Ollama (no API costs)"
+    config_file: "configs/ollama-local.yaml"
+    environment: development
+    enabled: true
+    tier_required: null
+    features:
+      - Free (local inference)
+      - Llama 8B, Mistral 7B, Llama 3B models
+      - Slower but private
+
+  legacy-claude:
+    name: "Legacy Multi-Provider"
+    description: "Original multi-provider workflow (Claude, Gemini, GPT)"
+    config_file: "configs/legacy-claude.yaml"
+    environment: development
+    enabled: false  # Disabled for launch
+    tier_required: premium
+    features:
+      - Claude, Gemini, GPT models
+      - Higher quality but higher cost
+      - Reserved for premium tiers
+
+# ============================================================================
+# DEPLOYMENT CONFIGURATION
+# ============================================================================
+# Controls which workflows are available in each deployment environment.
+
+deployment:
+  production:
+    # Only include production-grade workflows
+    include_environments: [production]
+    default_workflow: groq-production
+
+  development:
+    # Include all workflows for testing
+    include_environments: [production, development]
+    default_workflow: ollama-local
+
+  staging:
+    # Staging mirrors production
+    include_environments: [production]
+    default_workflow: groq-production
+
+# ============================================================================
+# METADATA
+# ============================================================================
+
+version: "1.0"
+last_updated: "2026-01-23"
