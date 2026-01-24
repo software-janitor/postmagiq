@@ -121,15 +121,15 @@ def upgrade() -> None:
 
     # Ensure system user exists
     op.execute("""
-        INSERT INTO users (id, email, full_name, created_at)
-        VALUES (gen_random_uuid(), 'system@local', 'System', now())
+        INSERT INTO users (id, email, full_name, is_active, is_superuser, created_at)
+        VALUES (gen_random_uuid(), 'system@local', 'System', true, false, now())
         ON CONFLICT (email) DO NOTHING;
     """)
 
-    # Seed system personas
+    # Seed system personas (description goes into content column)
     op.execute("""
         INSERT INTO workflow_personas (
-            id, name, slug, description, content, is_system, model_tier,
+            id, name, slug, content, is_active, is_system, model_tier,
             user_id, workspace_id, created_at
         )
         SELECT
@@ -137,7 +137,7 @@ def upgrade() -> None:
             v.name,
             v.slug,
             v.description,
-            '',
+            true,
             true,
             v.model_tier,
             u.id,
