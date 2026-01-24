@@ -98,7 +98,7 @@ services:
       - HOME=/root
       - OLLAMA_HOST=http://ollama:11434
       - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=postgresql://orchestrator:${POSTGRES_PASSWORD:-orchestrator_dev}@pgbouncer:5432/orchestrator
+      - DATABASE_URL=postgresql://orchestrator:${POSTGRES_PASSWORD:-orchestrator_dev}@postgres:5432/orchestrator
       # Stripe billing (required for payments)
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}

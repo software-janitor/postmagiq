@@ -1,4 +1,4 @@
-# GPU override for Ollama and Watermark services
+# GPU override for Ollama service
 # Auto-applied when nvidia-docker is detected
 
 services:
@@ -9,13 +9,4 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: [gpu]
-
-  watermark:
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
               capabilities: [gpu]
