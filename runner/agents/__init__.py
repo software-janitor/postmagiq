@@ -51,6 +51,13 @@ try:
 except ImportError:
     pass
 
+GroqAPIAgent = None
+
+try:
+    from runner.agents.groq_api import GroqAPIAgent
+except ImportError:
+    pass
+
 # Factory function
 from runner.agents.factory import create_agent, get_available_agents
 
@@ -77,6 +84,7 @@ __all__ = [
     "ClaudeAPIAgent",
     "OpenAIAPIAgent",
     "GeminiAPIAgent",
+    "GroqAPIAgent",
     # Factory
     "create_agent",
     "get_available_agents",

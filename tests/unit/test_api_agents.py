@@ -16,6 +16,7 @@ from runner.agents.api_base import APIAgent, RateLimitError
 from runner.agents.claude_api import ClaudeAPIAgent
 from runner.agents.openai_api import OpenAIAPIAgent
 from runner.agents.gemini_api import GeminiAPIAgent
+from runner.agents.groq_api import GroqAPIAgent
 from runner.agents.factory import create_agent, get_available_agents
 from runner.models import TokenUsage
 
@@ -187,6 +188,101 @@ class TestGeminiAPIAgent:
 
 
 # =============================================================================
+# GroqAPIAgent Tests
+# =============================================================================
+
+class TestGroqAPIAgent:
+    """Tests for GroqAPIAgent."""
+
+    def test_model_resolution_alias(self):
+        """Test model alias resolution."""
+        with patch.object(GroqAPIAgent, '_get_api_key_from_env', return_value='test-key'):
+            agent = GroqAPIAgent({"model": "llama-70b"})
+            assert agent.model_id == "llama-3.3-70b-versatile"
+
+    def test_model_resolution_direct(self):
+        """Test direct model name passes through."""
+        with patch.object(GroqAPIAgent, '_get_api_key_from_env', return_value='test-key'):
+            agent = GroqAPIAgent({"model": "llama-3.3-70b-versatile"})
+            assert agent.model_id == "llama-3.3-70b-versatile"
+
+    def test_invoke_success(self):
+        """Test successful invocation."""
+        mock_response = MagicMock()
+        mock_response.choices = [MagicMock()]
+        mock_response.choices[0].message.content = "Response"
+        mock_response.usage.prompt_tokens = 10
+        mock_response.usage.completion_tokens = 20
+
+        with patch.object(GroqAPIAgent, '_get_api_key_from_env', return_value='test-key'):
+            agent = GroqAPIAgent({"model": "llama-70b"})
+            agent.client = MagicMock()
+            agent.client.chat.completions.create.return_value = mock_response
+            result = agent.invoke("Hello")
+            assert result.success is True
+            assert result.content == "Response"
+            assert result.tokens.input_tokens == 10
+            assert result.tokens.output_tokens == 20
+
+    def test_transcribe_returns_tokens(self):
+        """Test transcription returns tokens."""
+        mock_response = MagicMock()
+        mock_response.text = "Transcribed text"
+        mock_response.duration = 60  # 1 minute
+
+        with patch.object(GroqAPIAgent, '_get_api_key_from_env', return_value='test-key'):
+            agent = GroqAPIAgent({"model": "whisper"})
+            agent.client = MagicMock()
+            agent.client.audio.transcriptions.create.return_value = mock_response
+
+            # Must pass file-like object, not string
+            mock_file = MagicMock()
+            result = agent.transcribe(mock_file)
+
+            assert result["text"] == "Transcribed text"
+            assert result["duration"] == 60
+            # 1 minute = 1/60 hour, tokens = max(1, int(1/60 * 11.1)) = 1
+            assert result["tokens"] >= 1
+
+    def test_transcribe_short_audio_minimum_token(self):
+        """Ensure short audio files return at least 1 token."""
+        mock_response = MagicMock()
+        mock_response.text = "Hi"
+        mock_response.duration = 1  # 1 second
+
+        with patch.object(GroqAPIAgent, '_get_api_key_from_env', return_value='test-key'):
+            agent = GroqAPIAgent({"model": "whisper"})
+            agent.client = MagicMock()
+            agent.client.audio.transcriptions.create.return_value = mock_response
+
+            mock_file = MagicMock()
+            result = agent.transcribe(mock_file)
+
+            # Even 1 second should return at least 1 token
+            assert result["tokens"] == 1
+
+    def test_rate_limit_error(self):
+        """Test that Groq rate limit errors are converted."""
+        from groq import RateLimitError as GroqRateLimitError
+
+        with patch.object(GroqAPIAgent, '_get_api_key_from_env', return_value='test-key'):
+            agent = GroqAPIAgent({"model": "llama-70b"})
+            agent.client = MagicMock()
+            # Create mock error with required parameters
+            mock_response = MagicMock()
+            mock_response.status_code = 429
+            mock_error = GroqRateLimitError(
+                message="Rate limited",
+                response=mock_response,
+                body=None
+            )
+            agent.client.chat.completions.create.side_effect = mock_error
+
+            with pytest.raises(RateLimitError):
+                agent._call_api([{"role": "user", "content": "test"}])
+
+
+# =============================================================================
 # Factory Tests
 # =============================================================================
 
@@ -206,6 +302,7 @@ class TestAgentFactory:
         assert "claude" in agents
         assert "openai" in agents
         assert "gemini" in agents
+        assert "groq" in agents
 
     def test_create_cli_agent(self):
         """Test creating a CLI agent."""
@@ -229,6 +326,18 @@ class TestAgentFactory:
         with patch.object(OpenAIAPIAgent, '_get_api_key_from_env', return_value='test-key'):
             agent = create_agent("gpt4o", {"model": "gpt4o"}, mode="api")
             assert isinstance(agent, OpenAIAPIAgent)
+
+    def test_create_groq_agent(self):
+        """Test creating a Groq API agent."""
+        with patch.object(GroqAPIAgent, '_get_api_key_from_env', return_value='test-key'):
+            agent = create_agent("groq", {"model": "llama-70b"}, mode="api")
+            assert isinstance(agent, GroqAPIAgent)
+
+    def test_groq_variant_resolves_to_groq(self):
+        """Test that groq-* models resolve to Groq agent."""
+        with patch.object(GroqAPIAgent, '_get_api_key_from_env', return_value='test-key'):
+            agent = create_agent("groq-llama-70b", {"model": "llama-70b"}, mode="api")
+            assert isinstance(agent, GroqAPIAgent)
 
 
 # =============================================================================
