@@ -97,7 +97,6 @@ services:
       - PYTHONUNBUFFERED=1
       - HOME=/root
       - OLLAMA_HOST=http://ollama:11434
-      - WATERMARK_SERVICE_URL=http://watermark:8001
       - REDIS_URL=redis://redis:6379/0
       - DATABASE_URL=postgresql://orchestrator:${POSTGRES_PASSWORD:-orchestrator_dev}@pgbouncer:5432/orchestrator
       # Stripe billing (required for payments)
@@ -115,30 +114,11 @@ services:
         condition: service_healthy
       postgres:
         condition: service_healthy
-      # watermark service is optional - API works without it (watermark removal will fail gracefully)
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 10s
       timeout: 5s
       retries: 3
-
-  watermark:
-    build:
-      context: ../watermark_remover
-      dockerfile: Dockerfile
-    image: postmagiq-watermark:v2
-    container_name: postmagiq-watermark-v2
-    ports:
-      - "8003:8001"
-    volumes:
-      # Mount assets for watermark detection
-      - ../watermark_remover/assets:/app/assets
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 60s  # LaMA model loading can take time
 
   gui:
     build:
