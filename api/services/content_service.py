@@ -705,6 +705,7 @@ class ContentService:
         prompt_id: Optional[str] = None,
         prompt_text: Optional[str] = None,
         title: Optional[str] = None,
+        workspace_id: Optional[UUID] = None,
     ) -> str:
         """Save a writing sample."""
         uid = normalize_user_id(user_id)
@@ -719,6 +720,7 @@ class ContentService:
             title=title,
             content=content,
             word_count=word_count,
+            workspace_id=workspace_id,
         )
         with get_session() as session:
             repo = WritingSampleRepository(session)
@@ -733,6 +735,26 @@ class ContentService:
         with get_session() as session:
             repo = WritingSampleRepository(session)
             samples = repo.list_by_user(uid)
+            return [
+                WritingSampleRecord(
+                    id=str(s.id),
+                    user_id=str(s.user_id),
+                    source_type=s.source_type,
+                    prompt_id=s.prompt_id,
+                    prompt_text=s.prompt_text,
+                    title=s.title,
+                    content=s.content,
+                    word_count=s.word_count,
+                    created_at=_datetime_to_str(s.created_at),
+                )
+                for s in samples
+            ]
+
+    def get_writing_samples_for_workspace(self, workspace_id: UUID) -> list[WritingSampleRecord]:
+        """Get all writing samples for a workspace."""
+        with get_session() as session:
+            repo = WritingSampleRepository(session)
+            samples = repo.list_by_workspace(workspace_id)
             return [
                 WritingSampleRecord(
                     id=str(s.id),
@@ -820,6 +842,55 @@ class ContentService:
                 word_choices=vocabulary_level,
                 example_excerpts=sentence_patterns,
                 avoid_patterns=storytelling_style,
+            )
+            profile = repo.create(record)
+            return str(profile.id)
+
+    def save_voice_profile_for_workspace(
+        self,
+        workspace_id: UUID,
+        user_id: UUID,
+        tone: Optional[str] = None,
+        sentence_patterns: Optional[str] = None,
+        vocabulary_level: Optional[str] = None,
+        signature_phrases: Optional[str] = None,
+        storytelling_style: Optional[str] = None,
+        emotional_register: Optional[str] = None,
+        raw_analysis: Optional[str] = None,
+    ) -> str:
+        """Save a voice profile scoped to a workspace."""
+        with get_session() as session:
+            repo = VoiceProfileRepository(session)
+            # Count existing workspace profiles for naming
+            existing = repo.list_by_workspace(workspace_id)
+            name = "Default" if not existing else f"Voice Profile {len(existing) + 1}"
+            slug = _generate_slug(name)
+            counter = 1
+            while repo.get_by_slug(slug, workspace_id=workspace_id):
+                counter += 1
+                slug = f"{_generate_slug(name)}-{counter}"
+
+            legacy_payload = {
+                "tone": tone,
+                "sentence_patterns": sentence_patterns,
+                "vocabulary_level": vocabulary_level,
+                "signature_phrases": signature_phrases,
+                "storytelling_style": storytelling_style,
+                "emotional_register": emotional_register,
+                "raw_analysis": raw_analysis,
+            }
+            record = VoiceProfileCreate(
+                name=name,
+                slug=slug,
+                description=_encode_legacy_voice_profile(legacy_payload),
+                is_preset=False,
+                tone_description=tone,
+                signature_phrases=signature_phrases,
+                word_choices=vocabulary_level,
+                example_excerpts=sentence_patterns,
+                avoid_patterns=storytelling_style,
+                workspace_id=workspace_id,
+                user_id=user_id,
             )
             profile = repo.create(record)
             return str(profile.id)

@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 from api.routes import runs, workflow, config, ws, eval, posts, content, onboarding, voice, finished_posts, image_prompts, image_config, ai_assistant, platforms, analytics, watermark, workflow_personas, characters, auth, health, portal, workflow_configs
-from api.routes.v1 import workspaces_router, content_router, usage_router, billing_router, webhook_router, approvals_router, notifications_router, api_keys_router, webhooks_router, audit_router, domains_router, privacy_router, voice_profiles_router
+from api.routes.v1 import workspaces_router, content_router, usage_router, billing_router, webhook_router, approvals_router, notifications_router, api_keys_router, webhooks_router, audit_router, domains_router, privacy_router, voice_profiles_router, voice_router
 from api.middleware import (
     UsageEnforcementMiddleware,
     MetricsMiddleware,
@@ -99,6 +99,7 @@ app.include_router(audit_router, prefix="/api", tags=["audit"])
 app.include_router(domains_router, prefix="/api", tags=["domains"])
 app.include_router(privacy_router, prefix="/api", tags=["privacy"])
 app.include_router(voice_profiles_router, prefix="/api", tags=["voice-profiles"])
+app.include_router(voice_router, prefix="/api", tags=["voice"])
 
 # Client portal routes (public login + authenticated review)
 app.include_router(portal.router, prefix="/api", tags=["portal"])

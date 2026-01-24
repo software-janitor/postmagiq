@@ -21,6 +21,7 @@ from api.routes.v1.audit import router as audit_router
 from api.routes.v1.domains import router as domains_router
 from api.routes.v1.privacy import router as privacy_router
 from api.routes.v1.voice_profiles import router as voice_profiles_router
+from api.routes.v1.voice import router as voice_router
 
 __all__ = [
     "workspaces_router",
@@ -36,4 +37,5 @@ __all__ = [
     "domains_router",
     "privacy_router",
     "voice_profiles_router",
+    "voice_router",
 ]
