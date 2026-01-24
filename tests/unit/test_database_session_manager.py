@@ -9,7 +9,9 @@ from runner.db import models  # noqa: F401
 from runner.content.workflow_store import WorkflowStore
 from runner.sessions.database import DatabaseSessionManager
 from runner.content.ids import get_system_user_id
-from tests.db_utils import create_test_engine, drop_test_schema
+from tests.db_utils import create_test_engine, drop_test_schema, requires_db
+
+pytestmark = requires_db  # Skip all tests in this module if DB not available
 
 
 @pytest.fixture

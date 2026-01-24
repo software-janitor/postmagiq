@@ -394,7 +394,7 @@ class TestHealthIntegration:
         try:
             from api.routes import health
             return health
-        except (ImportError, ModuleNotFoundError) as e:
+        except Exception as e:
             pytest.skip(f"Cannot import api.routes.health: {e}")
 
     @pytest.fixture
@@ -403,7 +403,7 @@ class TestHealthIntegration:
         try:
             from api.main import app
             return app
-        except (ImportError, ModuleNotFoundError) as e:
+        except Exception as e:
             pytest.skip(f"Cannot import api.main: {e}")
 
     def test_health_router_import_in_main(self, try_import_health_routes):

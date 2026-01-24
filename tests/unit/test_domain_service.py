@@ -34,7 +34,9 @@ from api.services.domain_service import (
     VERIFICATION_TXT_PREFIX,
     DKIM_TXT_PREFIX,
 )
-from tests.db_utils import create_test_engine, drop_test_schema
+from tests.db_utils import create_test_engine, drop_test_schema, requires_db
+
+pytestmark = requires_db  # Skip all tests in this module if DB not available
 
 
 @pytest.fixture

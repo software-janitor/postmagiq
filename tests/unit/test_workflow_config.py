@@ -19,7 +19,9 @@ from runner.db.models import (
     WorkflowEnvironment,
 )
 from runner.content.workflow_config_repository import WorkflowConfigRepository
-from tests.db_utils import create_test_engine, drop_test_schema
+from tests.db_utils import create_test_engine, drop_test_schema, requires_db
+
+pytestmark = requires_db  # Skip all tests in this module if DB not available
 
 
 @pytest.fixture

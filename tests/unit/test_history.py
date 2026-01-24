@@ -22,7 +22,9 @@ from runner.history.models import (
 from runner.history.queries import HistoryQueries
 from runner.history.service import HistoryService
 
-from tests.db_utils import create_test_engine, drop_test_schema
+from tests.db_utils import create_test_engine, drop_test_schema, requires_db
+
+pytestmark = requires_db  # Skip all tests in this module if DB not available
 
 db_engine = importlib.import_module("runner.db.engine")
 history_service_module = importlib.import_module("runner.history.service")
