@@ -1,5 +1,6 @@
 """FastAPI middleware for usage enforcement."""
 
+import logging
 from typing import Callable
 from uuid import UUID
 
@@ -8,6 +9,8 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from api.services.usage_service import UsageService, UsageLimitExceeded
+
+logger = logging.getLogger(__name__)
 
 
 # Routes that consume post credits
@@ -69,9 +72,13 @@ class UsageEnforcementMiddleware(BaseHTTPMiddleware):
                             "upgrade_url": "/settings/billing",
                         },
                     )
-            except Exception:
+            except Exception as e:
                 # Don't block on service errors - log and continue
-                pass
+                logger.warning(
+                    "Usage check failed for workspace %s: %s",
+                    workspace_id,
+                    str(e),
+                )
 
         # Check if this route consumes storage
         if self._matches_route(path, request.method, STORAGE_CONSUMING_ROUTES):
@@ -98,8 +105,12 @@ class UsageEnforcementMiddleware(BaseHTTPMiddleware):
                                 "upgrade_url": "/settings/billing",
                             },
                         )
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(
+                        "Storage check failed for workspace %s: %s",
+                        workspace_id,
+                        str(e),
+                    )
 
         return await call_next(request)
 
