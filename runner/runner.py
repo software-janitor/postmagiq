@@ -14,6 +14,7 @@ from runner.state_machine import StateMachine
 from runner.logging import StateLogger, AgentLogger, SummaryGenerator
 from runner.content.ids import get_system_user_id
 from runner.content.workflow_store import WorkflowStore
+from runner.config import resolve_workflow_config, list_workflow_configs
 
 
 class WorkflowRunner:
@@ -333,7 +334,7 @@ def main():
         "--config",
         "-c",
         default="workflow_config.yaml",
-        help="Path to workflow config",
+        help="Config name (e.g., groq-production) or path to workflow config",
     )
     parser.add_argument(
         "--story",
@@ -360,6 +361,11 @@ def main():
         help="List all runs",
     )
     parser.add_argument(
+        "--list-configs",
+        action="store_true",
+        help="List available workflow configs",
+    )
+    parser.add_argument(
         "--working-dir",
         "-w",
         default="workflow",
@@ -368,11 +374,27 @@ def main():
 
     args = parser.parse_args()
 
-    if not os.path.exists(args.config):
-        print(f"Error: Config file not found: {args.config}", file=sys.stderr)
+    # Handle --list-configs
+    if args.list_configs:
+        configs = list_workflow_configs()
+        if not configs:
+            print("No workflow configs found.")
+        else:
+            print(f"{'Name':<20} {'Environment':<12} {'Enabled':<8} Description")
+            print("-" * 80)
+            for cfg in configs:
+                enabled = "Yes" if cfg["enabled"] else "No"
+                print(f"{cfg['name']:<20} {cfg['environment']:<12} {enabled:<8} {cfg['description'][:40]}")
+        return
+
+    # Resolve config name or path
+    try:
+        config_path = str(resolve_workflow_config(args.config))
+    except FileNotFoundError as e:
+        print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
 
-    runner = WorkflowRunner(args.config, args.working_dir)
+    runner = WorkflowRunner(config_path, args.working_dir)
 
     if args.list_runs:
         runs = runner.list_runs()

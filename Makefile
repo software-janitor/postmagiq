@@ -3,7 +3,7 @@
 # ============================================================================
 
 .PHONY: help setup install-hooks install-deps install-gui-deps install-gh check-env \
-        workflow workflow-interactive workflow-step check-config test test-unit test-int test-e2e \
+        workflow workflow-interactive workflow-step list-configs check-config test test-unit test-int test-e2e \
         coverage logs log-states log-tokens log-summary clean \
         up up-gpu up-cpu down api gui gui-build dev dev-stop restart ollama-pull ollama-list \
         eval-agents eval-costs eval-trend eval-post eval-summary \
@@ -45,10 +45,13 @@ help:
 	@echo ""
 	@echo "Workflow:"
 	@echo "  make workflow STORY=post_03              Run workflow (auto-finds story)"
+	@echo "  make workflow STORY=post_03 CONFIG=groq-production   Use named config"
 	@echo "  make workflow STORY=post_03 INPUT=x.md   Run with explicit input file"
 	@echo "  make workflow-interactive STORY=post_03  Run with content paste prompt"
 	@echo "  make workflow-step STEP=draft            Run single workflow step"
-	@echo "  make check-config                        Validate workflow_config.yaml"
+	@echo "  make list-configs                        List available workflow configs"
+	@echo "  make check-config                        Validate workflow config"
+	@echo "  make check-config CONFIG=groq-production Validate named config"
 	@echo ""
 	@echo "Testing:"
 	@echo "  make test                      Run unit tests"
@@ -81,7 +84,6 @@ help:
 	@echo "  make db-rollback               Rollback last migration"
 	@echo "  make db-revision MSG=\"...\"     Create new migration"
 	@echo "  make db-history                Show migration history"
-	@echo "  make db-migrate-data           Migrate SQLite data to PostgreSQL"
 	@echo "  make db-shell                  Connect to PostgreSQL CLI"
 	@echo ""
 	@echo "Maintenance:"
@@ -144,33 +146,40 @@ check-env:
 # WORKFLOW COMMANDS
 # ============================================================================
 
+# CONFIG defaults to workflow_config.yaml (legacy symlink) for backward compatibility
+# Can be a name (groq-production) or path (workflows/configs/groq-production.yaml)
+CONFIG ?= workflow_config.yaml
+
 workflow:
 ifndef STORY
-	$(error STORY required. Usage: make workflow STORY=post_03)
+	$(error STORY required. Usage: make workflow STORY=post_03 [CONFIG=groq-production])
 endif
 ifdef INPUT
-	@python3 -m runner.runner --config workflow_config.yaml --story $(STORY) --input $(INPUT)
+	@python3 -m runner.runner --config $(CONFIG) --story $(STORY) --input $(INPUT)
 else
-	@python3 -m runner.runner --config workflow_config.yaml --story $(STORY)
+	@python3 -m runner.runner --config $(CONFIG) --story $(STORY)
 endif
 
 workflow-interactive:
 ifndef STORY
-	$(error STORY required. Usage: make workflow-interactive STORY=post_03)
+	$(error STORY required. Usage: make workflow-interactive STORY=post_03 [CONFIG=groq-production])
 endif
-	@python3 -m runner.runner --config workflow_config.yaml --story $(STORY) --interactive
+	@python3 -m runner.runner --config $(CONFIG) --story $(STORY) --interactive
 
 workflow-step:
 ifndef STEP
-	$(error STEP required. Usage: make workflow-step STEP=draft)
+	$(error STEP required. Usage: make workflow-step STEP=draft STORY=post_03 [CONFIG=groq-production])
 endif
 ifndef STORY
-	$(error STORY required. Usage: make workflow-step STEP=draft STORY=post_03)
+	$(error STORY required. Usage: make workflow-step STEP=draft STORY=post_03 [CONFIG=groq-production])
 endif
-	@python3 -m runner.runner --config workflow_config.yaml --story $(STORY) --step $(STEP)
+	@python3 -m runner.runner --config $(CONFIG) --story $(STORY) --step $(STEP)
+
+list-configs:
+	@python3 -m runner.runner --list-configs
 
 check-config:
-	@python3 -c "import yaml; yaml.safe_load(open('workflow_config.yaml')); print('Config OK')"
+	@python3 -c "from runner.config import resolve_workflow_config; print(f'Config OK: {resolve_workflow_config(\"$(CONFIG)\")}')"
 
 # ============================================================================
 # TEST COMMANDS
@@ -402,10 +411,6 @@ db-history:
 # Show current migration head
 db-current:
 	@cd runner/db && alembic current
-
-# Migrate data from SQLite to PostgreSQL
-db-migrate-data:
-	@python3 scripts/migrate_sqlite_to_postgres.py
 
 # Initialize database (development only - use migrations for production)
 db-init:

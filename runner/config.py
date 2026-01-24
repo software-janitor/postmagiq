@@ -47,3 +47,92 @@ AGENT_MODE = os.environ.get("AGENT_MODE", "cli")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+
+# =============================================================================
+# Workflow Configuration (Phase 11 - Dynamic Workflow Config)
+# =============================================================================
+
+# Directory containing workflow configs
+WORKFLOW_CONFIGS_DIR = PROJECT_ROOT / "workflows" / "configs"
+
+# Default config path (legacy symlink for backward compatibility)
+DEFAULT_CONFIG_PATH = PROJECT_ROOT / "workflow_config.yaml"
+
+
+def resolve_workflow_config(config: str) -> Path:
+    """Resolve a config name or path to an absolute path.
+
+    Args:
+        config: Either a config name (e.g., 'groq-production') or a path
+
+    Returns:
+        Path to the workflow config file
+
+    Raises:
+        FileNotFoundError: If config file doesn't exist
+    """
+    # If it looks like a path (contains / or ends with .yaml/.yml), use as-is
+    if "/" in config or config.endswith((".yaml", ".yml")):
+        config_path = Path(config)
+        if not config_path.is_absolute():
+            config_path = PROJECT_ROOT / config_path
+    else:
+        # It's a named config - look in workflows/configs/
+        config_path = WORKFLOW_CONFIGS_DIR / f"{config}.yaml"
+
+    if not config_path.exists():
+        # Check for common alternatives
+        alternatives = []
+        if WORKFLOW_CONFIGS_DIR.exists():
+            alternatives = [f.stem for f in WORKFLOW_CONFIGS_DIR.glob("*.yaml")]
+
+        if alternatives:
+            raise FileNotFoundError(
+                f"Config not found: {config}\n"
+                f"Available configs: {', '.join(sorted(alternatives))}"
+            )
+        else:
+            raise FileNotFoundError(f"Config not found: {config_path}")
+
+    return config_path
+
+
+def list_workflow_configs() -> list[dict]:
+    """List all available workflow configs.
+
+    Returns:
+        List of dicts with name, path, and enabled status
+    """
+    import yaml
+
+    configs = []
+    registry_path = PROJECT_ROOT / "workflows" / "registry.yaml"
+
+    if registry_path.exists():
+        with open(registry_path) as f:
+            registry = yaml.safe_load(f)
+            for name, meta in registry.get("workflows", {}).items():
+                config_path = WORKFLOW_CONFIGS_DIR / meta.get("config_file", "").replace("configs/", "")
+                configs.append({
+                    "name": name,
+                    "display_name": meta.get("name", name),
+                    "description": meta.get("description", ""),
+                    "environment": meta.get("environment", "production"),
+                    "enabled": meta.get("enabled", True),
+                    "path": str(config_path) if config_path.exists() else None,
+                })
+    else:
+        # Fallback: list files in configs directory
+        if WORKFLOW_CONFIGS_DIR.exists():
+            for config_file in WORKFLOW_CONFIGS_DIR.glob("*.yaml"):
+                configs.append({
+                    "name": config_file.stem,
+                    "display_name": config_file.stem,
+                    "description": "",
+                    "environment": "unknown",
+                    "enabled": True,
+                    "path": str(config_file),
+                })
+
+    return configs
