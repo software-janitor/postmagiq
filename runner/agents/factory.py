@@ -58,6 +58,12 @@ def _lazy_load_registries():
             API_AGENT_REGISTRY["gemini"] = GeminiAPIAgent
         except ImportError:
             pass
+
+        try:
+            from runner.agents.groq_api import GroqAPIAgent
+            API_AGENT_REGISTRY["groq"] = GroqAPIAgent
+        except ImportError:
+            pass
         # Note: ollama and codex don't have API equivalents yet
 
 
