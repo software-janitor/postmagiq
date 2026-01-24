@@ -1,8 +1,11 @@
-"""API routes for viewing finished posts."""
+"""API routes for viewing finished posts.
+
+NOTE: publish/unpublish endpoints removed for security.
+Use v1 workspace-scoped routes for future publish tracking.
+"""
 
 import json
 import re
-from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Optional
 from uuid import UUID
@@ -61,12 +64,6 @@ class FinishedPost(BaseModel):
     image_prompt: Optional[str] = None
     file_path: str
     publish_status: list[PublishInfo] = []
-
-
-class PublishRequest(BaseModel):
-    """Request to publish/unpublish a post."""
-    platform: str
-    url: Optional[str] = None
 
 
 def _load_publish_status() -> dict:
@@ -311,60 +308,6 @@ def get_platforms():
     return {"platforms": PLATFORMS}
 
 
-@router.post("/{post_id}/publish")
-def publish_post(post_id: str, request: PublishRequest):
-    """Mark a post as published on a platform."""
-    if request.platform not in PLATFORMS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid platform. Must be one of: {', '.join(PLATFORMS)}"
-        )
-
-    status = _load_publish_status()
-
-    if post_id not in status:
-        status[post_id] = {"platforms": []}
-
-    # Check if already published on this platform
-    existing = [p for p in status[post_id]["platforms"] if p["platform"] == request.platform]
-    if existing:
-        # Update existing
-        existing[0]["url"] = request.url
-        existing[0]["published_at"] = datetime.now().isoformat()
-    else:
-        # Add new
-        status[post_id]["platforms"].append({
-            "platform": request.platform,
-            "published_at": datetime.now().isoformat(),
-            "url": request.url,
-        })
-
-    _save_publish_status(status)
-    return {"success": True, "post_id": post_id, "platform": request.platform}
-
-
-@router.delete("/{post_id}/publish/{platform}")
-def unpublish_post(post_id: str, platform: str):
-    """Remove publish status for a post on a platform."""
-    if platform not in PLATFORMS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid platform. Must be one of: {', '.join(PLATFORMS)}"
-        )
-
-    status = _load_publish_status()
-
-    if post_id not in status:
-        return {"success": True, "message": "Post was not published"}
-
-    status[post_id]["platforms"] = [
-        p for p in status[post_id]["platforms"]
-        if p["platform"] != platform
-    ]
-
-    # Clean up empty entries
-    if not status[post_id]["platforms"]:
-        del status[post_id]
-
-    _save_publish_status(status)
-    return {"success": True, "post_id": post_id, "platform": platform}
+# NOTE: publish/unpublish endpoints removed for security.
+# Publish tracking will be reimplemented with proper auth in v1 routes.
+# See: LAUNCH_SIMPLIFICATION_PLAN.md
