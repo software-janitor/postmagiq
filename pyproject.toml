@@ -45,6 +45,8 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+# Ignore deprecated tests - these test deprecated features
+ignore = ["tests/deprecated"]
 markers = [
     "e2e: marks tests as end-to-end (deselect with '-m \"not e2e\"')",
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
