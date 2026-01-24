@@ -53,6 +53,7 @@ class WorkflowExecuteRequest(BaseModel):
     input_path: Optional[str] = None
     content: Optional[str] = None  # Raw content to process (alternative to input_path)
     interactive: bool = False
+    config: Optional[str] = None  # Workflow config slug (e.g., "groq-production")
 
 
 class WorkflowStepRequest(BaseModel):

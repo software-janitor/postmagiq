@@ -4,14 +4,15 @@ services:
   # =============================================================================
   postgres:
     image: pgvector/pgvector:pg16
+    container_name: postmagiq-postgres-v2
     environment:
       POSTGRES_USER: orchestrator
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-orchestrator_dev}
       POSTGRES_DB: orchestrator
     ports:
-      - "5433:5432"
+      - "5434:5432"
     volumes:
-      - ./data/postgres:/var/lib/postgresql/data
+      - ./data/postgres-v2:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U orchestrator"]
       interval: 5s
@@ -23,10 +24,11 @@ services:
   # =============================================================================
   redis:
     image: redis:7-alpine
+    container_name: postmagiq-redis-v2
     ports:
-      - "6380:6379"
+      - "6381:6379"
     volumes:
-      - redis_data:/data
+      - postmagiq_redis_data_v2:/data
     command: redis-server --appendonly yes
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -36,13 +38,14 @@ services:
 
   pgbouncer:
     image: edoburu/pgbouncer:latest
+    container_name: postmagiq-pgbouncer-v2
     environment:
       DATABASE_URL: postgres://orchestrator:${POSTGRES_PASSWORD:-orchestrator_dev}@postgres:5432/orchestrator
       POOL_MODE: transaction
       MAX_CLIENT_CONN: 100
       DEFAULT_POOL_SIZE: 20
     ports:
-      - "6433:5432"
+      - "6434:5432"
     depends_on:
       postgres:
         condition: service_healthy
@@ -52,8 +55,9 @@ services:
   # =============================================================================
   ollama:
     image: ollama/ollama:latest
+    container_name: postmagiq-ollama-v2
     ports:
-      - "11434:11434"
+      - "11435:11434"
     volumes:
       # Persist models on host
       - ~/.ollama:/root/.ollama
@@ -68,8 +72,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.api
+    image: postmagiq-api:v2
+    container_name: postmagiq-api-v2
     ports:
-      - "8000:8000"
+      - "8002:8000"
     volumes:
       # Mount local directories for file storage
       - ./workflow:/app/workflow
@@ -93,13 +99,15 @@ services:
       - OLLAMA_HOST=http://ollama:11434
       - WATERMARK_SERVICE_URL=http://watermark:8001
       - REDIS_URL=redis://redis:6379/0
-      - DATABASE_URL=postgresql://orchestrator:${POSTGRES_PASSWORD:-orchestrator_dev}@postgres:5432/orchestrator
+      - DATABASE_URL=postgresql://orchestrator:${POSTGRES_PASSWORD:-orchestrator_dev}@pgbouncer:5432/orchestrator
       # Stripe billing (required for payments)
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
       # App settings
-      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:5173}
+      - APP_BASE_URL=${APP_BASE_URL:-http://localhost:5174}
       - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-production}
+      # Workflow configuration
+      - DEPLOYMENT_ENV=${DEPLOYMENT_ENV:-development}
     depends_on:
       ollama:
         condition: service_healthy
@@ -118,8 +126,10 @@ services:
     build:
       context: ../watermark_remover
       dockerfile: Dockerfile
+    image: postmagiq-watermark:v2
+    container_name: postmagiq-watermark-v2
     ports:
-      - "8001:8001"
+      - "8003:8001"
     volumes:
       # Mount assets for watermark detection
       - ../watermark_remover/assets:/app/assets
@@ -134,8 +144,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.gui
+    image: postmagiq-gui:v2
+    container_name: postmagiq-gui-v2
     ports:
-      - "5173:5173"
+      - "5174:5173"
     volumes:
       # Mount source for hot reload
       - ./gui/src:/app/src
@@ -151,11 +163,11 @@ services:
       - VITE_API_TARGET=http://api:8000
 
 volumes:
-  postgres_data:
+  postmagiq_postgres_data_v2:
     driver: local
-  redis_data:
+  postmagiq_redis_data_v2:
     driver: local
 
 networks:
   default:
-    name: orchestrator-network
+    name: postmagiq-network-v2

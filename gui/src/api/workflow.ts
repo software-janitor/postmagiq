@@ -24,10 +24,11 @@ export async function getWorkflowStatus(): Promise<WorkflowStatus> {
   return apiGet<WorkflowStatus>('/workflow/status')
 }
 
-export async function startWorkflow(story: string, inputPath?: string): Promise<ExecuteResult> {
+export async function startWorkflow(story: string, inputPath?: string, config?: string): Promise<ExecuteResult> {
   return apiPost<ExecuteResult>('/workflow/execute', {
     story,
     input_path: inputPath,
+    config,
   })
 }
 

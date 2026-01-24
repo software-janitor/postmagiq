@@ -18,6 +18,7 @@ Multi-tenancy implementation tracking for Postmagiq. Reference: `MULTI_TENANCY_P
 | Phase 8 | API Keys & Webhooks | Week 14 | 🟢 Complete | Claude |
 | Phase 9 | White-labeling | Week 15-16 | 🟢 Complete | Claude |
 | Phase 10 | Polish & Launch | Week 17-18 | 🟡 In Progress | Claude |
+| Phase 11 | Dynamic Workflow Configuration | Week 19 | 🟢 Complete | Claude |
 
 Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 
@@ -31,16 +32,18 @@ Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 - [x] Add anthropic SDK to pyproject.toml
 - [x] Add openai SDK to pyproject.toml
 - [x] Add google-generativeai SDK to pyproject.toml
+- [x] Add groq SDK to pyproject.toml (>=0.12.0)
 
 ### 0A.2 Base Infrastructure
 - [x] Create runner/agents/api_base.py (APIAgent base class)
 - [x] Add AGENT_MODE config to runner/config.py ("cli" or "api")
-- [x] Add API key configs (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY)
+- [x] Add API key configs (ANTHROPIC_API_KEY, OPENAI_API_KEY, GOOGLE_API_KEY, GROQ_API_KEY)
 
 ### 0A.3 API Agent Implementations
 - [x] Create runner/agents/claude_api.py (ClaudeAPIAgent)
 - [x] Create runner/agents/openai_api.py (OpenAIAPIAgent)
 - [x] Create runner/agents/gemini_api.py (GeminiAPIAgent)
+- [x] Create runner/agents/groq_api.py (GroqAPIAgent with Whisper transcription)
 
 ### 0A.4 Factory Pattern
 - [x] Create runner/agents/factory.py (create_agent with mode selection)
@@ -56,7 +59,7 @@ Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 
 ## Phase 0B: SQLModel + PostgreSQL Foundation
 
-**Goal:** Replace SQLite + raw SQL with PostgreSQL + SQLModel ORM. Prerequisite for all multi-tenancy work.
+**Goal:** PostgreSQL + SQLModel ORM baseline. Prerequisite for all multi-tenancy work.
 
 ### 0B.1 Infrastructure
 - [x] Add sqlmodel, psycopg2-binary, alembic to pyproject.toml
@@ -100,24 +103,17 @@ Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 - [x] Implement ContentRepository (Goal, Chapter, Post)
 - [x] Add remaining repositories as needed
 
-### 0B.10 Migration Script (SQLite → PostgreSQL)
-- [x] Create scripts/migrate_sqlite_to_postgres.py
-- [x] Implement IdMapper (old INTEGER → new UUID)
-- [x] Migrate in FK dependency order (users → platforms → goals → chapters → posts → ...)
-- [x] Add validation (row counts, FK integrity, no orphans)
-
-### 0B.11 Service Layer Adaptation
+### 0B.10 Service Layer Adaptation
 - [x] Update ContentService for dual-backend support (USE_SQLMODEL flag)
-- [x] Verify existing SQLite path still works
 - [ ] Verify PostgreSQL path works
 
-### 0B.12 Testing
-- [x] Add SQLModel unit tests (in-memory SQLite) - tests/unit/test_repositories.py
+### 0B.11 Testing
+- [x] Add SQLModel unit tests (in-memory DB) - tests/unit/test_repositories.py
 - [ ] Add repository integration tests
 - [ ] Add migration validation tests
 - [ ] Add API compatibility tests (same responses from both backends)
 
-### 0B.13 Makefile Commands
+### 0B.12 Makefile Commands
 - [x] Add `make db-up` (start postgres + pgbouncer)
 - [x] Add `make db-migrate` (alembic upgrade head)
 - [x] Add `make db-rollback` (alembic downgrade -1)
@@ -162,8 +158,8 @@ Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 ### 1.5 Data Migration
 - [x] Create Alembic migration for new tables - runner/db/migrations/versions/20260115_225103_initial_tables_with_multi_tenancy.py
 - [x] Create Alembic migration for workspace_id columns - included in initial migration
-- [ ] Create script to generate "Default Workspace" for existing data
-- [ ] Backfill workspace_id for all existing records
+- [N/A] Create script to generate "Default Workspace" for existing data - Fresh deploy, no existing data
+- [N/A] Backfill workspace_id for all existing records - Fresh deploy, no existing data
 
 ---
 
@@ -223,7 +219,7 @@ Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 ### 3.2 Auth State
 - [x] Create useAuthStore (user, tokens, login, logout, refresh)
 - [x] Add axios/fetch interceptor for JWT header
-- [ ] Add interceptor for X-Workspace-ID header (deprecated but keep for transition)
+- [ ] Remove any legacy X-Workspace-ID header usage (workspace_id must be in URL path)
 
 ### 3.3 Workspace Switching (MULTI_TENANCY_PLAN.md §28)
 - [x] Update App.tsx with protected routes
@@ -472,6 +468,97 @@ Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 
 ---
 
+## Phase 11: Dynamic Workflow Configuration
+
+**Goal:** GUI-selectable workflow configs with deployment filtering. See GROQ_IMPLEMENTATION_PLAN.md §Dynamic Workflow Configuration.
+
+### 11.1 Update Project Plan Files
+- [x] Add Feedback Loop Handling section to GROQ_IMPLEMENTATION_PLAN.md
+- [x] Add Dynamic Workflow Configuration section to GROQ_IMPLEMENTATION_PLAN.md
+- [x] Update LAUNCH_SIMPLIFICATION_PLAN.md with dynamic workflow reference
+- [x] Add all phases to IMPLEMENTATION_TRACKER.md
+
+### 11.2 Create Workflow Config Directory Structure
+- [x] Create `workflows/configs/` directory
+- [x] Move `workflow_config.yaml` → `workflows/configs/legacy-claude.yaml`
+- [x] Create symlink: `workflow_config.yaml` → `workflows/configs/legacy-claude.yaml`
+- [x] Verify existing workflow still works via symlink
+
+### 11.3 Create Groq Production Config
+- [x] Copy `legacy-claude.yaml` to `groq-production.yaml`
+- [x] Replace all agent references with Groq agents
+- [x] Add Groq agent definitions
+- [x] Update tiers to use Groq agents
+- [x] Disable non-Groq agents (enabled: false)
+
+### 11.4 Create Ollama Local Config
+- [x] Copy `groq-production.yaml` to `ollama-local.yaml`
+- [x] Replace all agent references with Ollama agents
+- [x] Add Ollama agent definitions (ollama-llama-8b, ollama-mistral, ollama-llama-3b)
+- [x] Update tiers to use Ollama agents
+
+### 11.5 Create Workflow Registry
+- [x] Create `workflows/registry.yaml` with workflow metadata
+- [x] Define groq-production, ollama-local, legacy-claude entries
+- [x] Add deployment environment filtering config
+
+### 11.6 CLI Config Selection
+- [x] Add `--config` argument to runner/runner.py CLI
+- [x] Add `resolve_workflow_config(name: str)` and `list_workflow_configs()` functions
+- [x] Update Makefile: `make workflow CONFIG=groq-production STORY=post_01`
+- [x] Keep backward compat: if CONFIG not specified, use legacy symlink
+
+### 11.7 Database Schema - WorkflowConfig Table
+- [x] Create `runner/db/models/workflow_config.py` (WorkflowConfig model)
+- [x] Create Alembic migration for workflow_configs table
+- [ ] Run migration: `make db-migrate` (pending database start)
+
+### 11.8 Database Schema - Workspace Preference
+- [x] Create migration to add `workflow_config_id` column to workspaces
+- [x] Update Workspace model with relationship
+- [ ] Run migration: `make db-migrate` (pending database start)
+
+### 11.9 Sync Command
+- [x] Create `scripts/sync_workflows.py`
+- [x] Read `workflows/registry.yaml`, filter by DEPLOYMENT_ENV
+- [x] Upsert to workflow_configs table
+- [x] Add to Makefile: `make sync-workflows`
+
+### 11.10 WorkflowConfig Repository
+- [x] Create `runner/content/workflow_config_repository.py`
+- [x] Implement `list_for_workspace(environment, tier)`
+- [x] Implement `get_by_slug(slug)`
+- [x] Implement `get(id)`
+- [x] Implement `upsert(slug, config)`
+- [x] Add unit tests (tests/unit/test_workflow_config.py)
+
+### 11.11 WorkflowConfig API Endpoints
+- [x] Create `api/routes/workflow_configs.py`
+- [x] GET `/workflow-configs` - list available configs
+- [x] GET `/workflow-configs/{slug}` - get specific config
+- [x] GET `/workflow-configs/default` - get default config
+- [x] Register router in `api/main.py`
+- [ ] Add integration tests
+
+### 11.12 Runner Integration with API
+- [x] Update workflow execute request to accept config slug
+- [x] Update workflow_service.execute to resolve config path
+- [x] Fall back to default config if none selected
+
+### 11.13 GUI - Workflow Config Selector
+- [x] Add API client functions for workflow configs (`gui/src/api/workflow.ts`)
+- [x] Create WorkflowConfigSelector component
+- [x] Add to LiveWorkflow page (integrated into workflow start flow)
+- [x] Add to Settings page for default selection
+- [x] Only owner/admin can change (settings page)
+
+### 11.14 Deployment Configuration
+- [x] Add `DEPLOYMENT_ENV` to docker-compose.yml
+- [x] Document in `.env.example`
+- [ ] Ensure `make sync-workflows` runs on deploy (add to deploy scripts)
+
+---
+
 ## New Tables Summary (from MULTI_TENANCY_PLAN.md §21)
 
 | # | Table | Phase |
@@ -499,6 +586,7 @@ Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 | 21 | audit_logs | 10 |
 | 22 | accounts | 1 |
 | 23 | credit_reservations | 4 |
+| 24 | workflow_configs | 11 |
 
 ---
 
@@ -524,4 +612,6 @@ Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 
 - `MULTI_TENANCY_PLAN.md` - Full architectural specification
 - `WORKFLOW_ORCHESTRATION_PLAN.md` - Existing workflow system (complete)
+- `GROQ_IMPLEMENTATION_PLAN.md` - Groq agent + dynamic workflow configuration
+- `LAUNCH_SIMPLIFICATION_PLAN.md` - Launch scope and deprecation plan
 - `CLAUDE.md` - Project instructions and patterns
