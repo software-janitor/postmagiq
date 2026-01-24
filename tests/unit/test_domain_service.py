@@ -14,7 +14,7 @@ from uuid import uuid4
 # Skip all tests if sqlmodel is not installed
 pytest.importorskip("sqlmodel")
 
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import Session, SQLModel, select
 
 from runner.db.models import (
     User, UserCreate,
@@ -34,14 +34,18 @@ from api.services.domain_service import (
     VERIFICATION_TXT_PREFIX,
     DKIM_TXT_PREFIX,
 )
+from tests.db_utils import create_test_engine, drop_test_schema
 
 
 @pytest.fixture
 def engine():
-    """Create an in-memory SQLite engine for testing."""
-    engine = create_engine("sqlite:///:memory:", echo=False)
+    """Create a PostgreSQL engine for testing."""
+    engine, schema_name, database_url = create_test_engine()
     SQLModel.metadata.create_all(engine)
-    return engine
+    yield engine
+    SQLModel.metadata.drop_all(engine)
+    engine.dispose()
+    drop_test_schema(database_url, schema_name)
 
 
 @pytest.fixture

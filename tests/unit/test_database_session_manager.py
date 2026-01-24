@@ -2,27 +2,26 @@
 
 import importlib
 import pytest
-from sqlmodel import SQLModel, create_engine
+from sqlmodel import SQLModel
 
 db_engine = importlib.import_module("runner.db.engine")
 from runner.db import models  # noqa: F401
 from runner.content.workflow_store import WorkflowStore
 from runner.sessions.database import DatabaseSessionManager
 from runner.content.ids import get_system_user_id
+from tests.db_utils import create_test_engine, drop_test_schema
 
 
 @pytest.fixture
 def test_engine(monkeypatch):
-    """Create an in-memory SQLModel engine for tests."""
-    engine = create_engine(
-        "sqlite:///file::memory:?cache=shared&uri=true",
-        connect_args={"check_same_thread": False},
-    )
+    """Create a PostgreSQL engine for tests."""
+    engine, schema_name, database_url = create_test_engine()
     SQLModel.metadata.create_all(engine)
     monkeypatch.setattr(db_engine, "engine", engine)
     yield engine
     SQLModel.metadata.drop_all(engine)
     engine.dispose()
+    drop_test_schema(database_url, schema_name)
 
 
 @pytest.fixture

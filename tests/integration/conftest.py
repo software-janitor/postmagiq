@@ -6,7 +6,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from typing import Any
 
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel
 
 from api.main import app
 from api.services.content_service import ContentService
@@ -16,6 +16,7 @@ from api.routes import content, voice, onboarding, platforms
 from runner.db import models  # noqa: F401
 from runner.db.models import User, Goal, Chapter, Post
 
+from tests.db_utils import create_test_engine, drop_test_schema
 
 db_engine = importlib.import_module("runner.db.engine")
 
@@ -58,23 +59,16 @@ class SyncClient:
         return self._run_async(self._request("PATCH", url, **kwargs))
 
 
-def create_test_engine():
-    """Create a fresh SQLite engine for testing."""
-    return create_engine(
-        "sqlite:///file::memory:?cache=shared&uri=true",
-        connect_args={"check_same_thread": False},
-    )
-
-
 @pytest.fixture
 def test_engine(monkeypatch):
     """Create and configure a test database engine."""
-    engine = create_test_engine()
+    engine, schema_name, database_url = create_test_engine()
     SQLModel.metadata.create_all(engine)
     monkeypatch.setattr(db_engine, "engine", engine)
     yield engine
     SQLModel.metadata.drop_all(engine)
     engine.dispose()
+    drop_test_schema(database_url, schema_name)
 
 
 @pytest.fixture

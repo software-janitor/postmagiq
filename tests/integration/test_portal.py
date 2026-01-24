@@ -1,14 +1,10 @@
 """Integration tests for client portal API endpoints."""
 
-import os
 import pytest
 from datetime import datetime
 from uuid import uuid4, UUID
 
-# Use in-memory SQLite for fast integration tests
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
-
-from sqlmodel import Session, SQLModel, create_engine, select
+from sqlmodel import Session, SQLModel, select
 from httpx import ASGITransport, AsyncClient
 import asyncio
 
@@ -28,22 +24,11 @@ from runner.db.models import (
 from api.auth.password import hash_password
 from api.auth.jwt import create_access_token
 
+from tests.db_utils import create_test_engine, drop_test_schema
 
 # =============================================================================
 # Test Database Setup
 # =============================================================================
-
-
-def create_test_engine():
-    """Create a fresh SQLite engine for testing.
-
-    Uses shared cache mode for in-memory database to allow multiple connections
-    to see the same data.
-    """
-    return create_engine(
-        "sqlite:///file::memory:?cache=shared&uri=true",
-        connect_args={"check_same_thread": False},
-    )
 
 
 class SyncClient:
@@ -78,11 +63,12 @@ class SyncClient:
 @pytest.fixture(scope="function")
 def test_engine():
     """Create and configure a test database engine."""
-    engine = create_test_engine()
+    engine, schema_name, database_url = create_test_engine()
     SQLModel.metadata.create_all(engine)
     yield engine
     SQLModel.metadata.drop_all(engine)
     engine.dispose()
+    drop_test_schema(database_url, schema_name)
 
 
 @pytest.fixture(scope="function")
