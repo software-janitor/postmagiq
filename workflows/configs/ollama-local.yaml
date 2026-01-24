@@ -1,0 +1,323 @@
+# ============================================================================
+# OLLAMA LOCAL WORKFLOW CONFIGURATION
+# ============================================================================
+# Local testing configuration using Ollama models.
+# All agents use local Ollama models (no API costs).
+
+# Orchestrator settings
+orchestrator:
+  agent: ollama-llama-8b
+  session:
+    enabled: true
+
+# ============================================================================
+# WORKFLOW TIERS (Ollama Local)
+# ============================================================================
+# Local testing uses smaller, faster models.
+
+tiers:
+  standard:
+    draft_agents: [ollama-llama-8b, ollama-mistral, ollama-llama-3b]
+    audit_agents: [ollama-llama-8b, ollama-mistral]
+  premium:
+    # Same as standard for local testing
+    draft_agents: [ollama-llama-8b, ollama-mistral, ollama-llama-3b]
+    audit_agents: [ollama-llama-8b, ollama-mistral]
+
+# Credit weights (all free for local)
+credit_weights:
+  base_cost: 0
+  standard:
+    - ollama-llama-8b
+    - ollama-mistral
+    - ollama-llama-3b
+  premium:
+    - ollama-llama-8b
+    - ollama-mistral
+    - ollama-llama-3b
+
+# ============================================================================
+# AGENT DEFINITIONS
+# ============================================================================
+
+agents:
+  # Ollama models (local inference)
+  ollama-llama-8b:
+    type: ollama
+    enabled: true
+    model: llama3.1:8b
+    context_window: 128000
+    cost_per_1k:
+      input: 0.0
+      output: 0.0
+
+  ollama-mistral:
+    type: ollama
+    enabled: true
+    model: mistral:7b
+    context_window: 32768
+    cost_per_1k:
+      input: 0.0
+      output: 0.0
+
+  ollama-llama-3b:
+    type: ollama
+    enabled: true
+    model: llama3.2:3b
+    context_window: 128000
+    cost_per_1k:
+      input: 0.0
+      output: 0.0
+
+  # Disable all cloud agents
+  claude:
+    enabled: false
+  claude-sonnet:
+    enabled: false
+  claude-opus:
+    enabled: false
+  claude-haiku:
+    enabled: false
+  gemini:
+    enabled: false
+  gemini-2.5-pro:
+    enabled: false
+  gemini-2.5-flash:
+    enabled: false
+  gemini-3-pro:
+    enabled: false
+  codex:
+    enabled: false
+  gpt-5.2-medium:
+    enabled: false
+  gpt-5.2-high:
+    enabled: false
+  groq-llama-70b:
+    enabled: false
+  groq-llama-8b:
+    enabled: false
+  groq-mixtral:
+    enabled: false
+
+# ============================================================================
+# PERSONA DEFINITIONS
+# ============================================================================
+
+personas:
+  story-reviewer: prompts/story_reviewer_persona.md
+  story-processor: prompts/story_processor_persona.md
+  writer: prompts/writer_persona.md
+  auditor: prompts/auditor_persona.md
+  synthesizer: prompts/synthesizer_persona.md
+
+# ============================================================================
+# STATE MACHINE
+# ============================================================================
+#
+# Flow:
+#   start -> story-review -> story-process -> draft -> cross-audit ->
+#   synthesize -> final-audit -> human-approval -> complete
+#
+# Story review can loop back for more details:
+#   story-review -> (retry) -> story-feedback -> story-review
+#
+
+states:
+  start:
+    type: initial
+    next: story-review
+
+  # --------------------------------------------------------------------------
+  # PHASE 1: Story Review & Processing
+  # --------------------------------------------------------------------------
+
+  story-review:
+    type: single
+    description: "Review raw story for completeness - ask questions if needed"
+    agent: ollama-llama-8b
+    persona: story-reviewer
+    input: "workflow/input/story_input.md"
+    output: "workflow/review/review_result.json"
+    output_type: review
+    transitions:
+      proceed: story-process
+      retry: story-feedback
+      halt: halt
+
+  story-feedback:
+    type: human-approval
+    description: "Get more details from user based on reviewer questions"
+    input: "workflow/review/review_result.json"
+    prompt: |
+      The reviewer has questions about your story.
+      Review the feedback above and either:
+      - Type 'proceed' to continue with what you have
+      - Type 'abort' to cancel
+      - Provide the requested details to strengthen your story
+    transitions:
+      approved: story-process
+      feedback: story-review
+      abort: halt
+
+  story-process:
+    type: single
+    description: "Extract 5 elements, determine shape, create processed template"
+    agent: ollama-llama-8b
+    persona: story-processor
+    input: "workflow/input/story_input.md"
+    output: "workflow/processed/processed_story.md"
+    output_type: processed
+    transitions:
+      success: draft
+      failure: story-review
+
+  # --------------------------------------------------------------------------
+  # PHASE 2: Post Drafting
+  # --------------------------------------------------------------------------
+
+  draft:
+    type: fan-out
+    description: "Generate post drafts from processed story"
+    agents: [ollama-llama-8b, ollama-mistral, ollama-llama-3b]
+    persona: writer
+    input: "workflow/processed/processed_story.md"
+    output: "workflow/drafts/{agent}_draft.md"
+    output_type: draft
+    transitions:
+      all_success: cross-audit
+      partial_success: cross-audit
+      all_failure: halt
+
+  # --------------------------------------------------------------------------
+  # PHASE 3: Auditing & Synthesis
+  # --------------------------------------------------------------------------
+
+  cross-audit:
+    type: fan-out
+    description: "Each agent audits all drafts against source material"
+    agents: [ollama-llama-8b, ollama-mistral]
+    persona: auditor
+    input:
+      - "workflow/processed/processed_story.md"
+      - "workflow/input/story_input.md"
+      - "workflow/drafts/*.md"
+    output: "workflow/audits/{agent}_audit.json"
+    output_type: audit
+    transitions:
+      all_success: synthesize
+      partial_success: synthesize
+      all_failure: draft
+
+  synthesize:
+    type: orchestrator-task
+    description: "Combine best elements from drafts based on audits"
+    agent: ollama-llama-8b
+    persona: synthesizer
+    input:
+      - "workflow/drafts/*.md"
+      - "workflow/audits/*.json"
+    output: "workflow/final/final_post.md"
+    output_type: final
+    transitions:
+      success: final-audit
+      failure: cross-audit
+
+  # --------------------------------------------------------------------------
+  # PHASE 4: Final Review & Approval
+  # --------------------------------------------------------------------------
+
+  final-audit:
+    type: fan-out
+    description: "Final quality check on synthesized post against source"
+    agents: [ollama-llama-8b, ollama-mistral]
+    persona: auditor
+    input:
+      - "workflow/processed/processed_story.md"
+      - "workflow/input/story_input.md"
+      - "workflow/final/final_post.md"
+    output: "workflow/final/{agent}_final_audit.json"
+    output_type: final_audit
+    transitions:
+      all_success: human-approval
+      partial_success: human-approval
+      all_failure: synthesize
+
+  human-approval:
+    type: human-approval
+    description: "Human reviews and approves final post"
+    input: "workflow/final/final_post.md"
+    prompt: |
+      Review the final post above.
+      - Type 'approved' to complete the workflow
+      - Type 'abort' to cancel
+      - Provide feedback to revise the post
+    transitions:
+      approved: complete
+      feedback: synthesize
+      abort: halt
+
+  # --------------------------------------------------------------------------
+  # Terminal States
+  # --------------------------------------------------------------------------
+
+  complete:
+    type: terminal
+    on_enter:
+      - log: "Workflow complete - post ready for publishing"
+
+  halt:
+    type: terminal
+    error: true
+    on_enter:
+      - log: "Workflow halted"
+
+# ============================================================================
+# CIRCUIT BREAKER
+# ============================================================================
+
+circuit_breaker:
+  rules:
+    - name: state_visit_limit
+      limit: 3
+    - name: cycle_detection
+    - name: transition_limit
+      limit: 20
+    - name: timeout
+      seconds: 3600  # Longer timeout for local models
+    - name: cost_limit
+      limit: 0.00  # No cost for local
+
+  safety_limits:
+    max_transitions_hard: 50
+    max_runtime_hard: 7200  # 2 hours for local
+    max_cost_hard: 0.00
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+
+logging:
+  enabled: true
+  runs_dir: "workflow/runs"
+
+  capture:
+    prompts: true
+    input_content: true
+    output_content: true
+    tokens: true
+
+  summaries:
+    generate_markdown: true
+    include_previews: true
+    include_scores: true
+    include_token_summary: true
+
+# ============================================================================
+# SETTINGS
+# ============================================================================
+
+settings:
+  working_dir: "workflow"
+  parallel_fanout: false  # Sequential for local (resource constraints)
+  timeout_per_agent: 600  # Longer timeout for local models
+  retry_count: 2
