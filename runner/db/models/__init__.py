@@ -140,10 +140,16 @@ from runner.db.models.whitelabel import (
     WhitelabelAsset, WhitelabelAssetCreate, WhitelabelAssetRead,
 )
 
-# Audit models (Phase 11)
+# Audit models (Phase 10)
 from runner.db.models.audit import (
     AuditAction,
     AuditLog, AuditLogCreate, AuditLogRead,
+)
+
+# Workflow Config models (Phase 11)
+from runner.db.models.workflow_config import (
+    WorkflowEnvironment,
+    WorkflowConfig, WorkflowConfigCreate, WorkflowConfigRead, WorkflowConfigUpdate,
 )
 
 # Market Intelligence models (Phase 13)
@@ -248,9 +254,12 @@ __all__ = [
     "AssetType", "DomainVerificationStatus",
     "WhitelabelConfig", "WhitelabelConfigCreate", "WhitelabelConfigRead",
     "WhitelabelAsset", "WhitelabelAssetCreate", "WhitelabelAssetRead",
-    # Audit (Phase 11)
+    # Audit (Phase 10)
     "AuditAction",
     "AuditLog", "AuditLogCreate", "AuditLogRead",
+    # Workflow Config (Phase 11)
+    "WorkflowEnvironment",
+    "WorkflowConfig", "WorkflowConfigCreate", "WorkflowConfigRead", "WorkflowConfigUpdate",
     # Market Intelligence (Phase 13)
     "EmbeddingSourceType", "ResearchSourceType", "ContentStatus", "ModerationStatus", "ModerationType",
     "Embedding", "EmbeddingCreate",
