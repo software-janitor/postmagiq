@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 
 from api.routes import runs, workflow, config, ws, eval, posts, content, onboarding, voice, finished_posts, image_prompts, image_config, ai_assistant, platforms, analytics, watermark, workflow_personas, characters, auth, health, portal, workflow_configs
-from api.routes.v1 import workspaces_router, content_router, usage_router, billing_router, webhook_router, approvals_router, notifications_router, api_keys_router, webhooks_router, audit_router, domains_router, privacy_router, voice_profiles_router, voice_router
+from api.routes.v1 import workspaces_router, content_router, usage_router, billing_router, webhook_router, approvals_router, notifications_router, api_keys_router, webhooks_router, audit_router, domains_router, privacy_router, voice_profiles_router, voice_router, onboarding_router, finished_posts_router
 from api.middleware import (
     UsageEnforcementMiddleware,
     MetricsMiddleware,
@@ -100,6 +100,8 @@ app.include_router(domains_router, prefix="/api", tags=["domains"])
 app.include_router(privacy_router, prefix="/api", tags=["privacy"])
 app.include_router(voice_profiles_router, prefix="/api", tags=["voice-profiles"])
 app.include_router(voice_router, prefix="/api", tags=["voice"])
+app.include_router(onboarding_router, prefix="/api", tags=["onboarding-v1"])
+app.include_router(finished_posts_router, prefix="/api", tags=["finished-posts-v1"])
 
 # Client portal routes (public login + authenticated review)
 app.include_router(portal.router, prefix="/api", tags=["portal"])

@@ -397,6 +397,80 @@ class ContentService:
                 "posts_deleted": len(posts),
             }
 
+    def get_goal_for_workspace(self, workspace_id: UUID) -> Optional[dict]:
+        """Get the goal for a workspace."""
+        with get_session() as session:
+            repo = GoalRepository(session)
+            goal = repo.get_by_workspace(workspace_id)
+            if not goal:
+                return None
+            return {
+                "id": str(goal.id),
+                "strategy_type": goal.strategy_type or "series",
+                "voice_profile_id": _uuid_to_str(goal.voice_profile_id),
+                "image_config_set_id": _uuid_to_str(goal.image_config_set_id),
+                "positioning": goal.positioning,
+                "signature_thesis": goal.signature_thesis,
+                "target_audience": goal.target_audience,
+                "content_style": goal.content_style,
+                "onboarding_mode": goal.onboarding_mode,
+            }
+
+    def get_chapters_for_workspace(self, workspace_id: UUID) -> list[dict]:
+        """Get all chapters for a workspace with post counts."""
+        with get_session() as session:
+            chapter_repo = ChapterRepository(session)
+            post_repo = PostRepository(session)
+            chapters = chapter_repo.list_by_workspace(workspace_id)
+            posts = post_repo.list_by_workspace(workspace_id)
+            post_counts = {}
+            completed_counts = {}
+            for post in posts:
+                post_counts[post.chapter_id] = post_counts.get(post.chapter_id, 0) + 1
+                if post.status in ("ready", "published"):
+                    completed_counts[post.chapter_id] = completed_counts.get(post.chapter_id, 0) + 1
+            result = []
+            for chapter in chapters:
+                result.append({
+                    "id": str(chapter.id),
+                    "chapter_number": chapter.chapter_number,
+                    "title": chapter.title,
+                    "description": chapter.description,
+                    "theme": chapter.theme,
+                    "theme_description": chapter.theme_description,
+                    "weeks_start": chapter.weeks_start,
+                    "weeks_end": chapter.weeks_end,
+                    "post_count": post_counts.get(chapter.id, 0),
+                    "completed_count": completed_counts.get(chapter.id, 0),
+                })
+            return result
+
+    def delete_strategy_for_workspace(self, workspace_id: UUID) -> dict:
+        """Delete strategy (goal, chapters, posts) for a workspace."""
+        with get_session() as session:
+            goal_repo = GoalRepository(session)
+            chapter_repo = ChapterRepository(session)
+            post_repo = PostRepository(session)
+
+            goal = goal_repo.get_by_workspace(workspace_id)
+            chapters = chapter_repo.list_by_workspace(workspace_id)
+            chapter_ids = [c.id for c in chapters]
+            posts = post_repo.list_by_workspace(workspace_id)
+
+            for post in posts:
+                session.delete(post)
+            for chapter in chapters:
+                session.delete(chapter)
+            if goal:
+                session.delete(goal)
+            session.commit()
+
+            return {
+                "goal_id": str(goal.id) if goal else None,
+                "chapters_deleted": len(chapter_ids),
+                "posts_deleted": len(posts),
+            }
+
     # =========================================================================
     # Chapter Operations
     # =========================================================================
