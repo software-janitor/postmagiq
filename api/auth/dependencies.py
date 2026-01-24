@@ -12,9 +12,9 @@ from uuid import UUID
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from api.auth.jwt import verify_token
+from api.auth.jwt import verify_token, VALID_ACCESS_TOKEN_TYPES
 from api.auth.scopes import Scope, has_scope
-from runner.db.models import User, WorkspaceMembership, WorkspaceRole
+from runner.db.models import User, UserRole, WorkspaceMembership, WorkspaceRole
 
 
 # Security scheme for JWT Bearer tokens
@@ -96,6 +96,15 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Validate token type - only access tokens allowed for API routes
+    token_type = payload.get("type", "access")
+    if token_type not in VALID_ACCESS_TOKEN_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token type for this endpoint",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     # Get user_id from token
     user_id_str = payload.get("sub")
     if not user_id_str:
@@ -124,6 +133,14 @@ async def get_current_user(
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="User not found",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        # Check if user account is active
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User account is deactivated",
                 headers={"WWW-Authenticate": "Bearer"},
             )
 
@@ -230,3 +247,30 @@ def require_all_scopes(*scopes: Scope) -> Callable:
         return current_user
 
     return scope_checker
+
+
+def require_owner_role() -> Callable:
+    """Create a dependency that requires owner role.
+
+    Use for internal/admin endpoints that should only be accessible
+    to SaaS owners (e.g., workflow_personas, config management).
+
+    Returns:
+        A FastAPI dependency that returns CurrentUser if owner
+
+    Raises:
+        HTTPException 401: Not authenticated
+        HTTPException 403: Not an owner
+    """
+
+    async def owner_checker(
+        current_user: CurrentUser = Depends(get_current_user),
+    ) -> CurrentUser:
+        if current_user.user.role != UserRole.owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Owner access required",
+            )
+        return current_user
+
+    return owner_checker

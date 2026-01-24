@@ -17,7 +17,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 revision = 'phase13_market_intel'
-down_revision = '009_voice_profiles_modular'
+down_revision = '20260123_workspace_workflow'  # Moved after MVP migrations
 branch_labels = None
 depends_on = None
 

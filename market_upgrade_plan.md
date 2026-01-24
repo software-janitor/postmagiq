@@ -1859,7 +1859,7 @@ def generate_audience_insights(business_description, niche):
 | **Error Handling** | Created `runner/resilience/` module with retry policies (exponential backoff), model fallback chains (Opus→Sonnet→GPT-4o), rate limiting (token bucket), and budget enforcement ($5/day default). |
 | **Observability** | Created `runner/observability/` module with structured logging (structlog), latency tracking (p50/p95/p99), cost tracking per model, and quality drift detection. |
 | **History Tracking** | HistoryService + SQLModel queries/eval in use; legacy HistoryDatabase removed. |
-| **Legacy SQLite Removal** | Removed ContentDatabase/HistoryDatabase and migrated callers to SQLModel services. |
+| **Legacy DB Removal** | Removed ContentDatabase/HistoryDatabase and migrated callers to SQLModel services. |
 | **Plan Updates** | Documented agent consolidation (11→8), removed Reddit scraping approach, added character consent strategy. |
 
 ### What Was NOT Done ❌
@@ -1886,20 +1886,20 @@ Content Database             ████████████ 100% (legacy m
 
 ### Audit Corrections / Gaps Found (Status)
 
-1. ✅ **Schema mismatch:** `runner/db/models/market_intelligence.py` now aligns with `runner/db/migrations/versions/20260116_phase13_market_intelligence.py` using SQLite-safe custom types.
+1. ✅ **Schema mismatch:** `runner/db/models/market_intelligence.py` now aligns with `runner/db/migrations/versions/20260116_phase13_market_intelligence.py` using dialect-safe custom types.
 2. ✅ **Vector storage mismatch:** added migration to upgrade embeddings to `vector(1536)` + ivfflat index.
 3. ✅ **Docker/API deps gap:** `requirements-api.txt` now includes `pgvector`, `redis`, `tiktoken`, `structlog`.
-4. ✅ **Legacy persistence removed:** runner/state_machine now uses SQLModel services, eval queries use SQLModel, legacy SQLite history/content modules deleted.
+4. ✅ **Legacy persistence removed:** runner/state_machine now uses SQLModel services, eval queries use SQLModel, legacy history/content modules deleted.
 5. ✅ **Doc drift:** "Files Modified" now references `tests/unit/test_health.py`.
 6. ✅ **Resilience edge cases:** fixed rate limiter acquire API and fallback degraded flag.
 
 ### Gap Closure Checklist (Post-Audit)
 
-- [x] Align market intelligence SQLModel models with the Alembic schema (SQLite-safe types).
+- [x] Align market intelligence SQLModel models with the Alembic schema (dialect-safe types).
 - [x] Upgrade embeddings to `vector(1536)` + ivfflat index as defined in the plan.
 - [x] Add missing API/runtime deps to `requirements-api.txt` for Docker builds.
 - [x] Migrate runner and state_machine off `ContentDatabase` (use SQLModel services).
-- [x] Swap history queries/eval to SQLModel and delete legacy SQLite history code.
+- [x] Swap history queries/eval to SQLModel and delete legacy history code.
 - [x] Fix resilience module edge cases (rate limiter acquire API, fallback degraded flag) and add tests.
 - [x] Update plan schema snippets to use `workspace_id` consistently (replace legacy `brand_id` references).
 
@@ -1914,7 +1914,7 @@ Content Database             ████████████ 100% (legacy m
 | **pgvector support** | `docker-compose.yml` | Changed postgres image to `pgvector/pgvector:pg16` |
 | **Redis service** | `docker-compose.yml` | Added Redis 7 with persistence |
 | **New dependencies** | `pyproject.toml`, `requirements-api.txt` | Added `pgvector>=0.3.0`, `redis>=5.0.0`, `tiktoken>=0.7.0`, `structlog>=24.0.0` |
-| **Market intelligence models** | `runner/db/models/market_intelligence.py` | SQLModel tables aligned to migration via SQLite-safe types |
+| **Market intelligence models** | `runner/db/models/market_intelligence.py` | SQLModel tables aligned to migration via dialect-safe types |
 | **Alembic migration** | `runner/db/migrations/versions/20260116_phase13_market_intelligence.py` | Creates pgvector extension and all new tables |
 | **Embeddings vector upgrade** | `runner/db/migrations/versions/20260116_phase13_embeddings_vector.py` | Converts embeddings to `vector(1536)` and adds ivfflat index |
 | **Remove USE_SQLMODEL flag** | `runner/config.py`, `runner/db/engine.py`, tests, scripts | PostgreSQL is now always used (no conditional logic) |
@@ -1987,7 +1987,7 @@ tests/unit/test_resilience.py # New tests for resilience fixes
 ### 🔧 Configuration Changes
 
 **Database:**
-- PostgreSQL is now the only database backend (no more SQLite option)
+- PostgreSQL is now the only database backend
 - pgvector extension enabled for vector similarity search
 - Connection pooling via PgBouncer (already configured)
 
@@ -2030,8 +2030,5 @@ Claude Opus → Claude Sonnet → GPT-4o → GPT-4o-mini
 1. Run `alembic upgrade head` to create new tables
 2. Start PostgreSQL with pgvector: `docker-compose up postgres`
 3. Start Redis: `docker-compose up redis`
-4. Legacy SQLite files still exist but are deprecated
-
 **Breaking changes:**
 - `USE_SQLMODEL` no longer supported - always uses PostgreSQL
-- Legacy routes (`/voice/*`) still use SQLite until migrated

@@ -5,7 +5,7 @@ import importlib
 
 import pytest
 from sqlalchemy.exc import IntegrityError
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel
 from runner.db.models import (
     User,
     RunRecord as DbRunRecord,
@@ -22,6 +22,9 @@ from runner.history.models import (
 from runner.history.queries import HistoryQueries
 from runner.history.service import HistoryService
 
+from tests.db_utils import create_test_engine, drop_test_schema, requires_db
+
+pytestmark = requires_db  # Skip all tests in this module if DB not available
 
 db_engine = importlib.import_module("runner.db.engine")
 history_service_module = importlib.import_module("runner.history.service")
@@ -37,17 +40,15 @@ HISTORY_TABLES = [
 
 @pytest.fixture
 def history_engine(monkeypatch):
-    """Create a SQLite engine with just the history tables."""
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-    )
+    """Create a PostgreSQL engine with just the history tables."""
+    engine, schema_name, database_url = create_test_engine()
     SQLModel.metadata.create_all(engine, tables=HISTORY_TABLES)
     monkeypatch.setattr(db_engine, "engine", engine)
     monkeypatch.setattr(history_service_module, "engine", engine)
     yield engine
     SQLModel.metadata.drop_all(engine, tables=HISTORY_TABLES)
     engine.dispose()
+    drop_test_schema(database_url, schema_name)
 
 
 @pytest.fixture

@@ -1,7 +1,7 @@
 """Add user role column for feature flags.
 
 Revision ID: 009_user_role
-Revises: phase13_embeddings_vector
+Revises: 009_voice_profiles_modular
 Create Date: 2026-01-17
 
 Adds:
@@ -15,7 +15,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = '009_user_role'
-down_revision = 'phase13_embeddings_vector'
+down_revision = '009_voice_profiles_modular'
 branch_labels = None
 depends_on = None
 

@@ -346,6 +346,7 @@ class WebhookService:
         error_message: str,
     ) -> None:
         """Handle a failed delivery attempt."""
+        delivery.attempt_number += 1
         delivery.error_message = error_message
 
         if delivery.attempt_number < webhook.max_retries:

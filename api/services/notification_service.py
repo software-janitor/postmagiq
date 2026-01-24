@@ -310,7 +310,7 @@ class NotificationService:
             resource_id=resource_id,
             data=json.dumps(data) if data else None,
             delivered_via=json.dumps(delivered_channels) if delivered_channels else None,
-            delivered_at=datetime.utcnow() if delivered_channels else None,
+            # Note: delivered_at is set later when delivery is actually confirmed
         )
         session.add(notification)
         session.commit()
