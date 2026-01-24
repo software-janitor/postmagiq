@@ -1,13 +1,15 @@
-import { useQuery } from '@tanstack/react-query'
-import { CreditCard, Check, Zap } from 'lucide-react'
+import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { CreditCard, Check, Zap, Settings2 } from 'lucide-react'
 import { clsx } from 'clsx'
-import { apiGet } from '../api/client'
+import { apiGet, apiPost } from '../api/client'
 import { useWorkspaceStore } from '../stores/workspaceStore'
 import { useThemeClasses } from '../hooks/useThemeClasses'
 import { useEffectiveFlags } from '../stores/flagsStore'
 import UsageBar from '../components/UsageBar'
 import BillingSection from '../components/BillingSection'
 import NotificationSettings from '../components/NotificationSettings'
+import WorkflowConfigSelector from '../components/WorkflowConfigSelector'
 
 interface UsageSummary {
   period_start: string
@@ -38,7 +40,10 @@ interface Tier {
 export default function Settings() {
   const theme = useThemeClasses()
   const flags = useEffectiveFlags()
-  const { currentWorkspaceId } = useWorkspaceStore()
+  const { currentWorkspaceId, currentRole } = useWorkspaceStore()
+  const [selectedWorkflowConfig, setSelectedWorkflowConfig] = useState<string | null>(null)
+
+  const canChangeWorkflowConfig = currentRole === 'owner' || currentRole === 'admin'
 
   const { data: usage, isLoading: usageLoading } = useQuery({
     queryKey: ['usage', currentWorkspaceId],
@@ -212,6 +217,35 @@ export default function Settings() {
 
       {/* Notification Preferences */}
       <NotificationSettings />
+
+      {/* Workflow Configuration */}
+      <div className="bg-zinc-900 rounded-lg border border-zinc-800">
+        <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
+          <Settings2 className={clsx('w-5 h-5', theme.iconPrimary)} />
+          <h2 className="text-lg font-semibold text-white">Workflow Configuration</h2>
+        </div>
+        <div className="p-4 space-y-4">
+          <div>
+            <label className="block text-sm text-zinc-400 mb-2">
+              Default Workflow Config
+            </label>
+            <p className="text-sm text-zinc-500 mb-3">
+              Select the default workflow configuration for this workspace. This determines which AI models and settings are used when running workflows.
+            </p>
+            {canChangeWorkflowConfig ? (
+              <WorkflowConfigSelector
+                value={selectedWorkflowConfig}
+                onChange={setSelectedWorkflowConfig}
+                className="w-full max-w-md"
+              />
+            ) : (
+              <div className="text-sm text-zinc-500">
+                Only workspace owners and admins can change the workflow configuration.
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
       {/* Agents */}
       <div className="bg-slate-800 rounded-lg border border-slate-700">

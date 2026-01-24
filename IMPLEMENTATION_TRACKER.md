@@ -18,7 +18,7 @@ Multi-tenancy implementation tracking for Postmagiq. Reference: `MULTI_TENANCY_P
 | Phase 8 | API Keys & Webhooks | Week 14 | 🟢 Complete | Claude |
 | Phase 9 | White-labeling | Week 15-16 | 🟢 Complete | Claude |
 | Phase 10 | Polish & Launch | Week 17-18 | 🟡 In Progress | Claude |
-| Phase 11 | Dynamic Workflow Configuration | Week 19 | 🟡 In Progress | Claude |
+| Phase 11 | Dynamic Workflow Configuration | Week 19 | 🟢 Complete | Claude |
 
 Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 
@@ -530,7 +530,7 @@ Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 - [x] Implement `get_by_slug(slug)`
 - [x] Implement `get(id)`
 - [x] Implement `upsert(slug, config)`
-- [ ] Add unit tests
+- [x] Add unit tests (tests/unit/test_workflow_config.py)
 
 ### 11.11 WorkflowConfig API Endpoints
 - [x] Create `api/routes/workflow_configs.py`
@@ -549,13 +549,13 @@ Legend: 🔴 Not Started | 🟡 In Progress | 🟢 Complete | ⏸️ Blocked
 - [x] Add API client functions for workflow configs (`gui/src/api/workflow.ts`)
 - [x] Create WorkflowConfigSelector component
 - [x] Add to LiveWorkflow page (integrated into workflow start flow)
-- [ ] Add to Settings page for default selection
-- [ ] Only owner/admin can change (settings page)
+- [x] Add to Settings page for default selection
+- [x] Only owner/admin can change (settings page)
 
 ### 11.14 Deployment Configuration
-- [ ] Add `DEPLOYMENT_ENV` to docker-compose.yml
-- [ ] Document in `.env.example`
-- [ ] Ensure `make sync-workflows` runs on deploy
+- [x] Add `DEPLOYMENT_ENV` to docker-compose.yml
+- [x] Document in `.env.example`
+- [ ] Ensure `make sync-workflows` runs on deploy (add to deploy scripts)
 
 ---
 
