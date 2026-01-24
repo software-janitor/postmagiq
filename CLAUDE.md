@@ -30,8 +30,7 @@ Make the smallest possible changes that achieve the specific requirement, using 
 - Create branch automatically at start of work (don't ask)
 - Commit at checkpoints automatically (don't ask)
 - After tests pass: push and create PR using `make pr` (don't ask)
-- **ALWAYS use `make pr`** - it filters self-attribution patterns automatically
-
+- **ALWAYS use `make pr`** - it filters self-attribution patterns automatica
 ### Task Completion Checklist (MANDATORY)
 
 Before moving on, verify ALL:

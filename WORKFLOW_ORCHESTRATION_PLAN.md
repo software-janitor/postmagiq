@@ -604,10 +604,10 @@ linkedin_articles/
 │   │   ├── agent_logger.py           # Agent invocations
 │   │   └── summary_generator.py      # Human-readable summaries
 │   │
-│   ├── history/                      # Historical tracking
+│   ├── history/                      # Historical tracking (Postgres-backed)
 │   │   ├── __init__.py
-│   │   ├── database.py               # SQLite operations
 │   │   ├── queries.py                # Evaluation queries
+│   │   ├── service.py                # Query helpers
 │   │   └── eval.py                   # CLI for evaluation
 │   │
 │   └── mcp/                          # MCP layer (future)
@@ -628,7 +628,7 @@ linkedin_articles/
 │   ├── final/                        # Final post + audits
 │   ├── analysis/                     # Final analysis
 │   ├── sessions/                     # Ollama session files (JSON)
-│   ├── history/                      # SQLite database for tracking
+│   ├── history/                      # Historical tracking artifacts
 │   └── runs/                         # Historical run logs
 │       └── 2026-01-07_143022_post03/
 │           ├── run_manifest.yaml
@@ -2245,7 +2245,7 @@ All existing state machine logic, plus orchestrator consultation at checkpoints.
 - [ ] Any MCP-compatible agent can orchestrate
 
 ### Completed (Phase 11-12, 14-15):
-- [x] Historical tracking with SQLite database
+- [x] Historical tracking with database-backed store
 - [x] Evaluation queries + CLI (`make eval-*`)
 - [x] Ollama works with GPU-aware model selection
 - [x] File-based sessions work for Ollama
@@ -2278,7 +2278,6 @@ Track performance across all runs over time to:
 ```
 workflow/
 └── history/
-    ├── runs.db                     # SQLite database
     ├── runs_index.jsonl            # Flat file backup
     └── exports/                    # CSV/JSON exports for analysis
 ```
@@ -2364,8 +2363,8 @@ CREATE TABLE post_iterations (
 # runner/history/queries.py
 
 class HistoryQueries:
-    def __init__(self, db_path: str):
-        self.conn = sqlite3.connect(db_path)
+    def __init__(self, db_url: str):
+        self.conn = psycopg.connect(db_url)
 
     def agent_performance_over_time(self, agent: str) -> pd.DataFrame:
         """Track an agent's audit scores over time"""
@@ -2952,7 +2951,7 @@ This section documents architectural improvements deferred for Phase 2+. The cur
 | **Observability** | JSONL files | OpenTelemetry / LangSmith | Visual traces, latency waterfall, cost tracking |
 | **Orchestration** | Custom state machine | Temporal / Dagster | Durable workflows, built-in retries, persistence |
 | **Queue** | subprocess | Redis/RQ or Celery | Horizontal scaling, health checks, task routing |
-| **Database** | SQLite | DuckDB / TimescaleDB | Faster analytics queries, better time-series support |
+| **Database** | PostgreSQL | DuckDB / TimescaleDB | Faster analytics queries, better time-series support |
 
 ### Why CLI-Based for Now
 
@@ -3044,7 +3043,7 @@ with tracer.start_as_current_span("execute_state") as span:
 ### DuckDB for Analytics
 
 ```sql
--- Current: SQLite with pandas
+-- Current: PostgreSQL with pandas
 -- Works but slow for large datasets
 
 -- Future: DuckDB (columnar, fast analytics)

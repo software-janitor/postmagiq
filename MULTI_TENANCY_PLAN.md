@@ -282,48 +282,6 @@ The board will visualize `Posts` as cards moving through lifecycle stages (Swiml
 *   **Library:** `@dnd-kit/core` or `react-beautiful-dnd` for smooth interactions.
 *   **Design:** Professional "Postmagiq" aesthetic (Slate/Indigo), maximizing screen real estate for the columns.
 
-## 11. Database Migration (SQLite to PostgreSQL)
-
-To support concurrent users, UUIDs, and the robust locking required for multi-tenancy, we will migrate from SQLite to **PostgreSQL**.
-
-**Mandate:** SQLite will be deprecated. The application will strictly require a Dockerized environment to run.
-
-### 11.1 Infrastructure Changes
-*   **Docker Compose:**
-    *   Add a `postgres` service (v16+) to `docker-compose.yml`.
-    *   Configure persistent volumes for data safety (`pgdata`).
-    *   Set up environment variables for connection strings (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`).
-*   **Application Config:**
-    *   Update `runner/content/database.py` (and relevant config files) to switch from `sqlite://` to `postgresql+asyncpg://`.
-    *   Ensure all database connection logic uses connection pooling (e.g., `SQLAlchemy` pool).
-
-### 11.2 Migration Strategy
-
-**Step 1: Schema Migration (The Structure)**
-*   We will introduce **Alembic** for proper database migrations.
-*   Generate an initial migration script that matches the *current* SQLite schema but adapted for Postgres (e.g., proper Enum types, Boolean fields).
-*   Generate a second migration script for the *new* Multi-Tenancy schema (UUIDs, Workspaces table, etc.).
-
-**Step 2: Data Transfer (The Content)**
-*   Since UUIDs are being introduced simultaneously, direct replication is not possible.
-*   **Script:** `scripts/migrate_sqlite_to_pg.py`
-    1.  Connect to both the old SQLite DB file and the new Postgres instance.
-    2.  Read all rows from SQLite.
-    3.  **Transform:**
-        *   Generate new UUIDs for every record.
-        *   Map old integer IDs to new UUIDs in memory to preserve foreign key relationships (e.g., maintain `Chapter -> Post` links).
-        *   Assign all migrated data to a newly created "Legacy/Default Workspace".
-    4.  **Load:** Bulk insert the transformed data into Postgres.
-
-### 11.3 Validation & Cutover
-1.  **Dry Run:** Run the migration script against a copy of production data.
-2.  **Verify:** Check record counts and integrity (e.g., "Do all posts still belong to the correct chapters?").
-3.  **Cutover:**
-    *   Stop the API.
-    *   Run the final migration.
-    *   Update config to point to Postgres.
-    *   Restart API.
-
 ## 12. Subscription Tiers & Pricing Model
 
 To support Individual, Team, and Agency customer segments with differentiated features and limits.
@@ -1136,9 +1094,8 @@ runner/agents/
 
 ### Phase 0B: SQLModel + PostgreSQL Foundation (Prerequisite)
 
-**Goal:** Replace SQLite + raw SQL with PostgreSQL + SQLModel ORM. Required for UUID PKs, proper locking, and multi-tenancy.
+**Goal:** PostgreSQL + SQLModel ORM baseline. Required for UUID PKs, proper locking, and multi-tenancy.
 
-**Current:** SQLite + raw SQL + INTEGER PKs + 42 tables
 **Target:** PostgreSQL + SQLModel ORM + UUID PKs + Alembic migrations
 
 **Tasks:**
@@ -1158,8 +1115,7 @@ runner/agents/
   - `runner/models/character.py` (Character, Outfit, etc.)
   - `runner/models/analytics.py` (AnalyticsImport, PostMetric, etc.)
 - [ ] Create `runner/content/repository.py` (SQLModel query layer)
-- [ ] Create `scripts/migrate_sqlite_to_postgres.py` (data migration with UUID mapping)
-- [ ] Update ContentService for dual-backend support (USE_SQLMODEL flag)
+- [ ] Update ContentService to use SQLModel-backed repositories
 - [ ] Add Makefile commands (db-up, db-migrate, db-rollback, db-revision)
 - [ ] Add SQLModel unit tests
 
@@ -1187,8 +1143,7 @@ runner/
 │   ├── analytics.py
 │   └── history.py
 └── content/
-    ├── database.py            # KEEP during migration (existing SQLite)
-    └── repository.py          # NEW: SQLModel-based queries
+    └── repository.py          # SQLModel-based queries
 ```
 
 **Docker Compose Addition:**
@@ -2257,139 +2212,6 @@ class EmailService:
 | Remove "Powered by Postmagiq" | No | No | Yes |
 
 ## 32. Unified Migration Strategy
-
-### 32.1 Problem: Conflicting Migration Paths
-
-The original plan described two migrations:
-1. Section 2.2.5: In-place UUID conversion
-2. Section 11: SQLite → Postgres copy with UUID regeneration
-
-These conflict and could corrupt data. This section replaces both with a unified strategy.
-
-### 32.2 Single Migration Path
-
-```
-┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│   SQLite    │ ──▶ │  Transform  │ ──▶ │  Postgres   │
-│  (INTEGER)  │     │   Script    │     │   (UUID)    │
-└─────────────┘     └─────────────┘     └─────────────┘
-```
-
-**There is ONE migration, not two.**
-
-### 32.3 Migration Script
-
-```python
-# scripts/migrate_to_postgres.py
-
-"""
-Unified migration: SQLite (INTEGER PKs) → Postgres (UUID PKs)
-
-This script:
-1. Reads all data from SQLite
-2. Generates UUIDs for all records
-3. Maintains relationship mappings (old INT → new UUID)
-4. Creates default workspace for existing data
-5. Writes to Postgres with new UUIDs
-6. Verifies data integrity
-"""
-
-import sqlite3
-import asyncpg
-from uuid import uuid4
-
-class Migration:
-    def __init__(self, sqlite_path: str, postgres_url: str):
-        self.id_map: dict[str, dict[int, UUID]] = {}  # table -> old_id -> new_uuid
-
-    async def run(self):
-        # Phase 1: Read SQLite, generate UUID mappings
-        await self.read_and_map_ids()
-
-        # Phase 2: Create Postgres schema (Alembic)
-        await self.create_schema()
-
-        # Phase 3: Create default workspace
-        default_workspace_id = await self.create_default_workspace()
-
-        # Phase 4: Migrate data with UUID substitution
-        await self.migrate_data(default_workspace_id)
-
-        # Phase 5: Verify integrity
-        await self.verify()
-
-    async def read_and_map_ids(self):
-        """Generate UUIDs for every existing record."""
-        tables = ['goals', 'chapters', 'posts', 'runs', 'post_analytics']
-
-        for table in tables:
-            self.id_map[table] = {}
-            rows = self.sqlite.execute(f"SELECT id FROM {table}").fetchall()
-            for (old_id,) in rows:
-                self.id_map[table][old_id] = uuid4()
-
-    async def migrate_data(self, workspace_id: UUID):
-        """Copy data with UUID substitution."""
-        # Example: posts table
-        posts = self.sqlite.execute("SELECT * FROM posts").fetchall()
-
-        for post in posts:
-            new_id = self.id_map['posts'][post['id']]
-            new_chapter_id = self.id_map['chapters'][post['chapter_id']]
-
-            await self.postgres.execute("""
-                INSERT INTO posts (id, workspace_id, chapter_id, topic, status, ...)
-                VALUES ($1, $2, $3, $4, $5, ...)
-            """, new_id, workspace_id, new_chapter_id, post['topic'], post['status'])
-
-    async def verify(self):
-        """Verify record counts and relationships."""
-        for table in self.id_map:
-            sqlite_count = self.sqlite.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-            pg_count = await self.postgres.fetchval(f"SELECT COUNT(*) FROM {table}")
-            assert sqlite_count == pg_count, f"Count mismatch in {table}"
-
-        # Verify FK relationships
-        orphan_posts = await self.postgres.fetchval("""
-            SELECT COUNT(*) FROM posts p
-            WHERE NOT EXISTS (SELECT 1 FROM chapters c WHERE c.id = p.chapter_id)
-        """)
-        assert orphan_posts == 0, "Orphaned posts found"
-```
-
-### 32.4 Downtime & Rollback Strategy
-
-| Phase | Duration | Rollback |
-|-------|----------|----------|
-| Pre-migration (schema) | 0 | N/A |
-| Stop API | < 1 min | Restart API |
-| Run migration script | 5-30 min | Restore SQLite, restart |
-| Verify integrity | 2-5 min | Restore SQLite, restart |
-| Update config → Postgres | < 1 min | Revert config, restart |
-| Start API | < 1 min | N/A |
-
-**Total downtime:** 10-40 minutes depending on data size.
-
-### 32.5 Rollback Procedure
-
-```bash
-#!/bin/bash
-# scripts/rollback_migration.sh
-
-# 1. Stop API
-docker-compose stop api
-
-# 2. Revert database config
-cp .env.sqlite.backup .env
-
-# 3. Verify SQLite still intact
-sqlite3 data/postmatiq.db "SELECT COUNT(*) FROM posts;"
-
-# 4. Restart API with SQLite
-docker-compose up -d api
-
-echo "Rolled back to SQLite"
-```
 
 ## 33. Workspace Membership (Complete Schema)
 
@@ -3936,8 +3758,7 @@ services:
 - [ ] Create Alembic migration framework
 - [ ] Create `accounts`, `workspaces`, `workspace_memberships` tables
 - [ ] Create `users` table with auth fields
-- [ ] Run unified SQLite → Postgres migration
-- [ ] Verify data integrity post-migration
+- [ ] Verify data integrity
 
 ### Phase 2: Authentication & RBAC (Week 3-4)
 - [ ] Implement JWT auth with `active_sessions`
