@@ -35,6 +35,14 @@ class Workspace(UUIDModel, WorkspaceBase, TimestampMixin, table=True):
     # Owner is the billing owner - there can only be one
     owner_id: UUID = Field(foreign_key="users.id", index=True)
 
+    # Preferred workflow configuration (Phase 11 - Dynamic Workflow Config)
+    # Nullable - if not set, uses system default from registry
+    workflow_config_id: Optional[UUID] = Field(
+        default=None,
+        foreign_key="workflow_configs.id",
+        index=True,
+    )
+
     # JSON settings for workspace-level configuration
     # Example: {"default_platform_id": "...", "features": {...}}
     # Note: Using JSON instead of JSONB for SQLite compatibility in tests.
@@ -49,6 +57,7 @@ class WorkspaceCreate(WorkspaceBase):
     """Schema for creating a new workspace."""
 
     owner_id: UUID
+    workflow_config_id: Optional[UUID] = None
     settings: Optional[dict[str, Any]] = None
 
 
@@ -57,6 +66,7 @@ class WorkspaceRead(WorkspaceBase):
 
     id: UUID
     owner_id: UUID
+    workflow_config_id: Optional[UUID]
     settings: Optional[dict[str, Any]]
     created_at: datetime
     updated_at: Optional[datetime]
