@@ -7,7 +7,7 @@
         coverage logs log-states log-tokens log-summary clean \
         up up-gpu up-cpu down api gui gui-build dev dev-stop restart ollama-pull ollama-list \
         eval-agents eval-costs eval-trend eval-post eval-summary \
-        seed-db seed-db-force seed-voices seed-personas seed-sentiments \
+        seed-db seed-db-force seed-voices seed-personas seed-sentiments sync-workflows \
         db-up db-down db-migrate db-rollback db-revision db-history db-current db-migrate-data db-init db-drop db-shell \
         pr
 
@@ -74,8 +74,9 @@ help:
 	@echo "  make eval-post STORY=post_03   Post iteration history"
 	@echo "  make eval-summary              Weekly summary"
 	@echo ""
-	@echo "Personas:"
+	@echo "Personas & Workflows:"
 	@echo "  make seed-personas             Update system personas from prompts/"
+	@echo "  make sync-workflows            Sync workflow configs to database"
 	@echo ""
 	@echo "PostgreSQL Database (Phase 0B):"
 	@echo "  make db-up                     Start PostgreSQL + PgBouncer"
@@ -372,6 +373,11 @@ eval-summary:
 # Update system personas from prompts/ directory (refreshes content)
 seed-personas:
 	@python3 scripts/seed_personas.py
+
+# Sync workflow configs from registry.yaml to database
+# DEPLOYMENT_ENV can be: production, development, staging
+sync-workflows:
+	@python3 scripts/sync_workflows.py
 
 # ============================================================================
 # POSTGRESQL DATABASE COMMANDS (Phase 0B - Multi-tenancy)
