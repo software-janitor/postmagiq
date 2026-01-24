@@ -1,8 +1,11 @@
 /**
  * API client for onboarding flow
+ *
+ * v1 workspace-scoped routes for multi-tenant strategy builder.
+ * Legacy user-scoped routes are deprecated and will be removed.
  */
 
-import { apiGet, apiPost } from './client'
+import { apiDelete, apiGet, apiPost } from './client'
 import { getCurrentWorkspaceId } from '../stores/workspaceStore'
 
 // =============================================================================
@@ -244,4 +247,139 @@ export async function fetchExistingStrategy(): Promise<ExistingStrategy> {
   } catch {
     return { exists: false }
   }
+}
+
+// =============================================================================
+// v1 Workspace-Scoped API (preferred)
+// =============================================================================
+
+export interface V1ContentStyle {
+  id: string
+  name: string
+  description: string
+}
+
+export interface V1QuickModeRequest {
+  professional_role: string
+  known_for: string
+  target_audience: string
+  content_style: string
+  posts_per_week: number
+}
+
+export interface V1DeepModeMessageRequest {
+  message: string
+  state?: DeepModeState | null
+  force_ready?: boolean
+}
+
+export interface V1DeepModeResponse {
+  message: string
+  state: DeepModeState
+  is_ready: boolean
+}
+
+export interface V1GeneratePlanRequest {
+  content_style: string
+  state: DeepModeState
+}
+
+export interface V1ApprovePlanRequest {
+  plan: GeneratedPlan
+  positioning: string
+  target_audience: string
+  content_style: string
+  onboarding_mode: 'quick' | 'deep' | 'chat'
+  transcript?: string | null
+}
+
+export interface V1ApproveResponse {
+  goal_id: string
+  chapters: string[]
+}
+
+export interface V1StrategyResponse {
+  goal: ExistingGoal | null
+  chapters: ExistingChapter[]
+}
+
+/**
+ * Get available content styles (workspace-scoped).
+ */
+export async function fetchContentStylesV1(
+  workspaceId: string
+): Promise<{ styles: V1ContentStyle[] }> {
+  return apiGet<{ styles: V1ContentStyle[] }>(
+    `/v1/w/${workspaceId}/onboarding/content-styles`
+  )
+}
+
+/**
+ * Submit quick mode onboarding (workspace-scoped).
+ */
+export async function submitQuickModeV1(
+  workspaceId: string,
+  request: V1QuickModeRequest
+): Promise<QuickModeResponse> {
+  return apiPost<QuickModeResponse>(
+    `/v1/w/${workspaceId}/onboarding/quick`,
+    request
+  )
+}
+
+/**
+ * Send deep mode message (workspace-scoped).
+ */
+export async function sendDeepMessageV1(
+  workspaceId: string,
+  request: V1DeepModeMessageRequest
+): Promise<V1DeepModeResponse> {
+  return apiPost<V1DeepModeResponse>(
+    `/v1/w/${workspaceId}/onboarding/deep/message`,
+    request
+  )
+}
+
+/**
+ * Generate plan from deep mode (workspace-scoped).
+ */
+export async function generateFromDeepV1(
+  workspaceId: string,
+  request: V1GeneratePlanRequest
+): Promise<QuickModeResponse> {
+  return apiPost<QuickModeResponse>(
+    `/v1/w/${workspaceId}/onboarding/deep/generate-plan`,
+    request
+  )
+}
+
+/**
+ * Approve and save generated plan (workspace-scoped).
+ */
+export async function approvePlanV1(
+  workspaceId: string,
+  request: V1ApprovePlanRequest
+): Promise<V1ApproveResponse> {
+  return apiPost<V1ApproveResponse>(
+    `/v1/w/${workspaceId}/onboarding/approve`,
+    request
+  )
+}
+
+/**
+ * Get current strategy for workspace.
+ */
+export async function fetchStrategyV1(
+  workspaceId: string
+): Promise<V1StrategyResponse> {
+  return apiGet<V1StrategyResponse>(
+    `/v1/w/${workspaceId}/onboarding/strategy`
+  )
+}
+
+/**
+ * Delete current strategy for workspace.
+ */
+export async function deleteStrategyV1(workspaceId: string): Promise<void> {
+  return apiDelete(`/v1/w/${workspaceId}/onboarding/strategy`)
 }

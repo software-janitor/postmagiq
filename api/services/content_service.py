@@ -397,6 +397,80 @@ class ContentService:
                 "posts_deleted": len(posts),
             }
 
+    def get_goal_for_workspace(self, workspace_id: UUID) -> Optional[dict]:
+        """Get the goal for a workspace."""
+        with get_session() as session:
+            repo = GoalRepository(session)
+            goal = repo.get_by_workspace(workspace_id)
+            if not goal:
+                return None
+            return {
+                "id": str(goal.id),
+                "strategy_type": goal.strategy_type or "series",
+                "voice_profile_id": _uuid_to_str(goal.voice_profile_id),
+                "image_config_set_id": _uuid_to_str(goal.image_config_set_id),
+                "positioning": goal.positioning,
+                "signature_thesis": goal.signature_thesis,
+                "target_audience": goal.target_audience,
+                "content_style": goal.content_style,
+                "onboarding_mode": goal.onboarding_mode,
+            }
+
+    def get_chapters_for_workspace(self, workspace_id: UUID) -> list[dict]:
+        """Get all chapters for a workspace with post counts."""
+        with get_session() as session:
+            chapter_repo = ChapterRepository(session)
+            post_repo = PostRepository(session)
+            chapters = chapter_repo.list_by_workspace(workspace_id)
+            posts = post_repo.list_by_workspace(workspace_id)
+            post_counts = {}
+            completed_counts = {}
+            for post in posts:
+                post_counts[post.chapter_id] = post_counts.get(post.chapter_id, 0) + 1
+                if post.status in ("ready", "published"):
+                    completed_counts[post.chapter_id] = completed_counts.get(post.chapter_id, 0) + 1
+            result = []
+            for chapter in chapters:
+                result.append({
+                    "id": str(chapter.id),
+                    "chapter_number": chapter.chapter_number,
+                    "title": chapter.title,
+                    "description": chapter.description,
+                    "theme": chapter.theme,
+                    "theme_description": chapter.theme_description,
+                    "weeks_start": chapter.weeks_start,
+                    "weeks_end": chapter.weeks_end,
+                    "post_count": post_counts.get(chapter.id, 0),
+                    "completed_count": completed_counts.get(chapter.id, 0),
+                })
+            return result
+
+    def delete_strategy_for_workspace(self, workspace_id: UUID) -> dict:
+        """Delete strategy (goal, chapters, posts) for a workspace."""
+        with get_session() as session:
+            goal_repo = GoalRepository(session)
+            chapter_repo = ChapterRepository(session)
+            post_repo = PostRepository(session)
+
+            goal = goal_repo.get_by_workspace(workspace_id)
+            chapters = chapter_repo.list_by_workspace(workspace_id)
+            chapter_ids = [c.id for c in chapters]
+            posts = post_repo.list_by_workspace(workspace_id)
+
+            for post in posts:
+                session.delete(post)
+            for chapter in chapters:
+                session.delete(chapter)
+            if goal:
+                session.delete(goal)
+            session.commit()
+
+            return {
+                "goal_id": str(goal.id) if goal else None,
+                "chapters_deleted": len(chapter_ids),
+                "posts_deleted": len(posts),
+            }
+
     # =========================================================================
     # Chapter Operations
     # =========================================================================
@@ -705,6 +779,7 @@ class ContentService:
         prompt_id: Optional[str] = None,
         prompt_text: Optional[str] = None,
         title: Optional[str] = None,
+        workspace_id: Optional[UUID] = None,
     ) -> str:
         """Save a writing sample."""
         uid = normalize_user_id(user_id)
@@ -719,6 +794,7 @@ class ContentService:
             title=title,
             content=content,
             word_count=word_count,
+            workspace_id=workspace_id,
         )
         with get_session() as session:
             repo = WritingSampleRepository(session)
@@ -733,6 +809,26 @@ class ContentService:
         with get_session() as session:
             repo = WritingSampleRepository(session)
             samples = repo.list_by_user(uid)
+            return [
+                WritingSampleRecord(
+                    id=str(s.id),
+                    user_id=str(s.user_id),
+                    source_type=s.source_type,
+                    prompt_id=s.prompt_id,
+                    prompt_text=s.prompt_text,
+                    title=s.title,
+                    content=s.content,
+                    word_count=s.word_count,
+                    created_at=_datetime_to_str(s.created_at),
+                )
+                for s in samples
+            ]
+
+    def get_writing_samples_for_workspace(self, workspace_id: UUID) -> list[WritingSampleRecord]:
+        """Get all writing samples for a workspace."""
+        with get_session() as session:
+            repo = WritingSampleRepository(session)
+            samples = repo.list_by_workspace(workspace_id)
             return [
                 WritingSampleRecord(
                     id=str(s.id),
@@ -820,6 +916,55 @@ class ContentService:
                 word_choices=vocabulary_level,
                 example_excerpts=sentence_patterns,
                 avoid_patterns=storytelling_style,
+            )
+            profile = repo.create(record)
+            return str(profile.id)
+
+    def save_voice_profile_for_workspace(
+        self,
+        workspace_id: UUID,
+        user_id: UUID,
+        tone: Optional[str] = None,
+        sentence_patterns: Optional[str] = None,
+        vocabulary_level: Optional[str] = None,
+        signature_phrases: Optional[str] = None,
+        storytelling_style: Optional[str] = None,
+        emotional_register: Optional[str] = None,
+        raw_analysis: Optional[str] = None,
+    ) -> str:
+        """Save a voice profile scoped to a workspace."""
+        with get_session() as session:
+            repo = VoiceProfileRepository(session)
+            # Count existing workspace profiles for naming
+            existing = repo.list_by_workspace(workspace_id)
+            name = "Default" if not existing else f"Voice Profile {len(existing) + 1}"
+            slug = _generate_slug(name)
+            counter = 1
+            while repo.get_by_slug(slug, workspace_id=workspace_id):
+                counter += 1
+                slug = f"{_generate_slug(name)}-{counter}"
+
+            legacy_payload = {
+                "tone": tone,
+                "sentence_patterns": sentence_patterns,
+                "vocabulary_level": vocabulary_level,
+                "signature_phrases": signature_phrases,
+                "storytelling_style": storytelling_style,
+                "emotional_register": emotional_register,
+                "raw_analysis": raw_analysis,
+            }
+            record = VoiceProfileCreate(
+                name=name,
+                slug=slug,
+                description=_encode_legacy_voice_profile(legacy_payload),
+                is_preset=False,
+                tone_description=tone,
+                signature_phrases=signature_phrases,
+                word_choices=vocabulary_level,
+                example_excerpts=sentence_patterns,
+                avoid_patterns=storytelling_style,
+                workspace_id=workspace_id,
+                user_id=user_id,
             )
             profile = repo.create(record)
             return str(profile.id)

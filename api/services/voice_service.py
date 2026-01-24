@@ -353,3 +353,120 @@ class VoiceService:
         """
         total = self.get_total_word_count(user_id)
         return total >= min_words, total
+
+    # =========================================================================
+    # Workspace-Scoped Methods (for v1 API)
+    # =========================================================================
+
+    def save_sample(
+        self,
+        user_id: Union[str, UUID],
+        sample: WritingSample,
+        workspace_id: Optional[UUID] = None,
+    ) -> str:
+        """Save a writing sample, optionally with workspace scope."""
+        return self.content_service.save_writing_sample(
+            user_id=user_id,
+            source_type=sample.source_type,
+            content=sample.content,
+            prompt_id=sample.prompt_id,
+            prompt_text=sample.prompt_text,
+            title=sample.title,
+            workspace_id=workspace_id,
+        )
+
+    def get_samples_for_workspace(self, workspace_id: UUID) -> list[dict]:
+        """Get all writing samples for a workspace."""
+        samples = self.content_service.get_writing_samples_for_workspace(workspace_id)
+        return [
+            {
+                "id": str(s.id),
+                "source_type": s.source_type,
+                "prompt_id": s.prompt_id,
+                "prompt_text": s.prompt_text,
+                "title": s.title,
+                "content": s.content,
+                "word_count": s.word_count,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+            }
+            for s in samples
+        ]
+
+    def get_total_word_count_for_workspace(self, workspace_id: UUID) -> int:
+        """Get total word count across all workspace samples."""
+        samples = self.content_service.get_writing_samples_for_workspace(workspace_id)
+        return sum(s.word_count or 0 for s in samples)
+
+    def analyze_voice_for_workspace(self, workspace_id: UUID) -> VoiceAnalysis:
+        """Analyze voice from all workspace writing samples."""
+        samples = self.content_service.get_writing_samples_for_workspace(workspace_id)
+
+        if not samples:
+            raise ValueError("No writing samples found for workspace")
+
+        total_words = sum(s.word_count or 0 for s in samples)
+        if total_words < 500:
+            raise ValueError(f"Need at least 500 words for analysis (have {total_words})")
+
+        # Format samples for prompt
+        formatted_samples = []
+        for i, sample in enumerate(samples, 1):
+            header = f"SAMPLE {i}"
+            if sample.source_type == "prompt" and sample.prompt_text:
+                header += f" (Prompt: {sample.prompt_text})"
+            elif sample.title:
+                header += f" ({sample.title})"
+            formatted_samples.append(f"{header}\n{sample.content}")
+
+        samples_text = "\n\n---\n\n".join(formatted_samples)
+        prompt = VOICE_ANALYSIS_PROMPT.format(samples=samples_text)
+
+        # Call LLM
+        response = self._call_llm(prompt)
+        data = self._parse_json_response(response)
+
+        return VoiceAnalysis(
+            tone=data.get("tone", ""),
+            sentence_patterns=data.get("sentence_patterns", {}),
+            vocabulary_level=data.get("vocabulary_level", ""),
+            signature_phrases=data.get("signature_phrases", []),
+            storytelling_style=data.get("storytelling_style", ""),
+            emotional_register=data.get("emotional_register", ""),
+            summary=data.get("summary", ""),
+        )
+
+    def save_voice_profile_for_workspace(
+        self,
+        workspace_id: UUID,
+        user_id: UUID,
+        analysis: VoiceAnalysis,
+        raw_response: Optional[str] = None,
+    ) -> str:
+        """Save analyzed voice profile to database with workspace scope."""
+        return self.content_service.save_voice_profile_for_workspace(
+            workspace_id=workspace_id,
+            user_id=user_id,
+            tone=analysis.tone,
+            sentence_patterns=json.dumps(analysis.sentence_patterns),
+            vocabulary_level=analysis.vocabulary_level,
+            signature_phrases=json.dumps(analysis.signature_phrases),
+            storytelling_style=analysis.storytelling_style,
+            emotional_register=analysis.emotional_register,
+            raw_analysis=raw_response,
+        )
+
+    def analyze_and_save_for_workspace(
+        self,
+        workspace_id: UUID,
+        user_id: UUID,
+    ) -> dict:
+        """Analyze voice and save profile for workspace."""
+        analysis = self.analyze_voice_for_workspace(workspace_id)
+        profile_id = self.save_voice_profile_for_workspace(
+            workspace_id, user_id, analysis
+        )
+
+        return {
+            "profile_id": profile_id,
+            "analysis": analysis.model_dump(),
+        }

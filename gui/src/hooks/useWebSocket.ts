@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { useWorkflowStore, ModelMetrics } from '../stores/workflowStore'
+import { getAccessToken } from '../stores/authStore'
 
 // Singleton WebSocket instance - shared across all components
 let globalWs: WebSocket | null = null
@@ -84,8 +85,15 @@ export function useWebSocket() {
       return
     }
 
+    // Get access token for authentication
+    const token = getAccessToken()
+    if (!token) {
+      console.warn('WebSocket: No access token, skipping connection')
+      return
+    }
+
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-    const wsUrl = `${protocol}//${window.location.host}/api/ws`
+    const wsUrl = `${protocol}//${window.location.host}/api/ws?token=${encodeURIComponent(token)}`
 
     globalWs = new WebSocket(wsUrl)
 
