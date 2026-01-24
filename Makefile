@@ -423,8 +423,8 @@ ifndef TITLE
 	$(error TITLE required. Usage: make pr TITLE="My title" BODY_FILE=body.md)
 endif
 ifdef BODY_FILE
-	@bash ../hooks/filter-attribution.sh "$(BODY_FILE)" > /tmp/pr_body_clean.md && \
+	@bash ./hooks/filter-attribution.sh "$(BODY_FILE)" > /tmp/pr_body_clean.md && \
 		gh pr create --title "$(TITLE)" --body-file /tmp/pr_body_clean.md --base main
 else
-	gh pr create --title "$(TITLE)" --base main
+	gh pr create --title "$(TITLE)" --fill --base main
 endif
