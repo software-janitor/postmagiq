@@ -1,4 +1,8 @@
-"""API routes for workflow personas."""
+"""API routes for workflow personas.
+
+OWNER-ONLY: These are internal backend configuration endpoints.
+Regular users should not have access to workflow personas.
+"""
 
 from typing import Annotated, Optional
 from uuid import UUID
@@ -7,8 +11,7 @@ from pydantic import BaseModel
 
 from sqlmodel import select
 
-from api.auth.dependencies import CurrentUser, get_current_user
-from runner.content.ids import coerce_uuid, normalize_user_id
+from api.auth.dependencies import CurrentUser, require_owner_role
 from runner.content.repository import WorkflowPersonaRepository
 from runner.db.engine import get_session
 from runner.db.models import WorkflowPersona, UserRole
@@ -22,20 +25,6 @@ class WorkflowPersonaUpdate(BaseModel):
     description: Optional[str] = None
     content: Optional[str] = None
     model_tier: Optional[str] = None  # "writer", "auditor", or "coder"
-
-
-class WorkflowPersonaResponse(BaseModel):
-    """Workflow persona response."""
-    id: str
-    user_id: str
-    name: str
-    slug: str
-    description: Optional[str] = None
-    content: str
-    is_system: bool = False
-    model_tier: Optional[str] = None
-    created_at: Optional[str] = None
-    updated_at: Optional[str] = None
 
 
 # =============================================================================
@@ -85,7 +74,7 @@ def _get_persona_by_slug(session, user_id: UUID, slug: str) -> Optional[Workflow
 
 @router.get("/workflow-personas")
 def list_personas(
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_owner_role())],
 ) -> dict:
     """List all personas (frontend-compatible format).
 
@@ -130,7 +119,7 @@ def list_personas(
 @router.get("/workflow-personas/{slug}")
 def get_persona_by_slug(
     slug: str,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_owner_role())],
 ) -> PersonaDetail:
     """Get persona by slug (frontend-compatible format).
 
@@ -161,7 +150,7 @@ def get_persona_by_slug(
 def update_persona_by_slug(
     slug: str,
     request: WorkflowPersonaUpdate,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_owner_role())],
 ) -> PersonaDetail:
     """Update persona by slug (frontend-compatible format).
 
@@ -200,7 +189,7 @@ def update_persona_by_slug(
 @router.post("/workflow-personas")
 def create_persona(
     request: PersonaCreateRequest,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_owner_role())],
 ) -> PersonaDetail:
     """Create a new persona (frontend-compatible format)."""
     uid = current_user.user_id
@@ -234,7 +223,7 @@ def create_persona(
 @router.delete("/workflow-personas/{slug}")
 def delete_persona_by_slug(
     slug: str,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    current_user: Annotated[CurrentUser, Depends(require_owner_role())],
 ) -> dict:
     """Delete persona by slug (frontend-compatible format)."""
     uid = current_user.user_id
@@ -249,136 +238,18 @@ def delete_persona_by_slug(
         return {"deleted": True}
 
 
-@router.get("/users/{user_id}/workflow-personas")
-def get_workflow_personas(
-    user_id: str,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-) -> list[WorkflowPersonaResponse]:
-    """Get all workflow personas for a user.
-
-    System personas are only visible to the SaaS owner.
-    """
-    uid = normalize_user_id(user_id)
-    if not uid:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
-
-    is_owner = current_user.user.role == UserRole.owner
-
-    with get_session() as session:
-        repo = WorkflowPersonaRepository(session)
-        personas = repo.list_by_user(uid)
-
-        # Only include system personas for SaaS owner
-        if is_owner:
-            system_personas = repo.list_system_personas()
-            by_slug = {p.slug: p for p in system_personas}
-            for persona in personas:
-                by_slug[persona.slug] = persona
-        else:
-            by_slug = {p.slug: p for p in personas}
-
-        ordered = sorted(by_slug.values(), key=lambda p: (not p.is_system, p.name))
-        return [
-            WorkflowPersonaResponse(
-                id=str(p.id),
-                user_id=str(p.user_id),
-                name=p.name,
-                slug=p.slug,
-                description=p.description,
-                content=p.content,
-                is_system=p.is_system,
-                model_tier=p.model_tier,
-                created_at=p.created_at.isoformat() if p.created_at else None,
-                updated_at=p.updated_at.isoformat() if p.updated_at else None,
-            )
-            for p in ordered
-        ]
-
-
-@router.get("/users/{user_id}/workflow-personas/by-slug/{slug}")
-def get_workflow_persona_by_slug(
-    user_id: str,
-    slug: str,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-) -> WorkflowPersonaResponse:
-    """Get workflow persona by slug.
-
-    System personas are only accessible to the SaaS owner.
-    """
-    uid = normalize_user_id(user_id)
-    if not uid:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
-
-    is_owner = current_user.user.role == UserRole.owner
-
-    with get_session() as session:
-        persona = _get_persona_by_slug(session, uid, slug)
-        if not persona:
-            raise HTTPException(status_code=404, detail="Workflow persona not found")
-
-        # Non-owners cannot access system personas
-        if persona.is_system and not is_owner:
-            raise HTTPException(status_code=404, detail="Workflow persona not found")
-
-        return WorkflowPersonaResponse(
-            id=str(persona.id),
-            user_id=str(persona.user_id),
-            name=persona.name,
-            slug=persona.slug,
-            description=persona.description,
-            content=persona.content,
-            is_system=persona.is_system,
-            model_tier=persona.model_tier,
-            created_at=persona.created_at.isoformat() if persona.created_at else None,
-            updated_at=persona.updated_at.isoformat() if persona.updated_at else None,
-        )
-
-
-@router.put("/workflow-personas/by-id/{persona_id}")
-def update_workflow_persona(
-    persona_id: str,
-    request: WorkflowPersonaUpdate,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-) -> WorkflowPersonaResponse:
-    """Update a workflow persona by ID.
-
-    System personas can only be edited by the SaaS owner.
-    """
-    pid = coerce_uuid(persona_id)
-    if not pid:
-        raise HTTPException(status_code=400, detail="Invalid persona ID")
-
-    is_owner = current_user.user.role == UserRole.owner
-
-    with get_session() as session:
-        persona = session.get(WorkflowPersona, pid)
-        if not persona:
-            raise HTTPException(status_code=404, detail="Workflow persona not found")
-
-        # Non-owners cannot edit system personas
-        if persona.is_system and not is_owner:
-            raise HTTPException(status_code=403, detail="Cannot edit system personas")
-
-        updates = {k: v for k, v in request.model_dump().items() if v is not None}
-        for key, value in updates.items():
-            if hasattr(persona, key):
-                setattr(persona, key, value)
-        if updates:
-            session.add(persona)
-            session.commit()
-            session.refresh(persona)
-
-        return WorkflowPersonaResponse(
-            id=str(persona.id),
-            user_id=str(persona.user_id),
-            name=persona.name,
-            slug=persona.slug,
-            description=persona.description,
-            content=persona.content,
-            is_system=persona.is_system,
-            model_tier=persona.model_tier,
-            created_at=persona.created_at.isoformat() if persona.created_at else None,
-            updated_at=persona.updated_at.isoformat() if persona.updated_at else None,
-        )
+# =============================================================================
+# REMOVED: Legacy user_id routes (security remediation)
+# =============================================================================
+# The following routes were removed per SECURITY_REMEDIATION_TRACKER.md Phase 4:
+# - GET /users/{user_id}/workflow-personas
+# - GET /users/{user_id}/workflow-personas/by-slug/{slug}
+# - PUT /workflow-personas/by-id/{persona_id}
+#
+# Rationale: These routes exposed unnecessary user_id path parameters.
+# Use the frontend-compatible routes instead:
+# - GET /workflow-personas (list all)
+# - GET /workflow-personas/{slug} (get by slug)
+# - PUT /workflow-personas/{slug} (update by slug)
 
 
