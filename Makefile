@@ -345,28 +345,6 @@ ollama-list:
 	docker compose exec ollama ollama list
 
 # ============================================================================
-# EVALUATION COMMANDS
-# ============================================================================
-
-eval-agents:
-	@python3 -m runner.history.eval --query agent_comparison
-
-eval-costs:
-	@python3 -m runner.history.eval --query cost_by_agent
-
-eval-trend:
-	@python3 -m runner.history.eval --query quality_trend
-
-eval-post:
-ifndef STORY
-	$(error STORY required. Usage: make eval-post STORY=post_03)
-endif
-	@python3 -m runner.history.eval --query post_iterations --story $(STORY)
-
-eval-summary:
-	@python3 -m runner.history.eval --query weekly_summary
-
-# ============================================================================
 # PERSONA COMMANDS
 # ============================================================================
 

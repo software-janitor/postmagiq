@@ -8,20 +8,14 @@ import RunDetail from './pages/RunDetail'
 import Editor from './pages/Editor'
 import StoryWorkflow from './pages/StoryWorkflow'
 import Settings from './pages/Settings'
-import Evaluation from './pages/Evaluation'
 import Onboarding from './pages/Onboarding'
 import VoiceLearning from './pages/VoiceLearning'
 import FinishedPosts from './pages/FinishedPosts'
 import Strategy from './pages/Strategy'
 import Strategies from './pages/Strategies'
-import ImageConfig from './pages/ImageConfig'
-import AIPersonas from './pages/AIPersonas'
-import Characters from './pages/Characters'
-import OutfitBank from './pages/OutfitBank'
 import VoiceProfiles from './pages/VoiceProfiles'
 import TeamSettings from './pages/TeamSettings'
 import Approvals from './pages/Approvals'
-import DeveloperSettings from './pages/DeveloperSettings'
 import WhitelabelSettings from './pages/settings/WhitelabelSettings'
 import PrivacySettings from './pages/settings/PrivacySettings'
 
@@ -91,19 +85,13 @@ function App() {
                   <Route path="/runs/:runId" element={<RunDetail />} />
                   <Route path="/editor" element={<Editor />} />
                   <Route path="/settings" element={<Settings />} />
-                  <Route path="/evaluation" element={<Evaluation />} />
                   <Route path="/onboarding" element={<Onboarding />} />
                   <Route path="/strategy" element={<Strategy />} />
                   <Route path="/strategies" element={<Strategies />} />
                   <Route path="/voice" element={<VoiceLearning />} />
-                  <Route path="/image-config" element={<ImageConfig />} />
-                  <Route path="/ai-personas" element={<AIPersonas />} />
-                  <Route path="/characters" element={<Characters />} />
-                  <Route path="/outfit-bank" element={<OutfitBank />} />
                   <Route path="/voice-profiles" element={<VoiceProfiles />} />
                   <Route path="/team" element={<TeamSettings />} />
                   <Route path="/approvals" element={<Approvals />} />
-                  <Route path="/developer" element={<DeveloperSettings />} />
                   <Route path="/settings/whitelabel" element={<WhitelabelSettings />} />
                   <Route path="/settings/privacy" element={<PrivacySettings />} />
                 </Routes>
