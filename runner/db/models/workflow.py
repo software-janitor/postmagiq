@@ -17,15 +17,15 @@ class WorkflowRunBase(SQLModel):
     """Base workflow run fields."""
 
     run_id: str = Field(unique=True, index=True)
-    story: str
+    story_name: Optional[str] = Field(default=None)
     status: str = Field(default="running", index=True)
     current_state: Optional[str] = None
-    final_state: Optional[str] = None
-    total_tokens: int = Field(default=0)
-    total_cost_usd: float = Field(default=0.0)
+    total_transitions: Optional[int] = Field(default=0)
+    total_tokens: Optional[int] = Field(default=0)
+    total_cost: Optional[float] = Field(default=0.0)
     started_at: datetime = Field(default_factory=datetime.utcnow)
     completed_at: Optional[datetime] = None
-    error: Optional[str] = None
+    error_message: Optional[str] = None
 
 
 class WorkflowRun(UUIDModel, WorkflowRunBase, table=True):
@@ -48,7 +48,7 @@ class WorkflowRunCreate(SQLModel):
 
     user_id: UUID
     run_id: str
-    story: str
+    story_name: Optional[str] = None
     workspace_id: Optional[UUID] = None
 
 

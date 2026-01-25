@@ -154,7 +154,7 @@ class RunService:
             return None
 
         breakdown = TokenBreakdown()
-        breakdown.total_cost_usd = db_run.total_cost_usd or 0
+        breakdown.total_cost_usd = db_run.total_cost or 0
 
         # Try database metrics first (new runs)
         by_agent = self.store.get_state_metrics_by_agent(run_id)
@@ -318,17 +318,23 @@ class RunService:
         """Convert database record to API summary."""
         started_at = run.started_at or datetime.now()
         completed_at = run.completed_at
-        cost_usd = run.total_cost_usd or 0.0
+        cost_usd = run.total_cost or 0.0
+        # Determine final_state from status (complete/failed/cancelled)
+        final_state = None
+        if run.status == "completed":
+            final_state = "complete"
+        elif run.status == "failed":
+            final_state = "halt"
         return RunSummary(
             run_id=run.run_id,
-            story=run.story,
+            story=run.story_name or "",
             status=run.status,
             started_at=started_at,
             completed_at=completed_at,
-            total_tokens=run.total_tokens,
+            total_tokens=run.total_tokens or 0,
             total_cost_usd=cost_usd,
             credits=cost_to_credits(cost_usd),
-            final_state=run.final_state,
+            final_state=final_state,
             config_hash=None,  # Not stored in DB yet
         )
 

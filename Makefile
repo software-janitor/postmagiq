@@ -377,6 +377,13 @@ db-down:
 db-migrate:
 	@cd runner/db && alembic upgrade head
 
+# Seed development users (creates owner@example.com with password123)
+db-seed:
+	@echo "Seeding development users..."
+	DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator \
+	JWT_SECRET=dev-secret-for-seeding \
+	python3 scripts/seed_dev_users.py
+
 # Rollback last migration
 db-rollback:
 	@cd runner/db && alembic downgrade -1

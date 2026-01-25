@@ -12,7 +12,9 @@ from api.main import app
 from api.services.content_service import ContentService
 from api.services.voice_service import VoiceService
 from api.services.onboarding_service import OnboardingService
-from api.routes import content, voice, onboarding, platforms
+# Import deprecated routes for legacy API compatibility tests
+from api.routes.deprecated import content, onboarding, platforms
+from api.routes.v1 import voice_profiles as voice
 from runner.db import models  # noqa: F401
 from runner.db.models import User, Goal, Chapter, Post
 
@@ -158,7 +160,6 @@ def client(test_engine, monkeypatch):
     test_onboarding_service = OnboardingService(content_service=test_content_service)
 
     monkeypatch.setattr(content, "content_service", test_content_service)
-    monkeypatch.setattr(voice, "voice_service", test_voice_service)
     monkeypatch.setattr(onboarding, "content_service", test_content_service)
     monkeypatch.setattr(onboarding, "onboarding_service", test_onboarding_service)
     monkeypatch.setattr(platforms, "content_service", test_content_service)
@@ -174,7 +175,6 @@ def seeded_client(seeded_user, monkeypatch):
     test_onboarding_service = OnboardingService(content_service=test_content_service)
 
     monkeypatch.setattr(content, "content_service", test_content_service)
-    monkeypatch.setattr(voice, "voice_service", test_voice_service)
     monkeypatch.setattr(onboarding, "content_service", test_content_service)
     monkeypatch.setattr(onboarding, "onboarding_service", test_onboarding_service)
     monkeypatch.setattr(platforms, "content_service", test_content_service)
