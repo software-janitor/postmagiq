@@ -5,6 +5,7 @@ import { clsx } from 'clsx'
 import { useThemeClasses } from '../hooks/useThemeClasses'
 import { apiGet, apiPost, apiDelete } from '../api/client'
 import { useEffectiveFlags } from '../stores/flagsStore'
+import { useWorkspaceStore } from '../stores/workspaceStore'
 
 interface PublishInfo {
   platform: string
@@ -59,6 +60,8 @@ const PLATFORM_CONFIG: Record<string, { name: string; icon: React.ReactNode; col
 export default function FinishedPosts() {
   const theme = useThemeClasses()
   const flags = useEffectiveFlags()
+  const { currentWorkspace } = useWorkspaceStore()
+  const workspaceId = currentWorkspace?.id
   const [selectedPost, setSelectedPost] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [showPublishModal, setShowPublishModal] = useState(false)
@@ -75,16 +78,18 @@ export default function FinishedPosts() {
 
   const queryClient = useQueryClient()
 
-  const { data: posts, isLoading, error } = useQuery({
-    queryKey: ['finished-posts'],
-    queryFn: () => apiGet<FinishedPost[]>('/finished-posts'),
+  const { data: postsData, isLoading, error } = useQuery({
+    queryKey: ['finished-posts', workspaceId],
+    queryFn: () => apiGet<{ posts: FinishedPost[] }>(`/v1/w/${workspaceId}/finished-posts`),
+    enabled: !!workspaceId,
   })
+  const posts = postsData?.posts
 
   const publishMutation = useMutation({
     mutationFn: ({ postId, platform, url }: { postId: string; platform: string; url?: string }) =>
-      apiPost(`/finished-posts/${postId}/publish`, { platform, url }),
+      apiPost(`/v1/w/${workspaceId}/finished-posts/${postId}/publish`, { platform, url }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['finished-posts'] })
+      queryClient.invalidateQueries({ queryKey: ['finished-posts', workspaceId] })
       setShowPublishModal(false)
       setPublishUrl('')
       setSelectedPlatform(null)
@@ -93,9 +98,9 @@ export default function FinishedPosts() {
 
   const unpublishMutation = useMutation({
     mutationFn: ({ postId, platform }: { postId: string; platform: string }) =>
-      apiDelete(`/finished-posts/${postId}/publish/${platform}`),
+      apiDelete(`/v1/w/${workspaceId}/finished-posts/${postId}/publish/${platform}`),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['finished-posts'] })
+      queryClient.invalidateQueries({ queryKey: ['finished-posts', workspaceId] })
     },
   })
 
@@ -103,7 +108,7 @@ export default function FinishedPosts() {
     mutationFn: (storyId: string) =>
       apiPost(`/content/posts/${storyId}/reset`, {}),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['finished-posts'] })
+      queryClient.invalidateQueries({ queryKey: ['finished-posts', workspaceId] })
       queryClient.invalidateQueries({ queryKey: ['image-prompt', selectedPost] })
       setShowResetModal(false)
       setResetConfirmText('')
@@ -244,7 +249,9 @@ export default function FinishedPosts() {
         </div>
 
         <div className="overflow-y-auto h-[calc(100%-80px)]">
-          {isLoading ? (
+          {!workspaceId ? (
+            <div className="p-4 text-zinc-400">Select a workspace to view posts</div>
+          ) : isLoading ? (
             <div className="p-4 text-zinc-400">Loading...</div>
           ) : error ? (
             <div className="p-4 text-red-400">Failed to load posts</div>
