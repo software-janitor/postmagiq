@@ -9,7 +9,7 @@ class RunSummary(BaseModel):
     """Summary of a workflow run."""
 
     run_id: str
-    story: str
+    story: str = "unknown"
     status: Literal["running", "complete", "failed", "halted", "error"]
     started_at: datetime
     completed_at: Optional[datetime] = None

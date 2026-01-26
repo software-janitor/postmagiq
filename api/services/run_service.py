@@ -321,7 +321,7 @@ class RunService:
         cost_usd = run.total_cost_usd or 0.0
         return RunSummary(
             run_id=run.run_id,
-            story=run.story,
+            story=run.story or "unknown",
             status=run.status,
             started_at=started_at,
             completed_at=completed_at,

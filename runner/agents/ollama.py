@@ -161,6 +161,8 @@ class OllamaAgent(BaseAgent):
             '"decision":',
             "Required fields:",
             "# Auditor Persona",
+            "# Story Reviewer Persona",
+            "output_type: review",
         ]
         return any(indicator in prompt for indicator in json_indicators)
 
