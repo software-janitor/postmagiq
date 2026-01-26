@@ -114,6 +114,8 @@ states:
       proceed: human-approval
       retry: revise
       halt: halt
+      success: human-approval  # Fallback if LLM doesn't return valid AuditResult
+      failure: halt
 
   revise:
     type: single
@@ -143,6 +145,8 @@ states:
       proceed: human-approval
       retry: revise
       halt: halt
+      success: human-approval  # Fallback if LLM doesn't return valid AuditResult
+      failure: halt
 
   human-approval:
     type: human-approval
