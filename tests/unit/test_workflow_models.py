@@ -25,12 +25,12 @@ class TestWorkflowRunModel:
         create = WorkflowRunCreate(
             user_id=user_id,
             run_id="2026-01-26_120000_post_01",
-            story_name="post_01",
+            story="post_01",
         )
 
         assert create.user_id == user_id
         assert create.run_id == "2026-01-26_120000_post_01"
-        assert create.story_name == "post_01"
+        assert create.story == "post_01"
 
     def test_workflow_run_defaults(self):
         """WorkflowRun has sensible defaults."""
@@ -38,9 +38,10 @@ class TestWorkflowRunModel:
         create = WorkflowRunCreate(
             user_id=user_id,
             run_id="test_run",
+            story="test story",  # story is now required
         )
 
-        assert create.story_name is None
+        assert create.story == "test story"
         assert create.workspace_id is None
 
 
