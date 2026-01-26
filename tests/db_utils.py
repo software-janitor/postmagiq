@@ -63,3 +63,21 @@ def drop_test_schema(database_url: str, schema_name: str) -> None:
     with admin_engine.begin() as conn:
         conn.execute(text(f'DROP SCHEMA IF EXISTS "{schema_name}" CASCADE'))
     admin_engine.dispose()
+
+
+def get_test_engine():
+    """Get engine for schema validation tests (uses main schema, read-only).
+
+    Returns None if database is not available.
+    """
+    if not is_database_available():
+        return None
+    database_url = _database_url()
+    return create_engine(database_url, pool_pre_ping=True)
+
+
+# Decorator to skip test class if database is not available
+skip_if_no_db = pytest.mark.skipif(
+    not is_database_available(),
+    reason="Database not available"
+)
