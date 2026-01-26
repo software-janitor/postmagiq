@@ -1,21 +1,3 @@
-# GPU override for Ollama and Watermark services
-# Auto-applied when nvidia-docker is detected
-
-services:
-  ollama:
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
-  watermark:
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+# GPU override - empty since Ollama is external
+# This file exists to satisfy the Makefile GPU detection
+services: {}

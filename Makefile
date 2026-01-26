@@ -303,7 +303,7 @@ dev:
 	docker compose $(COMPOSE_FILES) up -d postgres pgbouncer
 	@sleep 3
 	@docker compose exec postgres pg_isready -U orchestrator || (echo "Waiting for postgres..." && sleep 5)
-	cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5433/orchestrator alembic upgrade head
+	cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator alembic upgrade head
 	@echo "Migrations complete. Starting all services..."
 	docker compose $(COMPOSE_FILES) up --build
 
