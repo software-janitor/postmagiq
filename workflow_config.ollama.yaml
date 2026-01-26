@@ -11,6 +11,16 @@ orchestrator:
     enabled: true
 
 # ============================================================================
+# DEFAULT TRANSITIONS - Inherited by all states unless overridden
+# ============================================================================
+default_transitions:
+  success: complete
+  failure: halt
+  retry: draft
+  proceed: human-approval
+  halt: halt
+
+# ============================================================================
 # AGENT DEFINITIONS - Single Model
 # ============================================================================
 
@@ -18,7 +28,7 @@ agents:
   ollama:
     type: ollama
     enabled: true
-    model: llama3.3:70b
+    model: gpt-oss:120b
     context_window: 128000
     cost_per_1k:
       input: 0.0
@@ -57,8 +67,8 @@ states:
     output_type: review
     transitions:
       success: story-process
+      proceed: story-process
       retry: story-feedback
-      failure: halt
 
   story-feedback:
     type: human-approval
@@ -97,7 +107,6 @@ states:
     output_type: draft
     transitions:
       success: audit
-      failure: halt
 
   audit:
     type: single
@@ -111,11 +120,8 @@ states:
     output: "workflow/audits/audit.json"
     output_type: audit
     transitions:
-      proceed: human-approval
       retry: revise
-      halt: halt
-      success: human-approval  # Fallback if LLM doesn't return valid AuditResult
-      failure: halt
+      success: human-approval
 
   revise:
     type: single
@@ -142,11 +148,8 @@ states:
     output: "workflow/audits/final_audit.json"
     output_type: audit
     transitions:
-      proceed: human-approval
       retry: revise
-      halt: halt
-      success: human-approval  # Fallback if LLM doesn't return valid AuditResult
-      failure: halt
+      success: human-approval
 
   human-approval:
     type: human-approval
@@ -159,7 +162,6 @@ states:
       - Provide feedback for changes
     transitions:
       approved: complete
-      retry: draft
       feedback: revise
 
   complete:

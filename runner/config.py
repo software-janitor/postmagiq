@@ -50,6 +50,14 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
 # =============================================================================
+# Developer Mode (Debug Visibility)
+# =============================================================================
+
+# Enable dev mode to broadcast full LLM messages via WebSocket
+# and write detailed logs to workflow/runs/{run_id}/dev_logs/
+DEV_MODE = os.environ.get("POSTMAGIQ_DEV_MODE", "false").lower() == "true"
+
+# =============================================================================
 # Workflow Configuration (Phase 11 - Dynamic Workflow Config)
 # =============================================================================
 

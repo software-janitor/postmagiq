@@ -326,6 +326,53 @@ class WorkflowService:
                         run_id,
                     )
                 )
+            elif event_type == "llm:request":
+                # DEV_MODE: Broadcast full LLM request for dev console
+                _broadcast_from_thread(
+                    main_loop,
+                    manager.broadcast(
+                        {
+                            "type": "llm:request",
+                            "run_id": run_id,
+                            "state": event.get("state"),
+                            "agent": event.get("agent"),
+                            "model": event.get("model"),
+                            "system_prompt": event.get("system_prompt"),
+                            "user_message": event.get("user_message"),
+                            "context_window": event.get("context_window"),
+                            "estimated_tokens": event.get("estimated_tokens"),
+                            "context_usage_percent": event.get("context_usage_percent"),
+                            "context_warning": event.get("context_warning"),
+                            "timestamp": event.get("timestamp"),
+                        },
+                        run_id,
+                    )
+                )
+            elif event_type == "llm:response":
+                # DEV_MODE: Broadcast full LLM response for dev console
+                _broadcast_from_thread(
+                    main_loop,
+                    manager.broadcast(
+                        {
+                            "type": "llm:response",
+                            "run_id": run_id,
+                            "state": event.get("state"),
+                            "agent": event.get("agent"),
+                            "model": event.get("model"),
+                            "content": event.get("content"),
+                            "tokens": event.get("tokens"),
+                            "duration_ms": event.get("duration_ms"),
+                            "context_window": event.get("context_window"),
+                            "context_usage_percent": event.get("context_usage_percent"),
+                            "context_remaining": event.get("context_remaining"),
+                            "context_warning": event.get("context_warning"),
+                            "success": event.get("success"),
+                            "error": event.get("error"),
+                            "timestamp": event.get("timestamp"),
+                        },
+                        run_id,
+                    )
+                )
 
         def run_workflow():
             try:

@@ -157,6 +157,7 @@ class TestStateMachineRetry:
                     "type": "single",
                     "agent": "auditor",
                     "output": str(tmp_path / "audit.json"),
+                    "output_type": "audit",  # Required for audit parsing
                     "transitions": {
                         "proceed": "complete",
                         "retry": "draft",
@@ -657,3 +658,525 @@ The post is ready.'''
 
         # Should fall back to 'success' transition
         assert result["final_state"] == "fallback"
+
+
+class TestDefaultTransitions:
+    """Tests for default transitions merging with state-specific transitions."""
+
+    def test_default_transitions_used_when_state_has_none(self, tmp_path):
+        """State with no transitions uses default transitions."""
+        config = {
+            "default_transitions": {
+                "success": "complete",
+                "failure": "halt",
+            },
+            "states": {
+                "start": {"type": "initial", "next": "process"},
+                "process": {
+                    "type": "single",
+                    "agent": "claude",
+                    "output": str(tmp_path / "out.md"),
+                    "output_type": "processed",
+                    # No transitions defined - should use defaults
+                },
+                "complete": {"type": "terminal"},
+                "halt": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        agents = {"claude": MockAgent(["Success output"])}
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+
+        result = sm.run()
+
+        # Should use default 'success' -> 'complete'
+        assert result["final_state"] == "complete"
+
+    def test_state_transitions_override_defaults(self, tmp_path):
+        """State-specific transitions override default transitions."""
+        config = {
+            "default_transitions": {
+                "success": "complete",
+                "failure": "halt",
+            },
+            "states": {
+                "start": {"type": "initial", "next": "process"},
+                "process": {
+                    "type": "single",
+                    "agent": "claude",
+                    "output": str(tmp_path / "out.md"),
+                    "output_type": "processed",
+                    "transitions": {
+                        "success": "custom_next",  # Override default
+                    },
+                },
+                "custom_next": {"type": "terminal"},
+                "complete": {"type": "terminal"},
+                "halt": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        agents = {"claude": MockAgent(["Success output"])}
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+
+        result = sm.run()
+
+        # Should use state-specific 'success' -> 'custom_next'
+        assert result["final_state"] == "custom_next"
+
+    def test_default_and_state_transitions_merge(self, tmp_path):
+        """State transitions merge with defaults - state overrides, defaults fill gaps."""
+        config = {
+            "default_transitions": {
+                "success": "complete",
+                "failure": "halt",
+                "retry": "draft",
+            },
+            "states": {
+                "start": {"type": "initial", "next": "audit"},
+                "audit": {
+                    "type": "single",
+                    "agent": "auditor",
+                    "output": str(tmp_path / "audit.json"),
+                    "output_type": "audit",
+                    "transitions": {
+                        "proceed": "approved",  # State-specific
+                        # 'retry' will come from defaults -> 'draft'
+                    },
+                },
+                "approved": {"type": "terminal"},
+                "draft": {"type": "terminal"},
+                "complete": {"type": "terminal"},
+                "halt": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        # Audit returning retry should use default retry transition
+        audit_response = '{"score": 4, "decision": "retry", "feedback": "Needs work"}'
+        agents = {"auditor": MockAgent([audit_response])}
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+
+        result = sm.run()
+
+        # Should use default 'retry' -> 'draft'
+        assert result["final_state"] == "draft"
+
+    def test_default_failure_transition(self, tmp_path):
+        """Default failure transition used when agent fails."""
+        config = {
+            "default_transitions": {
+                "success": "complete",
+                "failure": "error_state",
+            },
+            "states": {
+                "start": {"type": "initial", "next": "process"},
+                "process": {
+                    "type": "single",
+                    "agent": "claude",
+                    "output": str(tmp_path / "out.md"),
+                    "output_type": "processed",
+                    # No transitions - use defaults
+                },
+                "complete": {"type": "terminal"},
+                "error_state": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        agents = {"claude": FailingAgent([], fail_after=0)}
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+
+        result = sm.run()
+
+        # Should use default 'failure' -> 'error_state'
+        assert result["final_state"] == "error_state"
+
+    def test_get_transitions_method(self, tmp_path):
+        """Test _get_transitions method directly."""
+        config = {
+            "default_transitions": {
+                "success": "default_success",
+                "failure": "default_failure",
+                "retry": "default_retry",
+            },
+            "states": {},
+        }
+
+        sm = StateMachine(config)
+
+        # State with no transitions
+        state_config = {}
+        transitions = sm._get_transitions(state_config)
+        assert transitions["success"] == "default_success"
+        assert transitions["failure"] == "default_failure"
+        assert transitions["retry"] == "default_retry"
+
+        # State with partial overrides
+        state_config = {"transitions": {"success": "custom_success"}}
+        transitions = sm._get_transitions(state_config)
+        assert transitions["success"] == "custom_success"  # Overridden
+        assert transitions["failure"] == "default_failure"  # From defaults
+        assert transitions["retry"] == "default_retry"  # From defaults
+
+        # State with full overrides
+        state_config = {
+            "transitions": {
+                "success": "s1",
+                "failure": "f1",
+                "retry": "r1",
+            }
+        }
+        transitions = sm._get_transitions(state_config)
+        assert transitions["success"] == "s1"
+        assert transitions["failure"] == "f1"
+        assert transitions["retry"] == "r1"
+
+
+class TestNonAuditJsonOutput:
+    """Tests for JSON outputs that should NOT be parsed as audit results."""
+
+    def test_processed_json_not_parsed_as_audit(self, tmp_path):
+        """JSON output with output_type='processed' should not be parsed as audit."""
+        config = {
+            "states": {
+                "start": {"type": "initial", "next": "process"},
+                "process": {
+                    "type": "single",
+                    "agent": "claude",
+                    "output": str(tmp_path / "processed.json"),
+                    "output_type": "processed",  # Not audit!
+                    "transitions": {
+                        "success": "complete",
+                        "retry": "feedback",  # Should NOT be triggered
+                        "failure": "halt",
+                    },
+                },
+                "complete": {"type": "terminal"},
+                "feedback": {"type": "terminal"},
+                "halt": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        # JSON output that looks like it could be parsed but isn't an audit
+        json_response = '''{
+            "title": "My Story",
+            "hook": "Something interesting",
+            "story": "The full story here",
+            "shape": "PARTIAL"
+        }'''
+        agents = {"claude": MockAgent([json_response])}
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+
+        result = sm.run()
+
+        # Should use 'success' transition, NOT try to parse as audit
+        assert result["final_state"] == "complete"
+
+    def test_draft_json_not_parsed_as_audit(self, tmp_path):
+        """JSON output with output_type='draft' should not be parsed as audit."""
+        config = {
+            "states": {
+                "start": {"type": "initial", "next": "draft"},
+                "draft": {
+                    "type": "single",
+                    "agent": "writer",
+                    "output": str(tmp_path / "draft.json"),
+                    "output_type": "draft",
+                    "transitions": {
+                        "success": "complete",
+                        "retry": "revise",
+                        "failure": "halt",
+                    },
+                },
+                "complete": {"type": "terminal"},
+                "revise": {"type": "terminal"},
+                "halt": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        # Some JSON in the output
+        json_response = '{"content": "Draft content here", "version": 1}'
+        agents = {"writer": MockAgent([json_response])}
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+
+        result = sm.run()
+
+        assert result["final_state"] == "complete"
+
+    def test_review_output_type_parsed_as_audit(self, tmp_path):
+        """JSON output with output_type='review' SHOULD be parsed as audit."""
+        config = {
+            "states": {
+                "start": {"type": "initial", "next": "review"},
+                "review": {
+                    "type": "single",
+                    "agent": "reviewer",
+                    "output": str(tmp_path / "review.json"),
+                    "output_type": "review",  # Should be parsed as audit
+                    "transitions": {
+                        "proceed": "complete",
+                        "retry": "feedback",
+                        "success": "complete",
+                    },
+                },
+                "complete": {"type": "terminal"},
+                "feedback": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        # Valid audit result
+        audit_response = '{"score": 9, "decision": "proceed", "feedback": "Good"}'
+        agents = {"reviewer": MockAgent([audit_response])}
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+
+        result = sm.run()
+
+        # Should parse as audit and use 'proceed' transition
+        assert result["final_state"] == "complete"
+
+    def test_final_audit_output_type_parsed(self, tmp_path):
+        """JSON output with output_type='final_audit' SHOULD be parsed as audit."""
+        config = {
+            "states": {
+                "start": {"type": "initial", "next": "final_check"},
+                "final_check": {
+                    "type": "single",
+                    "agent": "auditor",
+                    "output": str(tmp_path / "final_audit.json"),
+                    "output_type": "final_audit",
+                    "transitions": {
+                        "proceed": "done",
+                        "retry": "revise",
+                    },
+                },
+                "done": {"type": "terminal"},
+                "revise": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        audit_response = '{"score": 8, "decision": "proceed", "feedback": "Approved"}'
+        agents = {"auditor": MockAgent([audit_response])}
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+
+        result = sm.run()
+
+        assert result["final_state"] == "done"
+
+
+class TestFullWorkflowTransitions:
+    """End-to-end tests simulating full workflow with all transition types."""
+
+    def test_happy_path_workflow(self, tmp_path):
+        """Test complete workflow: review -> process -> draft -> audit -> approve."""
+        config = {
+            "default_transitions": {
+                "success": "complete",
+                "failure": "halt",
+                "proceed": "human-approval",
+                "halt": "halt",
+            },
+            "states": {
+                "start": {"type": "initial", "next": "review"},
+                "review": {
+                    "type": "single",
+                    "agent": "reviewer",
+                    "output": str(tmp_path / "review.json"),
+                    "output_type": "review",
+                    "transitions": {
+                        "proceed": "process",
+                        "success": "process",
+                    },
+                },
+                "process": {
+                    "type": "single",
+                    "agent": "processor",
+                    "output": str(tmp_path / "processed.json"),
+                    "output_type": "processed",
+                    "transitions": {"success": "draft"},
+                },
+                "draft": {
+                    "type": "single",
+                    "agent": "writer",
+                    "output": str(tmp_path / "draft.md"),
+                    "output_type": "draft",
+                    "transitions": {"success": "audit"},
+                },
+                "audit": {
+                    "type": "single",
+                    "agent": "auditor",
+                    "output": str(tmp_path / "audit.json"),
+                    "output_type": "audit",
+                    "transitions": {"proceed": "complete"},
+                },
+                "complete": {"type": "terminal"},
+                "halt": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        agents = {
+            "reviewer": MockAgent(['{"score": 9, "decision": "proceed", "feedback": "Good story"}']),
+            "processor": MockAgent(['{"title": "Test", "story": "Content"}']),
+            "writer": MockAgent(["# Draft Post\n\nContent here"]),
+            "auditor": MockAgent(['{"score": 9, "decision": "proceed", "feedback": "Approved"}']),
+        }
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+
+        result = sm.run()
+
+        assert result["final_state"] == "complete"
+        assert (tmp_path / "review.json").exists()
+        assert (tmp_path / "processed.json").exists()
+        assert (tmp_path / "draft.md").exists()
+        assert (tmp_path / "audit.json").exists()
+
+    def test_retry_loop_workflow(self, tmp_path):
+        """Test workflow with retry: audit fails, revise, audit passes."""
+        config = {
+            "default_transitions": {
+                "success": "complete",
+                "failure": "halt",
+            },
+            "states": {
+                "start": {"type": "initial", "next": "draft"},
+                "draft": {
+                    "type": "single",
+                    "agent": "writer",
+                    "output": str(tmp_path / "draft.md"),
+                    "output_type": "draft",
+                    "transitions": {"success": "audit"},
+                },
+                "audit": {
+                    "type": "single",
+                    "agent": "auditor",
+                    "output": str(tmp_path / "audit.json"),
+                    "output_type": "audit",
+                    "transitions": {
+                        "proceed": "complete",
+                        "retry": "revise",
+                    },
+                },
+                "revise": {
+                    "type": "single",
+                    "agent": "writer",
+                    "output": str(tmp_path / "revised.md"),
+                    "output_type": "draft",
+                    "transitions": {"success": "audit"},
+                },
+                "complete": {"type": "terminal"},
+                "halt": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        agents = {
+            "writer": MockAgent(["Draft v1", "Draft v2 (revised)"]),
+            "auditor": MockAgent([
+                '{"score": 4, "decision": "retry", "feedback": "Needs improvement"}',
+                '{"score": 9, "decision": "proceed", "feedback": "Much better"}',
+            ]),
+        }
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+
+        result = sm.run()
+
+        assert result["final_state"] == "complete"
+        # Writer called twice (draft + revise)
+        assert agents["writer"].call_count == 2
+        # Auditor called twice
+        assert agents["auditor"].call_count == 2
+
+    def test_halt_workflow(self, tmp_path):
+        """Test workflow that halts on critical audit failure."""
+        config = {
+            "default_transitions": {
+                "success": "complete",
+                "failure": "halt",
+                "halt": "halt",
+            },
+            "states": {
+                "start": {"type": "initial", "next": "audit"},
+                "audit": {
+                    "type": "single",
+                    "agent": "auditor",
+                    "output": str(tmp_path / "audit.json"),
+                    "output_type": "audit",
+                    "transitions": {
+                        "proceed": "complete",
+                        "retry": "revise",
+                    },
+                },
+                "revise": {"type": "terminal"},
+                "complete": {"type": "terminal"},
+                "halt": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        agents = {
+            "auditor": MockAgent(['{"score": 1, "decision": "halt", "feedback": "Critical failure"}']),
+        }
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+
+        result = sm.run()
+
+        assert result["final_state"] == "halt"
+
+    def test_agent_failure_uses_failure_transition(self, tmp_path):
+        """Test that agent failure uses failure transition."""
+        config = {
+            "default_transitions": {
+                "success": "next",
+                "failure": "error_handler",
+            },
+            "states": {
+                "start": {"type": "initial", "next": "process"},
+                "process": {
+                    "type": "single",
+                    "agent": "claude",
+                    "output": str(tmp_path / "out.md"),
+                    "output_type": "processed",
+                },
+                "next": {"type": "terminal"},
+                "error_handler": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        agents = {"claude": FailingAgent([], fail_after=0)}
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+
+        result = sm.run()
+
+        assert result["final_state"] == "error_handler"

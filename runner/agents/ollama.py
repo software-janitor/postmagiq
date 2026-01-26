@@ -2,7 +2,7 @@
 
 import os
 import time
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import requests
 
@@ -10,6 +10,9 @@ from runner.agents.base import BaseAgent
 from runner.agents.gpu_detect import detect_gpu, get_model_tier, GPUInfo
 from runner.models import AgentResult, TokenUsage
 from runner.sessions.file_based import FileBasedSessionManager
+
+if TYPE_CHECKING:
+    from runner.logging.dev_logger import DevLogger
 
 
 # Model tier configurations
@@ -103,7 +106,15 @@ class OllamaAgent(BaseAgent):
         self.model = config.get("model") or self.tier_config["models"].get(
             "writer", "llama3.2"
         )
-        self.context_window = self.tier_config["max_context"]
+
+        # Context window: config override > per-model config > tier default
+        models_config = config.get("models", {})
+        model_config = models_config.get(self.model, {})
+        self.context_window = (
+            model_config.get("context_window")
+            or config.get("context_window")
+            or self.tier_config["max_context"]
+        )
 
         # File-based session manager
         self.session_manager = FileBasedSessionManager(
@@ -248,15 +259,53 @@ class OllamaAgent(BaseAgent):
 
         messages.append({"role": "user", "content": user_content})
 
+        # Extract system and user messages for dev logging
+        system_prompt = None
+        user_message_parts = []
+        for m in messages:
+            if m.get("role") == "system":
+                system_prompt = m.get("content", "")
+            elif m.get("role") == "user":
+                user_message_parts.append(m.get("content", ""))
+        user_message_combined = "\n\n".join(user_message_parts)
+
+        # Dev logging: log request before API call
+        if self._dev_logger and self._current_run_id and self._current_state:
+            self._dev_logger.log_llm_request(
+                run_id=self._current_run_id,
+                state=self._current_state,
+                agent=self.name,
+                model=self.model,
+                system_prompt=system_prompt,
+                user_message=user_message_combined,
+                context_window=self.context_window,
+            )
+
         try:
             # Ensure model is available
             if self.auto_pull and not self._ensure_model_available(self.model):
+                error_msg = f"Model {self.model} not available and could not be pulled"
+                # Dev logging: log error
+                if self._dev_logger and self._current_run_id and self._current_state:
+                    self._dev_logger.log_llm_response(
+                        run_id=self._current_run_id,
+                        state=self._current_state,
+                        agent=self.name,
+                        model=self.model,
+                        content="",
+                        input_tokens=0,
+                        output_tokens=0,
+                        duration_ms=int((time.time() - start_time) * 1000),
+                        context_window=self.context_window,
+                        success=False,
+                        error=error_msg,
+                    )
                 return AgentResult(
                     success=False,
                     content="",
                     tokens=TokenUsage(input_tokens=0, output_tokens=0),
                     duration_s=time.time() - start_time,
-                    error=f"Model {self.model} not available and could not be pulled",
+                    error=error_msg,
                 )
 
             # Use chat API for proper multi-turn support
@@ -286,6 +335,21 @@ class OllamaAgent(BaseAgent):
                 output_tokens=data.get("eval_count", 0),
             )
 
+            # Dev logging: log successful response
+            if self._dev_logger and self._current_run_id and self._current_state:
+                self._dev_logger.log_llm_response(
+                    run_id=self._current_run_id,
+                    state=self._current_state,
+                    agent=self.name,
+                    model=self.model,
+                    content=content,
+                    input_tokens=tokens.input_tokens,
+                    output_tokens=tokens.output_tokens,
+                    duration_ms=int(duration * 1000),
+                    context_window=self.context_window,
+                    success=True,
+                )
+
             # Save to session if using sessions
             if use_session:
                 self.session_manager.add_message("user", full_prompt)
@@ -311,20 +375,54 @@ class OllamaAgent(BaseAgent):
             )
 
         except requests.exceptions.Timeout:
+            error_msg = f"Ollama request timed out after {self.timeout}s"
+            duration = time.time() - start_time
+            # Dev logging: log timeout error
+            if self._dev_logger and self._current_run_id and self._current_state:
+                self._dev_logger.log_llm_response(
+                    run_id=self._current_run_id,
+                    state=self._current_state,
+                    agent=self.name,
+                    model=self.model,
+                    content="",
+                    input_tokens=0,
+                    output_tokens=0,
+                    duration_ms=int(duration * 1000),
+                    context_window=self.context_window,
+                    success=False,
+                    error=error_msg,
+                )
             return AgentResult(
                 success=False,
                 content="",
                 tokens=TokenUsage(input_tokens=0, output_tokens=0),
-                duration_s=time.time() - start_time,
-                error=f"Ollama request timed out after {self.timeout}s",
+                duration_s=duration,
+                error=error_msg,
             )
         except requests.exceptions.RequestException as e:
+            error_msg = f"Ollama request failed: {e}"
+            duration = time.time() - start_time
+            # Dev logging: log request error
+            if self._dev_logger and self._current_run_id and self._current_state:
+                self._dev_logger.log_llm_response(
+                    run_id=self._current_run_id,
+                    state=self._current_state,
+                    agent=self.name,
+                    model=self.model,
+                    content="",
+                    input_tokens=0,
+                    output_tokens=0,
+                    duration_ms=int(duration * 1000),
+                    context_window=self.context_window,
+                    success=False,
+                    error=error_msg,
+                )
             return AgentResult(
                 success=False,
                 content="",
                 tokens=TokenUsage(input_tokens=0, output_tokens=0),
-                duration_s=time.time() - start_time,
-                error=f"Ollama request failed: {e}",
+                duration_s=duration,
+                error=error_msg,
             )
 
     def _ensure_model_available(self, model_name: str) -> bool:

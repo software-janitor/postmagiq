@@ -12,9 +12,10 @@ from typing import Optional
 from runner.models import RunManifest
 from runner.state_machine import StateMachine
 from runner.logging import StateLogger, AgentLogger, SummaryGenerator
+from runner.logging.dev_logger import DevLogger
 from runner.content.ids import get_system_user_id
 from runner.content.workflow_store import WorkflowStore
-from runner.config import resolve_workflow_config, list_workflow_configs
+from runner.config import resolve_workflow_config, list_workflow_configs, DEV_MODE
 
 
 class WorkflowRunner:
@@ -173,6 +174,18 @@ class WorkflowRunner:
         agent_logger = AgentLogger(run_dir)
         summary_generator = SummaryGenerator(run_dir, run_id)
 
+        # Create dev logger if DEV_MODE is enabled (for LLM message visibility)
+        # The broadcast_callback forwards events to the log_callback for WebSocket broadcasting
+        def dev_broadcast_callback(event: dict):
+            if log_callback:
+                log_callback(event)
+
+        dev_logger = (
+            DevLogger(run_dir, broadcast_callback=dev_broadcast_callback, enabled=True)
+            if DEV_MODE
+            else None
+        )
+
         manifest = RunManifest(
             run_id=run_id,
             story=story,
@@ -233,6 +246,7 @@ class WorkflowRunner:
             agent_logger=agent_logger,
             approval_callback=approval_callback,
             database=self.db,  # Primary storage
+            dev_logger=dev_logger,  # LLM message visibility (DEV_MODE only)
         )
         state_machine.initialize(run_id)
 

@@ -1,9 +1,12 @@
 """Abstract base class for all agent implementations."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from runner.models import AgentResult, TokenUsage
+
+if TYPE_CHECKING:
+    from runner.logging.dev_logger import DevLogger
 
 
 class BaseAgent(ABC):
@@ -14,6 +17,34 @@ class BaseAgent(ABC):
         self.name = config.get("name", "unknown")
         self.context_window = config.get("context_window", 100000)
         self.cost_per_1k = config.get("cost_per_1k", {"input": 0.0, "output": 0.0})
+
+        # Dev logging (set externally when DEV_MODE is enabled)
+        self._dev_logger: Optional["DevLogger"] = None
+        self._current_run_id: Optional[str] = None
+        self._current_state: Optional[str] = None
+
+    def set_dev_logger(
+        self,
+        dev_logger: "DevLogger",
+        run_id: str,
+        state: str,
+    ) -> None:
+        """Set dev logger for request/response visibility.
+
+        Args:
+            dev_logger: DevLogger instance
+            run_id: Current workflow run ID
+            state: Current state name
+        """
+        self._dev_logger = dev_logger
+        self._current_run_id = run_id
+        self._current_state = state
+
+    def clear_dev_logger(self) -> None:
+        """Clear dev logger reference."""
+        self._dev_logger = None
+        self._current_run_id = None
+        self._current_state = None
 
     @abstractmethod
     def invoke(self, prompt: str, input_files: Optional[list[str]] = None) -> AgentResult:

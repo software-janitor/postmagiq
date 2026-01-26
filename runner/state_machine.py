@@ -33,6 +33,7 @@ class StateMachine:
         agent_logger=None,
         approval_callback: Optional[Callable[[dict], None]] = None,
         database=None,  # Database for primary storage
+        dev_logger=None,  # Dev logger for LLM message visibility
     ):
         self.config = config
         self.states = config.get("states", {})
@@ -43,6 +44,7 @@ class StateMachine:
         self.agent_logger = agent_logger
         self.approval_callback = approval_callback
         self.db = database  # Primary storage
+        self.dev_logger = dev_logger  # Dev logger for LLM visibility
 
         self.agents = agents or {}
         self._agent_configs = config.get("agents", {})
@@ -241,7 +243,7 @@ class StateMachine:
                 # If last audit score >= 8, auto-proceed (story is good enough)
                 if self.last_audit_score is not None and self.last_audit_score >= AUTO_PROCEED_THRESHOLD:
                     # Look for success/proceed transition (different states use different names)
-                    transitions = state_config.get("transitions", {})
+                    transitions = self._get_transitions(state_config)
                     skip_target = transitions.get("success") or transitions.get("proceed")
                     if skip_target:
                         self.log_callback({
@@ -274,7 +276,7 @@ class StateMachine:
 
                     if decision == "approved" or decision == "feedback":
                         # User wants to skip forward - find the "success" or "proceed" transition
-                        transitions = state_config.get("transitions", {})
+                        transitions = self._get_transitions(state_config)
                         skip_target = transitions.get("success") or transitions.get("proceed")
                         if skip_target:
                             self.log_callback({
@@ -498,18 +500,21 @@ class StateMachine:
         result = self._invoke_agent(agent_name, prompt, output_path, state_name)
 
         if result.status == "success":
-            audit = self._parse_audit_result(result)
-            if audit:
-                if audit.decision == "retry":
-                    target = state.get("transitions", {}).get("retry")
-                    if target:
-                        self.retry_feedback[target] = audit.feedback
-                return StateResult(
-                    state_name=state_name,
-                    transition=audit.decision,
-                    outputs={agent_name: result},
-                    total_tokens=result.tokens,
-                )
+            # Only parse as audit result for audit/review output types
+            output_type = state.get("output_type", "")
+            if output_type in ("audit", "review", "final_audit"):
+                audit = self._parse_audit_result(result)
+                if audit:
+                    if audit.decision == "retry":
+                        target = self._get_transitions(state).get("retry")
+                        if target:
+                            self.retry_feedback[target] = audit.feedback
+                    return StateResult(
+                        state_name=state_name,
+                        transition=audit.decision,
+                        outputs={agent_name: result},
+                        total_tokens=result.tokens,
+                    )
 
         transition = "success" if result.status == "success" else "failure"
         return StateResult(
@@ -627,9 +632,17 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
                 "message": "Starting new session (no previous session found)",
             })
 
+        # Set dev logger for LLM visibility (if enabled)
+        if self.dev_logger and self.run_id:
+            agent.set_dev_logger(self.dev_logger, self.run_id, state_name)
+
         # Use session ID based on run_id for continuity
         session_id = f"orchestrator_{self.run_id}"
         result = agent.invoke_with_session(session_id, prompt)
+
+        # Clear dev logger after invocation
+        if self.dev_logger:
+            agent.clear_dev_logger()
 
         duration = time.time() - start_time
 
@@ -747,7 +760,7 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
 
         # Store feedback for retry state if applicable
         if decision == "feedback" and feedback:
-            target = state.get("transitions", {}).get("feedback")
+            target = self._get_transitions(state).get("feedback")
             if target:
                 self.retry_feedback[target] = feedback
 
@@ -786,7 +799,16 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
 
         try:
             agent = self.get_agent(agent_name)
+
+            # Set dev logger for LLM visibility (if enabled)
+            if self.dev_logger and self.run_id:
+                agent.set_dev_logger(self.dev_logger, self.run_id, state)
+
             result = agent.invoke(prompt)
+
+            # Clear dev logger after invocation
+            if self.dev_logger:
+                agent.clear_dev_logger()
             duration = time.time() - start_time
 
             if result.success:
@@ -897,15 +919,44 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
                 error=str(e),
             )
 
-    def _get_next_state(self, state_config: dict, result: StateResult) -> Optional[str]:
-        """Determine next state from transitions."""
-        transitions = state_config.get("transitions", {})
-        next_state = state_config.get("next")
+    def _get_transitions(self, state_config: dict) -> dict:
+        """Get transitions for a state, merging with defaults.
 
-        if result.transition in transitions:
-            return transitions[result.transition]
-        elif next_state:
-            return next_state
+        Default transitions from config are used as base, then
+        state-specific transitions override them.
+        """
+        # Get default transitions from config (if defined)
+        defaults = self.config.get("default_transitions", {})
+        # Get state-specific transitions
+        state_transitions = state_config.get("transitions", {})
+        # Merge: state-specific overrides defaults
+        return {**defaults, **state_transitions}
+
+    def _get_next_state(self, state_config: dict, result: StateResult) -> Optional[str]:
+        """Determine next state from transitions.
+
+        For states with explicit transitions: use merged transitions (state overrides defaults)
+        For states without explicit transitions: use 'next' field first, then defaults
+        """
+        next_state = state_config.get("next")
+        has_explicit_transitions = "transitions" in state_config
+
+        if has_explicit_transitions:
+            # Use merged transitions (state overrides defaults)
+            transitions = self._get_transitions(state_config)
+            if result.transition in transitions:
+                return transitions[result.transition]
+            # Fall back to next if transition not found
+            if next_state:
+                return next_state
+        else:
+            # No explicit transitions - check 'next' first (for initial states)
+            if next_state:
+                return next_state
+            # Then check defaults
+            defaults = self.config.get("default_transitions", {})
+            if result.transition in defaults:
+                return defaults[result.transition]
 
         return None
 

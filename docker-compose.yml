@@ -95,6 +95,8 @@ services:
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - OLLAMA_HOST=${OLLAMA_HOST:-http://192.168.165.62:11434}
       - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.3:70b}
+      # Dev mode - log full LLM requests/responses
+      - POSTMAGIQ_DEV_MODE=${POSTMAGIQ_DEV_MODE:-true}
     depends_on:
       redis:
         condition: service_healthy
@@ -127,6 +129,8 @@ services:
     environment:
       # Use Docker service name for API proxy target
       - VITE_API_TARGET=http://api:8000
+      # Dev mode - show LLM console
+      - VITE_DEV_MODE=${VITE_DEV_MODE:-true}
 
 volumes:
   postmagiq_postgres_data_v2:

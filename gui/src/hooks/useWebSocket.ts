@@ -1,5 +1,6 @@
 import { useEffect, useCallback } from 'react'
 import { useWorkflowStore, ModelMetrics } from '../stores/workflowStore'
+import { useDevStore } from '../stores/devStore'
 import { getAccessToken } from '../stores/authStore'
 
 // Singleton WebSocket instance - shared across all components
@@ -34,6 +35,22 @@ interface WebSocketMessage {
   state?: string
   session_id?: string
   agent_metrics?: Record<string, ModelMetrics>
+
+  // LLM message fields (DEV_MODE)
+  model?: string
+  system_prompt?: string
+  user_message?: string
+  tokens?: {
+    input: number
+    output: number
+    total: number
+  }
+  duration_ms?: number
+  context_window?: number
+  context_usage_percent?: number
+  context_remaining?: number
+  context_warning?: string
+  success?: boolean
 }
 
 // Human-readable descriptions for workflow events
@@ -249,6 +266,43 @@ export function useWebSocket() {
         if (message.agent_metrics) {
           updateModelMetrics(message.state || '', message.agent_metrics)
         }
+        break
+
+      // DEV_MODE: LLM message events
+      case 'llm:request':
+        useDevStore.getState().addMessage({
+          type: 'request',
+          timestamp: message.timestamp || new Date().toISOString(),
+          runId: message.run_id || '',
+          state: message.state || '',
+          agent: message.agent || '',
+          model: message.model || '',
+          systemPrompt: message.system_prompt,
+          userMessage: message.user_message,
+          contextWindow: message.context_window || 0,
+          contextUsagePercent: message.context_usage_percent,
+          contextWarning: message.context_warning,
+        })
+        break
+
+      case 'llm:response':
+        useDevStore.getState().addMessage({
+          type: 'response',
+          timestamp: message.timestamp || new Date().toISOString(),
+          runId: message.run_id || '',
+          state: message.state || '',
+          agent: message.agent || '',
+          model: message.model || '',
+          content: message.content,
+          tokens: message.tokens,
+          durationMs: message.duration_ms,
+          contextWindow: message.context_window || 0,
+          contextUsagePercent: message.context_usage_percent,
+          contextRemaining: message.context_remaining,
+          contextWarning: message.context_warning,
+          success: message.success,
+          error: message.error,
+        })
         break
     }
   }, [setRunning, setPaused, setAborted, setCurrentRun, setCurrentState, setAwaitingApproval, updateMetrics, updateModelMetrics, addEvent, setOutput, setError, reset])
