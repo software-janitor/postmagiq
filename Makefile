@@ -305,6 +305,7 @@ dev:
 	@docker compose exec postgres pg_isready -U orchestrator || (echo "Waiting for postgres..." && sleep 5)
 	cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator alembic upgrade head
 	@echo "Migrations complete. Starting all services..."
+	@trap 'docker compose $(COMPOSE_FILES) down' INT TERM; \
 	docker compose $(COMPOSE_FILES) up --build
 
 # Development mode (Local) - starts API and GUI on host machine
