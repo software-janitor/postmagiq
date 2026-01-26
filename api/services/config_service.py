@@ -1,15 +1,29 @@
 """Service for workflow configuration management."""
 
+import os
 from pathlib import Path
 from typing import Optional
 
 import yaml
 
 
+def get_default_config_path() -> str:
+    """Get config path based on LLM_PROVIDER environment variable."""
+    provider = os.environ.get("LLM_PROVIDER", "cli")
+    config_map = {
+        "groq": "workflow_config.groq.yaml",
+        "ollama": "workflow_config.ollama.yaml",
+        "cli": "workflow_config.yaml",  # Original CLI agents (claude, gemini, gpt)
+    }
+    return config_map.get(provider, "workflow_config.yaml")
+
+
 class ConfigService:
     """Service for reading and validating workflow config."""
 
-    def __init__(self, config_path: str = "workflow_config.yaml"):
+    def __init__(self, config_path: Optional[str] = None):
+        if config_path is None:
+            config_path = get_default_config_path()
         self.config_path = Path(config_path)
 
     def get_config(self) -> dict:

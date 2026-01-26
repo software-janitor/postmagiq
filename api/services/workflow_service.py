@@ -9,6 +9,7 @@ from typing import Optional, Any
 from threading import Thread
 
 from api.models.api_models import WorkflowStatus
+from api.services.config_service import get_default_config_path
 from api.websocket.manager import manager
 from runner.content.ids import normalize_user_id
 from runner.content.repository import PostRepository
@@ -30,8 +31,9 @@ def _broadcast_from_thread(loop: asyncio.AbstractEventLoop, coro):
 class WorkflowService:
     """Service for controlling workflow execution."""
 
-    def __init__(self, config_path: str = "workflow_config.yaml"):
-        self.config_path = config_path
+    def __init__(self, config_path: str = None):
+        # Use LLM_PROVIDER-based config selection if no explicit path provided
+        self.config_path = config_path or get_default_config_path()
         self.current_run_id: Optional[str] = None
         self.current_story: Optional[str] = None
         self.current_user_id: Optional[str] = None  # Set during execute()
