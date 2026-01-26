@@ -131,24 +131,45 @@ class OllamaAgent(BaseAgent):
         return self.tier_config["models"].get(tier, self.model)
 
     def invoke(
-        self, prompt: str, input_files: Optional[list[str]] = None
+        self, prompt: str, input_files: Optional[list[str]] = None,
+        json_mode: bool = None
     ) -> AgentResult:
         """One-shot invocation without session context.
 
         Args:
             prompt: The prompt to send
             input_files: Optional list of files to include as context
+            json_mode: If True, force JSON output format. If None, auto-detect from prompt.
 
         Returns:
             AgentResult with response and metadata
         """
-        return self._invoke_internal(prompt, input_files, use_session=False)
+        # Auto-detect JSON mode if not explicitly set
+        if json_mode is None:
+            json_mode = self._should_use_json_mode(prompt)
+        return self._invoke_internal(prompt, input_files, use_session=False, json_mode=json_mode)
+
+    def _should_use_json_mode(self, prompt: str) -> bool:
+        """Detect if prompt requires JSON output.
+
+        Looks for indicators that the persona expects JSON output format.
+        """
+        json_indicators = [
+            "Return ONLY valid JSON",
+            "Output Format",
+            '{"score":',
+            '"decision":',
+            "Required fields:",
+            "# Auditor Persona",
+        ]
+        return any(indicator in prompt for indicator in json_indicators)
 
     def invoke_with_session(
         self,
         session_id: str,
         prompt: str,
         input_files: Optional[list[str]] = None,
+        json_mode: bool = False,
     ) -> AgentResult:
         """Invocation with session context.
 
@@ -158,6 +179,7 @@ class OllamaAgent(BaseAgent):
             session_id: Session identifier
             prompt: The prompt to send
             input_files: Optional list of files to include as context
+            json_mode: If True, force JSON output format
 
         Returns:
             AgentResult with response and metadata
@@ -166,13 +188,14 @@ class OllamaAgent(BaseAgent):
         if not self.session_manager.load_session(session_id):
             self.session_manager.create_session(session_id)
 
-        return self._invoke_internal(prompt, input_files, use_session=True)
+        return self._invoke_internal(prompt, input_files, use_session=True, json_mode=json_mode)
 
     def _invoke_internal(
         self,
         prompt: str,
         input_files: Optional[list[str]],
         use_session: bool,
+        json_mode: bool = False,
     ) -> AgentResult:
         """Internal invocation logic.
 
@@ -180,6 +203,7 @@ class OllamaAgent(BaseAgent):
             prompt: The prompt to send
             input_files: Optional list of files to include
             use_session: Whether to use session context
+            json_mode: If True, force JSON output format
 
         Returns:
             AgentResult with response and metadata
@@ -234,13 +258,18 @@ class OllamaAgent(BaseAgent):
                 )
 
             # Use chat API for proper multi-turn support
+            request_body = {
+                "model": self.model,
+                "messages": messages,
+                "stream": False,
+            }
+            # Force JSON output format if requested
+            if json_mode:
+                request_body["format"] = "json"
+
             response = requests.post(
                 f"{self.host}/api/chat",
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    "stream": False,
-                },
+                json=request_body,
                 timeout=self.timeout,
             )
             response.raise_for_status()
