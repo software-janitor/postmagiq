@@ -4,33 +4,8 @@ import pytest
 from unittest.mock import MagicMock, patch, mock_open
 import requests
 
-from runner.agents.ollama import OllamaAgent, MODEL_MAP, MODEL_TIERS
+from runner.agents.ollama import OllamaAgent, MODEL_TIERS
 from runner.models import TokenUsage
-
-
-class TestOllamaModelMapping:
-    """Tests for model alias mapping."""
-
-    def test_llama4_aliases(self):
-        """Llama 4 model aliases resolve correctly."""
-        assert MODEL_MAP["llama4-scout"] == "llama4:scout"
-        assert MODEL_MAP["llama4"] == "llama4:scout"
-
-    def test_llama3_aliases(self):
-        """Llama 3.x model aliases resolve correctly."""
-        assert MODEL_MAP["llama-70b"] == "llama3.3:70b"
-        assert MODEL_MAP["llama-8b"] == "llama3.1:8b"
-        assert MODEL_MAP["llama3.3"] == "llama3.3:70b"
-
-    def test_mixtral_aliases(self):
-        """Mixtral model aliases resolve correctly."""
-        assert MODEL_MAP["mixtral-8x22b"] == "mixtral:8x22b"
-        assert MODEL_MAP["mixtral"] == "mixtral:8x22b"
-
-    def test_qwen_aliases(self):
-        """Qwen model aliases resolve correctly."""
-        assert MODEL_MAP["qwen-32b"] == "qwen3:32b"
-        assert MODEL_MAP["qwen3"] == "qwen3:32b"
 
 
 class TestOllamaModelTiers:
@@ -40,7 +15,7 @@ class TestOllamaModelTiers:
         """CPU tier has minimal models."""
         tier = MODEL_TIERS["tier_cpu"]
         assert tier["vram_range"] == (0, 6)
-        assert "1b" in tier["models"]["writer"]
+        assert "phi3" in tier["models"]["writer"]  # phi3:mini for CPU
         assert tier["max_context"] == 4096
 
     def test_tier_8gb_config(self):
@@ -66,7 +41,7 @@ class TestOllamaAgent:
         return {
             "name": "ollama",
             "type": "ollama",
-            "model": "llama-70b",
+            "model": "llama3.3:70b",
             "timeout": 300,
         }
 
@@ -80,28 +55,28 @@ class TestOllamaAgent:
 
         agent = OllamaAgent(ollama_config, session_dir=str(tmp_path))
 
-        assert agent.model == "llama3.3:70b"  # llama-70b alias resolved
+        assert agent.model == "llama3.3:70b"
         assert agent.timeout == 300
         assert agent.tier == "tier_48gb"
 
     @patch("runner.agents.ollama.detect_gpu")
     @patch("runner.agents.ollama.get_model_tier")
     @patch("runner.agents.ollama.FileBasedSessionManager")
-    def test_model_alias_resolution(self, mock_session, mock_tier, mock_gpu, tmp_path):
-        """Model aliases are resolved during init."""
+    def test_model_from_config(self, mock_session, mock_tier, mock_gpu, tmp_path):
+        """Model from config is used directly."""
         mock_gpu.return_value = MagicMock(vendor="nvidia", vram_gb=48, name="RTX 4090")
         mock_tier.return_value = "tier_48gb"
 
-        config = {"model": "llama4-scout", "timeout": 60}
+        config = {"model": "llama3.1:8b", "timeout": 60}
         agent = OllamaAgent(config, session_dir=str(tmp_path))
 
-        assert agent.model == "llama4:scout"
+        assert agent.model == "llama3.1:8b"
 
     @patch("runner.agents.ollama.detect_gpu")
     @patch("runner.agents.ollama.get_model_tier")
     @patch("runner.agents.ollama.FileBasedSessionManager")
-    def test_unknown_model_passes_through(self, mock_session, mock_tier, mock_gpu, tmp_path):
-        """Unknown models pass through without modification."""
+    def test_custom_model_passes_through(self, mock_session, mock_tier, mock_gpu, tmp_path):
+        """Custom models pass through without modification."""
         mock_gpu.return_value = MagicMock(vendor="nvidia", vram_gb=48, name="RTX 4090")
         mock_tier.return_value = "tier_48gb"
 
@@ -274,3 +249,336 @@ class TestOllamaAgent:
         agent = OllamaAgent(ollama_config, session_dir=str(tmp_path))
 
         assert agent.host == "http://192.168.1.100:11434"
+
+
+class TestOllamaJsonMode:
+    """Tests for JSON mode detection and API formatting."""
+
+    @pytest.fixture
+    def ollama_config(self):
+        """Basic Ollama agent config."""
+        return {"model": "llama3.3:70b", "timeout": 300}
+
+    @patch("runner.agents.ollama.detect_gpu")
+    @patch("runner.agents.ollama.get_model_tier")
+    @patch("runner.agents.ollama.FileBasedSessionManager")
+    def test_json_mode_detected_for_auditor_persona(self, mock_session, mock_tier, mock_gpu, ollama_config, tmp_path):
+        """JSON mode is enabled when prompt contains Auditor Persona."""
+        mock_gpu.return_value = MagicMock(vendor="nvidia", vram_gb=48, name="RTX 4090")
+        mock_tier.return_value = "tier_48gb"
+
+        agent = OllamaAgent(ollama_config, session_dir=str(tmp_path))
+
+        prompt = """# Auditor Persona
+
+You are a quality gate auditor...
+
+## Input Files
+content here"""
+
+        assert agent._should_use_json_mode(prompt) is True
+
+    @patch("runner.agents.ollama.detect_gpu")
+    @patch("runner.agents.ollama.get_model_tier")
+    @patch("runner.agents.ollama.FileBasedSessionManager")
+    def test_json_mode_detected_for_json_output_instruction(self, mock_session, mock_tier, mock_gpu, ollama_config, tmp_path):
+        """JSON mode is enabled when prompt says 'Return ONLY valid JSON'."""
+        mock_gpu.return_value = MagicMock(vendor="nvidia", vram_gb=48, name="RTX 4090")
+        mock_tier.return_value = "tier_48gb"
+
+        agent = OllamaAgent(ollama_config, session_dir=str(tmp_path))
+
+        prompt = """Some persona instructions.
+
+Return ONLY valid JSON. Do not wrap in markdown.
+
+## Input Files
+content"""
+
+        assert agent._should_use_json_mode(prompt) is True
+
+    @patch("runner.agents.ollama.detect_gpu")
+    @patch("runner.agents.ollama.get_model_tier")
+    @patch("runner.agents.ollama.FileBasedSessionManager")
+    def test_json_mode_detected_for_decision_field(self, mock_session, mock_tier, mock_gpu, ollama_config, tmp_path):
+        """JSON mode is enabled when prompt contains decision field example."""
+        mock_gpu.return_value = MagicMock(vendor="nvidia", vram_gb=48, name="RTX 4090")
+        mock_tier.return_value = "tier_48gb"
+
+        agent = OllamaAgent(ollama_config, session_dir=str(tmp_path))
+
+        prompt = """Instructions with example:
+{"score": 8, "decision": "proceed", "feedback": "Good"}
+"""
+
+        assert agent._should_use_json_mode(prompt) is True
+
+    @patch("runner.agents.ollama.detect_gpu")
+    @patch("runner.agents.ollama.get_model_tier")
+    @patch("runner.agents.ollama.FileBasedSessionManager")
+    def test_json_mode_not_detected_for_writer(self, mock_session, mock_tier, mock_gpu, ollama_config, tmp_path):
+        """JSON mode is NOT enabled for writer persona (prose output)."""
+        mock_gpu.return_value = MagicMock(vendor="nvidia", vram_gb=48, name="RTX 4090")
+        mock_tier.return_value = "tier_48gb"
+
+        agent = OllamaAgent(ollama_config, session_dir=str(tmp_path))
+
+        prompt = """# Writer Persona
+
+You are a LinkedIn post writer. Write engaging prose.
+
+## Input Files
+story content here"""
+
+        assert agent._should_use_json_mode(prompt) is False
+
+    @patch("runner.agents.ollama.detect_gpu")
+    @patch("runner.agents.ollama.get_model_tier")
+    @patch("runner.agents.ollama.FileBasedSessionManager")
+    @patch("runner.agents.ollama.requests.post")
+    @patch("runner.agents.ollama.requests.get")
+    def test_json_format_sent_to_api_when_detected(self, mock_get, mock_post, mock_session, mock_tier, mock_gpu, ollama_config, tmp_path):
+        """format: 'json' is sent to Ollama API when JSON mode detected."""
+        mock_gpu.return_value = MagicMock(vendor="nvidia", vram_gb=48, name="RTX 4090")
+        mock_tier.return_value = "tier_48gb"
+
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"models": [{"name": "llama3.3:70b"}]}
+        )
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "message": {"content": '{"score": 8, "decision": "proceed"}'},
+                "prompt_eval_count": 100,
+                "eval_count": 50,
+            },
+            raise_for_status=lambda: None,
+        )
+
+        agent = OllamaAgent(ollama_config, session_dir=str(tmp_path))
+
+        # Prompt that triggers JSON mode
+        prompt = """# Auditor Persona
+Return ONLY valid JSON.
+## Input Files
+content"""
+
+        agent.invoke(prompt)
+
+        # Check that format: json was in the request
+        call_args = mock_post.call_args
+        request_body = call_args[1]["json"]
+        assert request_body.get("format") == "json"
+
+    @patch("runner.agents.ollama.detect_gpu")
+    @patch("runner.agents.ollama.get_model_tier")
+    @patch("runner.agents.ollama.FileBasedSessionManager")
+    @patch("runner.agents.ollama.requests.post")
+    @patch("runner.agents.ollama.requests.get")
+    def test_json_format_not_sent_for_prose(self, mock_get, mock_post, mock_session, mock_tier, mock_gpu, ollama_config, tmp_path):
+        """format: 'json' is NOT sent for prose output prompts."""
+        mock_gpu.return_value = MagicMock(vendor="nvidia", vram_gb=48, name="RTX 4090")
+        mock_tier.return_value = "tier_48gb"
+
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"models": [{"name": "llama3.3:70b"}]}
+        )
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "message": {"content": "A beautifully written post..."},
+                "prompt_eval_count": 100,
+                "eval_count": 50,
+            },
+            raise_for_status=lambda: None,
+        )
+
+        agent = OllamaAgent(ollama_config, session_dir=str(tmp_path))
+
+        # Writer prompt - no JSON mode
+        prompt = """# Writer Persona
+Write engaging LinkedIn posts.
+## Input Files
+story content"""
+
+        agent.invoke(prompt)
+
+        # Check that format was NOT in the request
+        call_args = mock_post.call_args
+        request_body = call_args[1]["json"]
+        assert "format" not in request_body
+
+    @patch("runner.agents.ollama.detect_gpu")
+    @patch("runner.agents.ollama.get_model_tier")
+    @patch("runner.agents.ollama.FileBasedSessionManager")
+    @patch("runner.agents.ollama.requests.post")
+    @patch("runner.agents.ollama.requests.get")
+    def test_explicit_json_mode_override(self, mock_get, mock_post, mock_session, mock_tier, mock_gpu, ollama_config, tmp_path):
+        """Explicit json_mode=True overrides auto-detection."""
+        mock_gpu.return_value = MagicMock(vendor="nvidia", vram_gb=48, name="RTX 4090")
+        mock_tier.return_value = "tier_48gb"
+
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"models": [{"name": "llama3.3:70b"}]}
+        )
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "message": {"content": '{"data": "value"}'},
+                "prompt_eval_count": 100,
+                "eval_count": 50,
+            },
+            raise_for_status=lambda: None,
+        )
+
+        agent = OllamaAgent(ollama_config, session_dir=str(tmp_path))
+
+        # Simple prompt that wouldn't trigger auto-detection
+        prompt = "Generate some data"
+
+        agent.invoke(prompt, json_mode=True)
+
+        call_args = mock_post.call_args
+        request_body = call_args[1]["json"]
+        assert request_body.get("format") == "json"
+
+
+class TestOllamaMessageSplitting:
+    """Tests for system/user message splitting."""
+
+    @pytest.fixture
+    def ollama_config(self):
+        """Basic Ollama agent config."""
+        return {"model": "llama3.3:70b", "timeout": 300}
+
+    @patch("runner.agents.ollama.detect_gpu")
+    @patch("runner.agents.ollama.get_model_tier")
+    @patch("runner.agents.ollama.FileBasedSessionManager")
+    @patch("runner.agents.ollama.requests.post")
+    @patch("runner.agents.ollama.requests.get")
+    def test_prompt_split_at_input_files(self, mock_get, mock_post, mock_session, mock_tier, mock_gpu, ollama_config, tmp_path):
+        """Prompt is split into system and user messages at '## Input Files'."""
+        mock_gpu.return_value = MagicMock(vendor="nvidia", vram_gb=48, name="RTX 4090")
+        mock_tier.return_value = "tier_48gb"
+
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"models": [{"name": "llama3.3:70b"}]}
+        )
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "message": {"content": "Response"},
+                "prompt_eval_count": 100,
+                "eval_count": 50,
+            },
+            raise_for_status=lambda: None,
+        )
+
+        agent = OllamaAgent(ollama_config, session_dir=str(tmp_path))
+
+        prompt = """# Writer Persona
+
+You are a LinkedIn post writer.
+
+## Input Files
+
+File content here"""
+
+        agent.invoke(prompt, json_mode=False)
+
+        call_args = mock_post.call_args
+        messages = call_args[1]["json"]["messages"]
+
+        # Should have system + user messages
+        assert len(messages) == 2
+        assert messages[0]["role"] == "system"
+        assert "# Writer Persona" in messages[0]["content"]
+        assert messages[1]["role"] == "user"
+        assert "## Input Files" in messages[1]["content"]
+
+    @patch("runner.agents.ollama.detect_gpu")
+    @patch("runner.agents.ollama.get_model_tier")
+    @patch("runner.agents.ollama.FileBasedSessionManager")
+    @patch("runner.agents.ollama.requests.post")
+    @patch("runner.agents.ollama.requests.get")
+    def test_prompt_split_at_context(self, mock_get, mock_post, mock_session, mock_tier, mock_gpu, ollama_config, tmp_path):
+        """Prompt is split at '## Context' if no Input Files marker."""
+        mock_gpu.return_value = MagicMock(vendor="nvidia", vram_gb=48, name="RTX 4090")
+        mock_tier.return_value = "tier_48gb"
+
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"models": [{"name": "llama3.3:70b"}]}
+        )
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "message": {"content": "Response"},
+                "prompt_eval_count": 100,
+                "eval_count": 50,
+            },
+            raise_for_status=lambda: None,
+        )
+
+        agent = OllamaAgent(ollama_config, session_dir=str(tmp_path))
+
+        prompt = """# Persona Instructions
+
+Do something useful.
+
+## Context
+
+Previous context here"""
+
+        agent.invoke(prompt, json_mode=False)
+
+        call_args = mock_post.call_args
+        messages = call_args[1]["json"]["messages"]
+
+        assert len(messages) == 2
+        assert messages[0]["role"] == "system"
+        assert "# Persona Instructions" in messages[0]["content"]
+        assert messages[1]["role"] == "user"
+        assert "## Context" in messages[1]["content"]
+
+    @patch("runner.agents.ollama.detect_gpu")
+    @patch("runner.agents.ollama.get_model_tier")
+    @patch("runner.agents.ollama.FileBasedSessionManager")
+    @patch("runner.agents.ollama.requests.post")
+    @patch("runner.agents.ollama.requests.get")
+    def test_simple_prompt_no_split(self, mock_get, mock_post, mock_session, mock_tier, mock_gpu, ollama_config, tmp_path):
+        """Simple prompts without markers are sent as single user message."""
+        mock_gpu.return_value = MagicMock(vendor="nvidia", vram_gb=48, name="RTX 4090")
+        mock_tier.return_value = "tier_48gb"
+
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"models": [{"name": "llama3.3:70b"}]}
+        )
+        mock_post.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {
+                "message": {"content": "Response"},
+                "prompt_eval_count": 100,
+                "eval_count": 50,
+            },
+            raise_for_status=lambda: None,
+        )
+
+        agent = OllamaAgent(ollama_config, session_dir=str(tmp_path))
+
+        prompt = "Just a simple question without any structure"
+
+        agent.invoke(prompt, json_mode=False)
+
+        call_args = mock_post.call_args
+        messages = call_args[1]["json"]["messages"]
+
+        # Should have just one user message
+        assert len(messages) == 1
+        assert messages[0]["role"] == "user"
+        assert messages[0]["content"] == prompt
