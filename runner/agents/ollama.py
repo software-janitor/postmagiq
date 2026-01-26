@@ -199,10 +199,28 @@ class OllamaAgent(BaseAgent):
         full_prompt = f"{context}\n\n{prompt}" if context else prompt
 
         # Build messages for chat API
+        # Split prompt into system (persona/instructions) and user (task/input) messages
         messages = []
+        system_content = None
+        user_content = full_prompt
+
+        # Look for "## Input Files" or "## Context" as the split point
+        # Everything before is system instructions, everything after is user input
+        for marker in ["## Input Files", "## Context", "## File:"]:
+            if marker in full_prompt:
+                idx = full_prompt.find(marker)
+                system_content = full_prompt[:idx].strip()
+                user_content = full_prompt[idx:].strip()
+                break
+
         if use_session:
             messages = self.session_manager.get_context_for_ollama()
-        messages.append({"role": "user", "content": full_prompt})
+
+        # Add system message if we extracted persona instructions
+        if system_content and not any(m.get("role") == "system" for m in messages):
+            messages.insert(0, {"role": "system", "content": system_content})
+
+        messages.append({"role": "user", "content": user_content})
 
         try:
             # Ensure model is available
