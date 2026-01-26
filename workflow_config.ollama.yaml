@@ -1,0 +1,177 @@
+# ============================================================================
+# WORKFLOW ORCHESTRATOR CONFIGURATION - OLLAMA (Local)
+# ============================================================================
+# Single model workflow - no fan-out, optimized for single GPU server
+# Set LLM_PROVIDER=ollama to use this config
+# Set OLLAMA_HOST to your server (default: http://192.168.165.62:11434)
+
+orchestrator:
+  agent: ollama
+  session:
+    enabled: true
+
+# ============================================================================
+# AGENT DEFINITIONS - Single Model
+# ============================================================================
+
+agents:
+  ollama:
+    type: ollama
+    enabled: true
+    model: llama3.3:70b
+    context_window: 128000
+    cost_per_1k:
+      input: 0.0
+      output: 0.0
+
+# ============================================================================
+# PERSONA DEFINITIONS
+# ============================================================================
+
+personas:
+  story-reviewer: prompts/story_reviewer_persona.md
+  story-processor: prompts/story_processor_persona.md
+  writer: prompts/writer_persona.md
+  auditor: prompts/auditor_persona.md
+  synthesizer: prompts/synthesizer_persona.md
+
+# ============================================================================
+# STATE MACHINE - Linear Pipeline (No Fan-out)
+# ============================================================================
+#
+# Flow: start → review → process → draft → audit → approval → complete
+#
+
+states:
+  start:
+    type: initial
+    next: story-review
+
+  story-review:
+    type: single
+    description: "Review raw story for completeness"
+    agent: ollama
+    persona: story-reviewer
+    input: "workflow/input/story_input.md"
+    output: "workflow/review/review_result.json"
+    output_type: review
+    transitions:
+      success: story-process
+      retry: story-feedback
+      failure: halt
+
+  story-feedback:
+    type: human-approval
+    description: "Get more details from user based on reviewer questions"
+    input: "workflow/review/review_result.json"
+    prompt: |
+      The reviewer has questions about your story.
+      Review the feedback above and either:
+      - Type 'proceed' to continue with what you have
+      - Type 'abort' to cancel
+      - Provide the requested details to strengthen your story
+    transitions:
+      approved: story-process
+      feedback: story-review
+      abort: halt
+
+  story-process:
+    type: single
+    description: "Extract elements, determine shape, create processed template"
+    agent: ollama
+    persona: story-processor
+    input: "workflow/input/story_input.md"
+    output: "workflow/processed/processed_story.md"
+    output_type: processed
+    transitions:
+      success: draft
+      failure: story-review
+
+  draft:
+    type: single
+    description: "Generate post draft from processed story"
+    agent: ollama
+    persona: writer
+    input: "workflow/processed/processed_story.md"
+    output: "workflow/drafts/draft.md"
+    output_type: draft
+    transitions:
+      success: audit
+      failure: halt
+
+  audit:
+    type: single
+    description: "Audit draft against source material"
+    agent: ollama
+    persona: auditor
+    input:
+      - "workflow/processed/processed_story.md"
+      - "workflow/input/story_input.md"
+      - "workflow/drafts/draft.md"
+    output: "workflow/audits/audit.json"
+    output_type: audit
+    transitions:
+      proceed: human-approval
+      retry: revise
+      halt: halt
+
+  revise:
+    type: single
+    description: "Revise draft based on audit feedback"
+    agent: ollama
+    persona: synthesizer
+    input:
+      - "workflow/drafts/draft.md"
+      - "workflow/audits/audit.json"
+    output: "workflow/final/final_post.md"
+    output_type: final
+    transitions:
+      success: final-audit
+      failure: draft
+
+  final-audit:
+    type: single
+    description: "Final quality check"
+    agent: ollama
+    persona: auditor
+    input:
+      - "workflow/processed/processed_story.md"
+      - "workflow/final/final_post.md"
+    output: "workflow/audits/final_audit.json"
+    output_type: audit
+    transitions:
+      proceed: human-approval
+      retry: revise
+      halt: halt
+
+  human-approval:
+    type: human-approval
+    description: "Human reviews final post"
+    input: "workflow/final/final_post.md"
+    prompt: |
+      Review the final post above and either:
+      - Type 'approve' to finalize
+      - Type 'retry' to regenerate
+      - Provide feedback for changes
+    transitions:
+      approved: complete
+      retry: draft
+      feedback: revise
+
+  complete:
+    type: terminal
+    description: "Workflow complete"
+
+  halt:
+    type: terminal
+    description: "Workflow halted"
+
+# ============================================================================
+# RUNTIME SETTINGS
+# ============================================================================
+
+runtime:
+  working_dir: "workflow"
+  parallel_fanout: false
+  timeout_per_agent: 600
+  retry_count: 2

@@ -7,7 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from api.auth.dependencies import CurrentUser, require_owner_role
+from api.auth.dependencies import CurrentUser, get_current_user, require_owner_role
 from api.models.api_models import ConfigUpdateRequest, ConfigValidationResult
 from api.services.config_service import ConfigService
 
@@ -72,7 +72,10 @@ async def get_personas(
 
 @router.get("/states")
 async def get_workflow_states(
-    current_user: Annotated[CurrentUser, Depends(require_owner_role())],
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ):
-    """Get workflow states with their agents for the UI."""
+    """Get workflow states with their agents for the UI.
+
+    Available to all authenticated users (not owner-only).
+    """
     return {"states": config_service.get_workflow_states()}

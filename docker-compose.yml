@@ -50,24 +50,6 @@ services:
       postgres:
         condition: service_healthy
 
-  # =============================================================================
-  # Ollama (Local LLM)
-  # =============================================================================
-  ollama:
-    image: ollama/ollama:latest
-    container_name: postmagiq-ollama-v2
-    ports:
-      - "11435:11434"
-    volumes:
-      # Persist models on host
-      - ~/.ollama:/root/.ollama
-    healthcheck:
-      test: ["CMD-SHELL", "ollama list || exit 1"]
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-
   api:
     build:
       context: .
@@ -80,6 +62,8 @@ services:
       # Mount local directories for file storage
       - ./workflow:/app/workflow
       - ./workflow_config.yaml:/app/workflow_config.yaml
+      - ./workflow_config.groq.yaml:/app/workflow_config.groq.yaml
+      - ./workflow_config.ollama.yaml:/app/workflow_config.ollama.yaml
       - ./prompts:/app/prompts
       # Mount content tracker from parent directory
       - ../linkedin_content_tracker.md:/app/linkedin_content_tracker.md:ro
@@ -96,7 +80,6 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - HOME=/root
-      - OLLAMA_HOST=http://ollama:11434
       - REDIS_URL=redis://redis:6379/0
       - DATABASE_URL=postgresql://orchestrator:${POSTGRES_PASSWORD:-orchestrator_dev}@postgres:5432/orchestrator
       # Stripe billing (required for payments)
@@ -107,9 +90,12 @@ services:
       - JWT_SECRET=${JWT_SECRET:-dev-jwt-secret-change-in-production}
       # Workflow configuration
       - DEPLOYMENT_ENV=${DEPLOYMENT_ENV:-development}
+      # LLM Provider: "groq" (cloud) or "ollama" (local)
+      - LLM_PROVIDER=${LLM_PROVIDER:-groq}
+      - GROQ_API_KEY=${GROQ_API_KEY:-}
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://192.168.165.62:11434}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.3:70b}
     depends_on:
-      ollama:
-        condition: service_healthy
       redis:
         condition: service_healthy
       postgres:
