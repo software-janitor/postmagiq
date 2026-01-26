@@ -399,7 +399,7 @@ export default function FinishedPosts() {
                   {selectedPostData.title}
                 </div>
                 <div className="text-zinc-300 whitespace-pre-wrap leading-relaxed">
-                  {selectedPostData.content.split('\n').slice(1).join('\n').trim()}
+                  {selectedPostData.content}
                 </div>
               </div>
             </div>
