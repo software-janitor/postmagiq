@@ -81,22 +81,10 @@ def _extract_title(content: str) -> str:
 
 
 def _get_workflow_run_with_final(workspace_id: UUID, story: str, user_id: UUID):
-    """Get the latest workflow run that has a 'final' output.
-
-    First tries workspace-scoped query, then falls back to user_id for legacy runs
-    that were created without workspace_id.
-    """
+    """Get the latest workflow run that has a 'final' output for this workspace."""
     with get_session() as session:
         repo = WorkflowRunRepository(session)
-
-        # Try workspace-scoped query first (for new runs with workspace_id)
-        run = repo.get_latest_with_final_output(user_id, story, workspace_id=workspace_id)
-        if run:
-            return run
-
-        # Fallback: query by user_id only (for legacy runs without workspace_id)
-        run = repo.get_latest_with_final_output(user_id, story)
-        return run
+        return repo.get_latest_with_final_output(user_id, story, workspace_id=workspace_id)
 
 
 def _get_workflow_outputs(run_id: str):

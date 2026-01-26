@@ -7,6 +7,7 @@ import tempfile
 from datetime import datetime
 from typing import Optional, Any
 from threading import Thread
+from uuid import UUID
 
 from api.models.api_models import WorkflowStatus
 from api.services.config_service import get_default_config_path
@@ -63,6 +64,7 @@ class WorkflowService:
         input_path: Optional[str] = None,
         content: Optional[str] = None,
         config: Optional[str] = None,
+        workspace_id: Optional[UUID] = None,
     ) -> dict:
         """Start workflow execution in background.
 
@@ -72,6 +74,7 @@ class WorkflowService:
             input_path: Optional path to input file
             content: Optional input content
             config: Optional workflow config slug (e.g., "groq-production")
+            workspace_id: Optional workspace for multi-tenant scoping
         """
         if self.running:
             return {"error": "Workflow already running", "run_id": self.current_run_id}
@@ -102,7 +105,7 @@ class WorkflowService:
         self.current_run_id = runner._generate_run_id(story)
 
         # Create workflow run in database
-        self._store.create_workflow_run(self.current_user_id, self.current_run_id, story)
+        self._store.create_workflow_run(self.current_user_id, self.current_run_id, story, workspace_id=workspace_id)
 
         # Save content to database (primary) and try file (secondary)
         if content:

@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from typing import Literal, Optional, Any
+from uuid import UUID
 from pydantic import BaseModel, Field
 
 
@@ -54,6 +55,7 @@ class WorkflowExecuteRequest(BaseModel):
     content: Optional[str] = None  # Raw content to process (alternative to input_path)
     interactive: bool = False
     config: Optional[str] = None  # Workflow config slug (e.g., "groq-production")
+    workspace_id: Optional[UUID] = None  # Workspace for multi-tenant scoping
 
 
 class WorkflowStepRequest(BaseModel):

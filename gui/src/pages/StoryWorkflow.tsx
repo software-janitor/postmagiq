@@ -18,12 +18,12 @@ import {
   PlayCircle,
   Square
 } from 'lucide-react'
-import { apiPost } from '../api/client'
 import { fetchAvailablePosts, PostMetadata } from '../api/posts'
-import { getLatestRunForStory, getWorkflowStates } from '../api/workflow'
+import { getLatestRunForStory, getWorkflowStates, startWorkflow } from '../api/workflow'
 import { clsx } from 'clsx'
 import { useThemeClasses } from '../hooks/useThemeClasses'
 import { useWorkflowStore } from '../stores/workflowStore'
+import { useWorkspaceStore } from '../stores/workspaceStore'
 import { useEffectiveFlags } from '../stores/flagsStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { pauseWorkflow, resumeWorkflow, abortWorkflow, submitApproval } from '../api/workflow'
@@ -103,6 +103,9 @@ export default function StoryWorkflow() {
     reset: resetWorkflow,
     setOutputs,
   } = useWorkflowStore()
+
+  // Get current workspace for multi-tenant scoping
+  const { currentWorkspace } = useWorkspaceStore()
 
   // Query client for invalidating queries
   const queryClient = useQueryClient()
@@ -227,7 +230,11 @@ export default function StoryWorkflow() {
 
   const executeWorkflow = useMutation({
     mutationFn: (data: { story: string; content: string }) =>
-      apiPost('/workflow/execute', { story: data.story, content: data.content }),
+      startWorkflow({
+        story: data.story,
+        content: data.content,
+        workspaceId: currentWorkspace?.id,
+      }),
   })
 
   const currentStepIndex = STEPS.findIndex(s => s.id === currentStep)

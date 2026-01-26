@@ -24,11 +24,21 @@ export async function getWorkflowStatus(): Promise<WorkflowStatus> {
   return apiGet<WorkflowStatus>('/workflow/status')
 }
 
-export async function startWorkflow(story: string, inputPath?: string, config?: string): Promise<ExecuteResult> {
+export interface StartWorkflowParams {
+  story: string
+  inputPath?: string
+  config?: string
+  content?: string
+  workspaceId?: string
+}
+
+export async function startWorkflow(params: StartWorkflowParams): Promise<ExecuteResult> {
   return apiPost<ExecuteResult>('/workflow/execute', {
-    story,
-    input_path: inputPath,
-    config,
+    story: params.story,
+    input_path: params.inputPath,
+    config: params.config,
+    content: params.content,
+    workspace_id: params.workspaceId,
   })
 }
 

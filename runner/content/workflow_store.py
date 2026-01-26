@@ -27,18 +27,17 @@ class WorkflowStore:
     # ---------------------------------------------------------------------
     # Workflow runs
     # ---------------------------------------------------------------------
-    def create_workflow_run(self, user_id, run_id: str, story: str):
+    def create_workflow_run(self, user_id, run_id: str, story: str, workspace_id: Optional[UUID] = None):
         with get_session() as session:
             repo = WorkflowRunRepository(session)
-            return repo.create(
-                repo.model.model_validate(
-                    {
-                        "user_id": normalize_user_id(user_id),
-                        "run_id": run_id,
-                        "story": story,
-                    }
-                )
-            )
+            data = {
+                "user_id": normalize_user_id(user_id),
+                "run_id": run_id,
+                "story": story,
+            }
+            if workspace_id:
+                data["workspace_id"] = workspace_id
+            return repo.create(repo.model.model_validate(data))
 
     def update_workflow_run(self, run_id: str, **kwargs) -> bool:
         with get_session() as session:
