@@ -105,8 +105,8 @@ export default function FinishedPosts() {
   })
 
   const resetPostMutation = useMutation({
-    mutationFn: (storyId: string) =>
-      apiPost(`/content/posts/${storyId}/reset`, {}),
+    mutationFn: (postId: string) =>
+      apiPost(`/v1/w/${workspaceId}/posts/${postId}/reset`, {}),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['finished-posts', workspaceId] })
       queryClient.invalidateQueries({ queryKey: ['image-prompt', selectedPost] })

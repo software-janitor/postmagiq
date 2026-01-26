@@ -24,6 +24,7 @@ from runner.db.models import (
     Chapter, ChapterCreate,
     Post, PostCreate,
 )
+from runner.content.repository import WorkflowRunRepository, WorkflowOutputRepository
 
 
 router = APIRouter(prefix="/v1/w/{workspace_id}", tags=["workspace-content"])
@@ -644,3 +645,102 @@ async def delete_post(
 
     session.delete(post)
     session.commit()
+
+
+class ResetPostResponse(BaseModel):
+    """Response for post reset."""
+    status: str
+    post_id: UUID
+    post_number: int
+    deleted_workflow_outputs: int
+
+
+@router.post("/posts/{post_id}/reset", response_model=ResetPostResponse)
+async def reset_post(
+    post_id: str,
+    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))],
+    session: Annotated[Session, Depends(get_session_dependency)],
+):
+    """Reset a post to 'not started' state.
+
+    Accepts post_id in formats: UUID, c1p1, post_04
+
+    This will:
+    - Set status to 'not_started'
+    - Delete workflow outputs for this post
+
+    Requires content:write scope.
+    """
+    import re
+
+    # Parse post_id to find the post
+    post = None
+    post_number = None
+
+    # Try UUID first
+    try:
+        from uuid import UUID as UUIDType
+        post_uuid = UUIDType(post_id)
+        post = session.get(Post, post_uuid)
+        if post:
+            post_number = post.post_number
+    except ValueError:
+        pass
+
+    # Try c1p1 format
+    if not post and post_id.startswith("c") and "p" in post_id:
+        try:
+            post_number = int(post_id.split("p")[1])
+        except (ValueError, IndexError):
+            pass
+
+    # Try post_04 format
+    if not post and post_id.startswith("post_"):
+        try:
+            post_number = int(post_id.replace("post_", "").lstrip("0") or "0")
+        except ValueError:
+            pass
+
+    # Find post by number if we parsed one
+    if not post and post_number:
+        statement = select(Post).where(
+            Post.workspace_id == ctx.workspace_id,
+            Post.post_number == post_number,
+        )
+        post = session.exec(statement).first()
+
+    if not post or post.workspace_id != ctx.workspace_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Post {post_id} not found in workspace",
+        )
+
+    # Reset status
+    post.status = "not_started"
+    session.add(post)
+
+    # Delete workflow outputs for this post
+    story_id = f"post_{post.post_number:02d}"
+    deleted_outputs = 0
+
+    workflow_repo = WorkflowRunRepository(session)
+    output_repo = WorkflowOutputRepository(session)
+
+    # Find workflow runs for this story
+    runs = workflow_repo.list_by_workspace(ctx.workspace_id, limit=100)
+    for run in runs:
+        if run.story == story_id:
+            # Delete outputs for this run
+            outputs = output_repo.list_by_run(run.run_id)
+            for output in outputs:
+                session.delete(output)
+                deleted_outputs += 1
+
+    session.commit()
+
+    return ResetPostResponse(
+        status="reset",
+        post_id=post.id,
+        post_number=post.post_number,
+        deleted_workflow_outputs=deleted_outputs,
+    )
