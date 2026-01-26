@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   FileText,
   Wand2,
-  Image,
   Check,
   Loader2,
   BookOpen,
@@ -30,13 +29,12 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import { pauseWorkflow, resumeWorkflow, abortWorkflow, submitApproval } from '../api/workflow'
 import { Send, MessageCircle, XCircle } from 'lucide-react'
 
-type Step = 'select' | 'raw' | 'workflow' | 'image' | 'complete'
+type Step = 'select' | 'raw' | 'workflow' | 'complete'
 
 const STEPS: { id: Step; label: string; icon: React.ElementType }[] = [
   { id: 'select', label: 'Select Post', icon: FileText },
   { id: 'raw', label: 'Raw Content', icon: FileText },
   { id: 'workflow', label: 'Generate Post', icon: Wand2 },
-  { id: 'image', label: 'Image Prompt', icon: Image },
   { id: 'complete', label: 'Complete', icon: Check },
 ]
 
@@ -75,10 +73,6 @@ export default function StoryWorkflow() {
   const [currentStep, setCurrentStep] = useState<Step>('select')
   const [selectedPost, setSelectedPost] = useState<PostMetadata | null>(null)
   const [rawContent, setRawContent] = useState('')
-  const [imagePrompt, setImagePrompt] = useState('')
-  const [imageSentiment, setImageSentiment] = useState<'success' | 'failure' | 'unresolved'>('success')
-  const [imageContext, setImageContext] = useState<'software' | 'hardware'>('software')
-  const [generatingPrompt, setGeneratingPrompt] = useState(false)
   const [feedbackInput, setFeedbackInput] = useState('')
   const [submittingApproval, setSubmittingApproval] = useState(false)
   const [approvalError, setApprovalError] = useState<string | null>(null)
@@ -1341,110 +1335,11 @@ Include specific details: error messages, tools used, time spent, etc."
                 <button
                   onClick={nextStep}
                   disabled={running || !outputs.finalPost}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  Generate Image Prompt <ChevronRight className="w-4 h-4" />
+                  Finish <Check className="w-4 h-4" />
                 </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {currentStep === 'image' && (
-          <div className="space-y-4">
-            <h2 className="text-lg font-semibold text-white">Image Prompt</h2>
-            <p className="text-slate-400">
-              Generate an image prompt for your post.
-            </p>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Sentiment
-                </label>
-                <select
-                  value={imageSentiment}
-                  onChange={(e) => setImageSentiment(e.target.value as 'success' | 'failure' | 'unresolved')}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
-                >
-                  <option value="success">SUCCESS - Lesson learned</option>
-                  <option value="failure">FAILURE - Mid-crisis</option>
-                  <option value="unresolved">UNRESOLVED - Ongoing challenge</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Context
-                </label>
-                <select
-                  value={imageContext}
-                  onChange={(e) => setImageContext(e.target.value as 'software' | 'hardware')}
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
-                >
-                  <option value="software">Software</option>
-                  <option value="hardware">Hardware</option>
-                </select>
-              </div>
-            </div>
-            <div className="flex justify-center">
-              <button
-                onClick={async () => {
-                  if (!selectedPost) return
-                  setGeneratingPrompt(true)
-                  try {
-                    // Use c{chapter}p{post_number} format to match FinishedPosts page
-                    const promptPostId = `c${selectedPost.chapter}p${selectedPost.post_number}`
-                    const result = await apiPost<{ prompt_content: string }>('/image-prompts', {
-                      post_id: promptPostId,
-                      title: selectedPost.topic || '',
-                      sentiment: imageSentiment.toUpperCase(),
-                      context: imageContext,
-                      is_field_note: selectedPost.cadence?.toLowerCase() === 'field note',
-                    })
-                    setImagePrompt(result.prompt_content)
-                  } catch (e) {
-                    console.error('Failed to generate image prompt:', e)
-                    alert('Failed to generate image prompt')
-                  } finally {
-                    setGeneratingPrompt(false)
-                  }
-                }}
-                disabled={generatingPrompt || !selectedPost}
-                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 disabled:opacity-50 flex items-center gap-2"
-              >
-                {generatingPrompt ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <Wand2 className="w-4 h-4" />
-                    Generate Image Prompt
-                  </>
-                )}
-              </button>
-            </div>
-            <textarea
-              value={imagePrompt}
-              onChange={(e) => setImagePrompt(e.target.value)}
-              placeholder="Click 'Generate Image Prompt' above to create a prompt, or paste your own..."
-              rows={10}
-              className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-sm"
-            />
-            <div className="flex justify-between">
-              <button
-                onClick={prevStep}
-                className="px-6 py-2 bg-slate-700 text-white rounded-lg hover:bg-slate-600 flex items-center gap-2"
-              >
-                <ChevronLeft className="w-4 h-4" /> Back
-              </button>
-              <button
-                onClick={nextStep}
-                disabled={!imagePrompt}
-                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 disabled:opacity-50 flex items-center gap-2"
-              >
-                Complete <Check className="w-4 h-4" />
-              </button>
             </div>
           </div>
         )}
@@ -1456,7 +1351,7 @@ Include specific details: error messages, tools used, time spent, etc."
             </div>
             <h2 className="text-lg font-semibold text-white">Story Complete!</h2>
             <p className="text-slate-400">
-              Your post and image prompt have been generated and saved.
+              Your post has been generated and saved.
             </p>
             <div className="flex justify-center gap-4 pt-4">
               <button
@@ -1466,7 +1361,6 @@ Include specific details: error messages, tools used, time spent, etc."
                   setCurrentStep('select')
                   setSelectedPost(null)
                   setRawContent('')
-                  setImagePrompt('')
                   resetWorkflow()
                 }}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500"

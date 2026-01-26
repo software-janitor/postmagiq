@@ -698,10 +698,26 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
                 input_path = input_path[len("workflow/"):]
             input_path = os.path.join(self.run_dir, input_path)
 
-        # Read content for approval if available
+        # Read content for approval - try primary path first, then fallbacks
         content = None
+        actual_path = None
+
+        # Try the configured input path first
         if input_path and os.path.exists(input_path):
-            with open(input_path) as f:
+            actual_path = input_path
+        elif self.run_dir:
+            # Fallback paths for post content (when audit passes without revise)
+            fallback_paths = [
+                os.path.join(self.run_dir, "final/final_post.md"),
+                os.path.join(self.run_dir, "drafts/draft.md"),
+            ]
+            for fallback in fallback_paths:
+                if os.path.exists(fallback):
+                    actual_path = fallback
+                    break
+
+        if actual_path:
+            with open(actual_path) as f:
                 content = f.read()
 
         if self.approval_callback:
@@ -713,7 +729,7 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
 
             # Notify the callback that approval is needed
             self.approval_callback({
-                "input_path": input_path,
+                "input_path": actual_path or input_path,
                 "content": content,
                 "prompt": prompt_text,
                 "run_id": self.run_id,
@@ -737,9 +753,10 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
             print(f"{'='*60}")
 
             if content:
-                print(f"\n--- {input_path} ---")
+                display_path = actual_path or input_path
+                print(f"\n--- {display_path} ---")
                 print(content)
-                print(f"--- end {input_path} ---\n")
+                print(f"--- end {display_path} ---\n")
 
             print(prompt_text)
 

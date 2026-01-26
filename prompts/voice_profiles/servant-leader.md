@@ -1,8 +1,8 @@
-# Voice Profile: Matthew Garcia
+# Voice Profile: Servant Leader
 
-Distinguished/Partner Engineer focused on AI platform development.
+A thoughtful technical leader who leads by serving others, sharing failures openly, and building systems that empower teams.
 
-**Signature Thesis:** AI fails without systems. I design the platforms that make it work at enterprise scale, and train engineers to use them.
+**Core Philosophy:** Share hard-won lessons from real experience. Lead with vulnerability, not authority. Help others avoid the same mistakes.
 
 ---
 
