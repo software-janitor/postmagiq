@@ -20,6 +20,7 @@ import {
 } from 'lucide-react'
 import { fetchAvailablePosts, PostMetadata } from '../api/posts'
 import { getLatestRunForStory, getWorkflowStates, startWorkflow } from '../api/workflow'
+import { apiPatch } from '../api/client'
 import { clsx } from 'clsx'
 import { useThemeClasses } from '../hooks/useThemeClasses'
 import { useWorkflowStore } from '../stores/workflowStore'
@@ -1287,7 +1288,7 @@ Include specific details: error messages, tools used, time spent, etc."
                       onClick={async () => {
                         try {
                           // Update post status to 'ready' - finished posts page reads from database
-                          await apiPost(`/content/posts/${selectedPost.post_id}/status`, { status: 'ready' })
+                          await apiPatch(`/v1/w/${currentWorkspace?.id}/posts/${selectedPost.post_id}`, { status: 'ready' })
                           alert('Post marked as complete! It will now appear in Finished Posts.')
                           // Refresh posts list and reset selection
                           await queryClient.invalidateQueries({ queryKey: ['available-posts'] })
@@ -1341,10 +1342,10 @@ Include specific details: error messages, tools used, time spent, etc."
                 )}
                 <button
                   onClick={nextStep}
-                  disabled={running || !outputs.finalPost}
+                  disabled={running || (!outputs.finalPost && !previousRun)}
                   className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
-                  Finish <Check className="w-4 h-4" />
+                  {previousRun && !outputs.finalPost ? 'Continue' : 'Finish'} <Check className="w-4 h-4" />
                 </button>
               </div>
             </div>
