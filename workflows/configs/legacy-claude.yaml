@@ -157,11 +157,11 @@ agents:
 # ============================================================================
 
 personas:
-  story-reviewer: prompts/story_reviewer_persona.md
-  story-processor: prompts/story_processor_persona.md
-  writer: prompts/writer_persona.md
-  auditor: prompts/auditor_persona.md
-  synthesizer: prompts/synthesizer_persona.md
+  story-reviewer: prompts/templates/story_reviewer.md
+  story-processor: prompts/templates/story_processor.md
+  writer: prompts/templates/writer.md
+  auditor: prompts/templates/auditor.md
+  synthesizer: prompts/templates/synthesizer.md
 
 # ============================================================================
 # STATE MACHINE
