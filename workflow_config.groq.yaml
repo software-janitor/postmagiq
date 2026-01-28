@@ -89,6 +89,25 @@ agents:
       input: 0.00024
       output: 0.00024
 
+  # Split auditor agents (same models, different personas)
+  groq-fabrication-auditor:
+    type: api
+    enabled: true
+    model: llama-70b
+    context_window: 128000
+    cost_per_1k:
+      input: 0.00059
+      output: 0.00079
+
+  groq-style-auditor:
+    type: api
+    enabled: true
+    model: llama4-scout
+    context_window: 128000
+    cost_per_1k:
+      input: 0.00011
+      output: 0.00034
+
 # ============================================================================
 # PERSONA DEFINITIONS
 # ============================================================================
@@ -178,9 +197,11 @@ states:
 
   cross-audit:
     type: fan-out
-    description: "Each agent audits all drafts against source material"
-    agents: [groq-70b, groq-scout]
-    persona: auditor
+    description: "Split audit: fabrication + style checks on drafts"
+    agents: [groq-fabrication-auditor, groq-style-auditor]
+    personas:
+      groq-fabrication-auditor: fabrication-auditor
+      groq-style-auditor: style-auditor
     input:
       - "workflow/processed/processed_story.md"
       - "workflow/input/story_input.md"
@@ -188,9 +209,9 @@ states:
     output: "workflow/audits/{agent}_audit.json"
     output_type: audit
     transitions:
-      all_success: synthesize
-      partial_success: synthesize
-      all_failure: draft
+      proceed: synthesize
+      retry: draft
+      halt: halt
 
   synthesize:
     type: orchestrator-task
@@ -212,19 +233,21 @@ states:
 
   final-audit:
     type: fan-out
-    description: "Final quality check on synthesized post against source"
-    agents: [groq-70b, groq-scout]
-    persona: auditor
+    description: "Final split audit: fabrication + style checks on final post"
+    agents: [groq-fabrication-auditor, groq-style-auditor]
+    personas:
+      groq-fabrication-auditor: fabrication-auditor
+      groq-style-auditor: style-auditor
     input:
       - "workflow/processed/processed_story.md"
       - "workflow/input/story_input.md"
       - "workflow/final/final_post.md"
-    output: "workflow/audits/final_{agent}_audit.json"
-    output_type: audit
+    output: "workflow/final/{agent}_final_audit.json"
+    output_type: final_audit
     transitions:
-      all_success: human-approval
-      partial_success: human-approval
-      all_failure: synthesize
+      proceed: human-approval
+      retry: synthesize
+      halt: halt
 
   human-approval:
     type: human-approval
