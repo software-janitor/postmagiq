@@ -329,7 +329,16 @@ class StateMachine:
 
         feedback = self.retry_feedback.pop(state_name, None)
         if feedback:
-            state["context"] = f"Previous attempt feedback:\n{feedback}"
+            # If feedback already has structured markers (from human approval),
+            # preserve them. Otherwise wrap audit feedback with a marker so
+            # _build_prompt places it after input files in the user message.
+            if "## USER FEEDBACK" in feedback or "## Reviewer Context" in feedback:
+                state["context"] = feedback
+            else:
+                state["context"] = (
+                    f"## USER FEEDBACK — MUST INCORPORATE\n\n"
+                    f"Previous attempt feedback:\n{feedback}"
+                )
 
         self.log_callback({
             "event": "state_enter",
@@ -1096,14 +1105,18 @@ Your output will be cross-checked against source material. Fabrications = automa
 """
 
     def _get_content_from_db(self, output_type: str) -> Optional[str]:
-        """Get content from database by output type."""
+        """Get content from database by output type.
+
+        Returns only the latest record for this output type to avoid
+        duplicate content from re-runs or multiple submissions.
+        """
         if not self.db or not self.run_id:
             return None
         try:
             outputs = self.db.get_workflow_outputs_by_type(self.run_id, output_type)
             if outputs:
-                # Return all outputs of this type, combined
-                return "\n\n---\n\n".join(o.content for o in outputs)
+                # Use only the latest record to avoid duplicate content
+                return outputs[-1].content
         except Exception:
             pass
         return None
@@ -1202,6 +1215,12 @@ Your output will be cross-checked against source material. Fabrications = automa
     ) -> str:
         """Build full prompt from persona, database content, and files.
 
+        Layout: [preamble] [persona] [input files] [feedback context]
+
+        Feedback context is placed AFTER input files so the Ollama agent's
+        message split logic puts it in the user message (not system).
+        Non-feedback context goes before input files.
+
         Args:
             input_files: Resolved file paths that exist on disk
             input_specs: Original input specs from config (for database lookup even if files don't exist)
@@ -1214,8 +1233,17 @@ Your output will be cross-checked against source material. Fabrications = automa
         if persona:
             parts.append(persona)
 
-        if context:
-            parts.append(f"## Context\n\n{context}")
+        # Separate feedback context from regular context.
+        # Feedback markers (from retry_feedback) go AFTER input files
+        # so the Ollama split puts them in the user message.
+        feedback_context = None
+        regular_context = context
+        if context and ("## USER FEEDBACK" in context or "## Reviewer Context" in context):
+            feedback_context = context
+            regular_context = None
+
+        if regular_context:
+            parts.append(f"## Context\n\n{regular_context}")
 
         # Collect all paths to try (both resolved files and original specs)
         paths_to_try = list(input_files) if input_files else []
@@ -1248,6 +1276,11 @@ Your output will be cross-checked against source material. Fabrications = automa
 
                 if content:
                     parts.append(f"### {source}\n\n{content}")
+
+        # Feedback context goes AFTER input files so Ollama splits it into
+        # the user message (split markers: ## Reviewer Context, ## USER FEEDBACK)
+        if feedback_context:
+            parts.append(feedback_context)
 
         return "\n\n".join(parts)
 
