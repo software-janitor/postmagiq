@@ -18,6 +18,14 @@ export interface WorkflowOutputs {
   finalPost?: string
 }
 
+export interface AuditResultItem {
+  agent: string
+  score?: number
+  decision?: string
+  feedback?: string
+  audit_type?: string
+}
+
 export interface ModelMetrics {
   tokens: number
   tokens_input: number
@@ -40,6 +48,7 @@ interface WorkflowState {
   awaitingApproval: boolean
   approvalContent: string | null
   approvalPrompt: string | null
+  auditResults: AuditResultItem[]
   tokens: number
   cost: number
   modelMetrics: Record<string, ModelMetrics>  // Per-model breakdown
@@ -54,7 +63,7 @@ interface WorkflowState {
   setAborted: (aborted: boolean) => void
   setCurrentRun: (runId: string | null, story: string | null) => void
   setCurrentState: (state: string | null) => void
-  setAwaitingApproval: (awaiting: boolean, content?: string | null, prompt?: string | null) => void
+  setAwaitingApproval: (awaiting: boolean, content?: string | null, prompt?: string | null, auditResults?: AuditResultItem[]) => void
   updateMetrics: (tokens: number, cost: number) => void
   updateModelMetrics: (state: string, agentMetrics: Record<string, ModelMetrics>) => void
   addEvent: (event: Omit<WorkflowEvent, 'id' | 'timestamp'>) => void
@@ -102,6 +111,7 @@ export const useWorkflowStore = create<WorkflowState>((set) => ({
   awaitingApproval: false,
   approvalContent: null,
   approvalPrompt: null,
+  auditResults: [],
   tokens: 0,
   cost: 0,
   modelMetrics: {},
@@ -126,10 +136,11 @@ export const useWorkflowStore = create<WorkflowState>((set) => ({
 
   setCurrentState: (state) => set({ currentState: state }),
 
-  setAwaitingApproval: (awaiting, content, prompt) => set({
+  setAwaitingApproval: (awaiting, content, prompt, auditResults) => set({
     awaitingApproval: awaiting,
     approvalContent: content ?? null,
     approvalPrompt: prompt ?? null,
+    auditResults: auditResults ?? [],
   }),
 
   updateMetrics: (tokens, cost) => set({ tokens, cost }),
@@ -228,6 +239,7 @@ export const useWorkflowStore = create<WorkflowState>((set) => ({
       awaitingApproval: false,
       approvalContent: null,
       approvalPrompt: null,
+      auditResults: [],
       tokens: 0,
       cost: 0,
       modelMetrics: {},

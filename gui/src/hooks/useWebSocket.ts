@@ -1,5 +1,5 @@
 import { useEffect, useCallback } from 'react'
-import { useWorkflowStore, ModelMetrics } from '../stores/workflowStore'
+import { useWorkflowStore, ModelMetrics, AuditResultItem } from '../stores/workflowStore'
 import { useDevStore } from '../stores/devStore'
 import { getAccessToken } from '../stores/authStore'
 
@@ -35,6 +35,7 @@ interface WebSocketMessage {
   state?: string
   session_id?: string
   agent_metrics?: Record<string, ModelMetrics>
+  audit_results?: AuditResultItem[]
 
   // LLM message fields (DEV_MODE)
   model?: string
@@ -208,7 +209,7 @@ export function useWebSocket() {
         break
 
       case 'approval:requested':
-        setAwaitingApproval(true, message.content, message.prompt)
+        setAwaitingApproval(true, message.content, message.prompt, message.audit_results)
         break
 
       case 'approval:received':

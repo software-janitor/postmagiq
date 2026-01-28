@@ -67,6 +67,9 @@ class StateMachine:
         self._pause_event = threading.Event()
         self._pause_event.set()  # Start unpaused (event is set = continue)
 
+        # Abort state
+        self._aborted = False
+
     def initialize(self, run_id: str):
         """Initialize for a new run."""
         self.run_id = run_id
@@ -80,6 +83,8 @@ class StateMachine:
         # Reset pause state
         self._paused = False
         self._pause_event.set()
+        # Reset abort state
+        self._aborted = False
 
     def pause(self) -> bool:
         """Pause execution at the next state checkpoint.
@@ -108,6 +113,14 @@ class StateMachine:
     def is_paused(self) -> bool:
         """Check if workflow is paused."""
         return self._paused
+
+    def abort(self):
+        """Abort execution. Unblocks pause and approval waits so the main loop exits."""
+        self._aborted = True
+        # Unblock pause wait if paused
+        self._pause_event.set()
+        # Unblock approval wait if waiting
+        self._approval_event.set()
 
     def submit_approval(self, decision: str, feedback: Optional[str] = None) -> bool:
         """Submit approval response from API.
@@ -161,6 +174,17 @@ class StateMachine:
         error = None
 
         while True:
+            # Check for abort
+            if self._aborted:
+                self.log_callback({
+                    "event": "aborted",
+                    "state": self.current_state,
+                })
+                return {
+                    "final_state": "halt",
+                    "error": "Aborted by user",
+                }
+
             # Check for pause checkpoint
             if self._paused:
                 self.log_callback({
@@ -169,6 +193,16 @@ class StateMachine:
                 })
                 # Wait for resume (blocks until _pause_event is set)
                 self._pause_event.wait()
+                # Check if we were unblocked by abort rather than resume
+                if self._aborted:
+                    self.log_callback({
+                        "event": "aborted",
+                        "state": self.current_state,
+                    })
+                    return {
+                        "final_state": "halt",
+                        "error": "Aborted by user",
+                    }
                 self.log_callback({
                     "event": "resumed",
                     "state": self.current_state,
@@ -744,6 +778,9 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
 
         with self._approval_lock:
             self.awaiting_approval = False
+            # If aborted, return abort regardless of approval state
+            if self._aborted:
+                return ("abort", None)
             if not got_response:
                 return ("abort", None)
             decision = self._approval_response.get("decision", "abort")
@@ -799,6 +836,12 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
             # Include reviewer context for feedback states
             if state.get("type") == "human-approval" and content:
                 callback_data["reviewer_context"] = content
+
+            # Include audit results so the UI can display scores/feedback
+            audit_results = self._collect_audit_results()
+            if audit_results:
+                callback_data["audit_results"] = audit_results
+
             self.approval_callback(callback_data)
 
             decision, feedback = self._wait_for_approval(timeout=timeout)
@@ -1223,6 +1266,73 @@ Your output will be cross-checked against source material. Fabrications = automa
     def _get_final_audit_feedback_for_synthesizer(self) -> Optional[str]:
         """Get final audit feedback for synthesizer."""
         return self._get_audit_feedback("final")
+
+    def _collect_audit_results(self) -> list[dict]:
+        """Collect parsed audit results from database or files for UI display.
+
+        Returns a list of dicts with keys: agent, score, decision, feedback.
+        Tries final_audit first, falls back to cross-audit.
+        """
+        import json as _json
+
+        results = []
+
+        for audit_type, db_type, file_pattern in [
+            ("final_audit", "final_audit", "final/*_final_audit.json"),
+            ("audit", "audit", "audits/*_audit.json"),
+        ]:
+            # Try database first
+            if self.db and self.run_id:
+                try:
+                    outputs = self.db.get_workflow_outputs_by_type(self.run_id, db_type)
+                    for output in outputs:
+                        parsed = self._try_parse_audit_json(output.content)
+                        if parsed:
+                            parsed["agent"] = output.agent or "auditor"
+                            parsed["audit_type"] = audit_type
+                            results.append(parsed)
+                except Exception:
+                    pass
+
+            # Fall back to files
+            if not results and self.run_dir:
+                import glob
+                pattern = os.path.join(self.run_dir, file_pattern)
+                for audit_file in sorted(glob.glob(pattern)):
+                    try:
+                        with open(audit_file) as f:
+                            content = f.read()
+                        parsed = self._try_parse_audit_json(content)
+                        if parsed:
+                            basename = os.path.basename(audit_file)
+                            agent_name = basename.replace("_final_audit.json", "").replace("_audit.json", "")
+                            parsed["agent"] = agent_name
+                            parsed["audit_type"] = audit_type
+                            results.append(parsed)
+                    except Exception:
+                        pass
+
+            if results:
+                return results
+
+        return results
+
+    def _try_parse_audit_json(self, content: str) -> Optional[dict]:
+        """Try to parse audit JSON content, returning score/decision/feedback dict."""
+        import json as _json
+
+        json_str = self._extract_json(content)
+        if not json_str:
+            return None
+        try:
+            data = _json.loads(json_str)
+            return {
+                "score": data.get("score"),
+                "decision": data.get("decision"),
+                "feedback": data.get("feedback"),
+            }
+        except Exception:
+            return None
 
     def _path_to_output_type(self, path: str) -> Optional[str]:
         """Map file path to database output type."""

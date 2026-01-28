@@ -138,19 +138,21 @@ class WorkflowService:
             self._approval_content = approval_info.get("content")
             # Store state_machine reference (passed via closure from runner)
             # We need to get it from the runner - will be set after StateMachine init
+            broadcast_data = {
+                "type": "approval:requested",
+                "run_id": self.current_run_id,
+                "input_path": approval_info.get("input_path"),
+                "content": approval_info.get("content"),
+                "prompt": approval_info.get("prompt"),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            # Include audit results if available
+            if approval_info.get("audit_results"):
+                broadcast_data["audit_results"] = approval_info["audit_results"]
+
             _broadcast_from_thread(
                 main_loop,
-                manager.broadcast(
-                    {
-                        "type": "approval:requested",
-                        "run_id": self.current_run_id,
-                        "input_path": approval_info.get("input_path"),
-                        "content": approval_info.get("content"),
-                        "prompt": approval_info.get("prompt"),
-                        "timestamp": datetime.utcnow().isoformat(),
-                    },
-                    self.current_run_id,
-                )
+                manager.broadcast(broadcast_data, self.current_run_id)
             )
 
         # Broadcast start event
@@ -436,7 +438,10 @@ class WorkflowService:
         if not self.running:
             return {"error": "No workflow running"}
 
-        # Note: actual abort logic would need to be added to runner
+        # Signal the state machine to abort (unblocks pause/approval waits)
+        if self._state_machine:
+            self._state_machine.abort()
+
         self.running = False
         await manager.broadcast(
             {

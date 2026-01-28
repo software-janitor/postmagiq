@@ -100,6 +100,7 @@ export default function StoryWorkflow() {
     awaitingApproval,
     approvalContent,
     approvalPrompt,
+    auditResults,
     events,
     outputs,
     error: workflowError,
@@ -838,6 +839,49 @@ Include specific details: error messages, tools used, time spent, etc."
                           </div>
                         )
                       })()}
+                    </div>
+                  )}
+
+                  {/* Show audit results from state machine (available to all users) */}
+                  {auditResults && auditResults.length > 0 && (
+                    <div className="bg-amber-900/20 rounded-lg p-4 mb-4 border border-amber-700/50">
+                      <div className="text-xs text-amber-400 uppercase tracking-wide mb-3 font-medium">
+                        Audit Results
+                      </div>
+                      <div className="space-y-3">
+                        {auditResults.map((result, idx) => (
+                          <div key={idx} className="border-b border-amber-700/30 pb-2 last:border-b-0 last:pb-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs text-amber-300 font-medium uppercase">{result.agent}</span>
+                              <div className="flex items-center gap-2">
+                                {result.score != null && (
+                                  <span className={clsx(
+                                    'text-xs px-2 py-0.5 rounded',
+                                    result.score >= 7 && 'bg-green-600/20 text-green-400',
+                                    result.score >= 4 && result.score < 7 && 'bg-amber-600/20 text-amber-400',
+                                    result.score < 4 && 'bg-red-600/20 text-red-400',
+                                  )}>
+                                    Score: {result.score}
+                                  </span>
+                                )}
+                                {result.decision && (
+                                  <span className={clsx(
+                                    'text-xs px-2 py-0.5 rounded',
+                                    result.decision === 'proceed' && 'bg-green-600/20 text-green-400',
+                                    result.decision === 'retry' && 'bg-amber-600/20 text-amber-400',
+                                    result.decision === 'halt' && 'bg-red-600/20 text-red-400',
+                                  )}>
+                                    {result.decision}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {result.feedback && (
+                              <p className="text-amber-200/80 text-sm">{result.feedback}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 
