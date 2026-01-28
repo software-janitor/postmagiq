@@ -2,6 +2,7 @@
 
 import pytest
 import os
+import threading
 from unittest.mock import patch, MagicMock
 
 from runner.state_machine import StateMachine
@@ -1180,3 +1181,188 @@ class TestFullWorkflowTransitions:
         result = sm.run()
 
         assert result["final_state"] == "error_handler"
+
+
+class TestWaitForApproval:
+    """Tests for _wait_for_approval() method."""
+
+    def test_returns_decision_and_feedback(self):
+        """_wait_for_approval returns decision/feedback when event is set."""
+        config = {"states": {}}
+        sm = StateMachine(config)
+        sm.initialize("test-run")
+
+        def submit_after_delay():
+            import time
+            # Wait for awaiting_approval to be set by _wait_for_approval
+            for _ in range(100):
+                if sm.awaiting_approval:
+                    sm.submit_approval("approved", "looks good")
+                    return
+                time.sleep(0.05)
+
+        t = threading.Thread(target=submit_after_delay)
+        t.start()
+
+        decision, feedback = sm._wait_for_approval(timeout=5)
+        t.join()
+
+        assert decision == "approved"
+        assert feedback == "looks good"
+
+    def test_returns_abort_on_timeout(self):
+        """_wait_for_approval returns ('abort', None) when timeout expires."""
+        config = {"states": {}}
+        sm = StateMachine(config)
+        sm.initialize("test-run")
+
+        decision, feedback = sm._wait_for_approval(timeout=0.1)
+
+        assert decision == "abort"
+        assert feedback is None
+
+    def test_resets_awaiting_approval_after_response(self):
+        """awaiting_approval is False after _wait_for_approval returns."""
+        config = {"states": {}}
+        sm = StateMachine(config)
+        sm.initialize("test-run")
+
+        def submit_after_delay():
+            import time
+            for _ in range(100):
+                if sm.awaiting_approval:
+                    sm.submit_approval("abort")
+                    return
+                time.sleep(0.05)
+
+        t = threading.Thread(target=submit_after_delay)
+        t.start()
+
+        sm._wait_for_approval(timeout=5)
+        t.join()
+
+        assert sm.awaiting_approval is False
+
+    def test_resets_awaiting_approval_after_timeout(self):
+        """awaiting_approval is False after timeout."""
+        config = {"states": {}}
+        sm = StateMachine(config)
+        sm.initialize("test-run")
+
+        sm._wait_for_approval(timeout=0.1)
+
+        assert sm.awaiting_approval is False
+
+
+class TestCircuitBreakerApproval:
+    """Tests for circuit breaker approval flow."""
+
+    def test_circuit_break_skip_proceeds(self, tmp_path):
+        """Circuit breaker with approval_callback skips forward on 'approved'."""
+        # Use "next" for looping and "proceed" as the skip target.
+        # The circuit breaker skip logic looks for transitions.get("success")
+        # then transitions.get("proceed"). Since "success" isn't in transitions
+        # here, it falls through to "proceed" -> "done".
+        config = {
+            "states": {
+                "start": {"type": "initial", "next": "loop"},
+                "loop": {
+                    "type": "single",
+                    "agent": "claude",
+                    "output": str(tmp_path / "out.md"),
+                    "next": "loop",
+                    "transitions": {
+                        "proceed": "done",
+                    },
+                },
+                "done": {"type": "terminal"},
+                "halt": {"type": "terminal"},
+            },
+            "circuit_breaker": {
+                "rules": [{"name": "state_visit_limit", "limit": 3}]
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+        agents = {"claude": MockAgent(["ok"])}
+
+        approval_calls = []
+
+        def approval_callback(data):
+            approval_calls.append(data)
+
+        sm = StateMachine(
+            config,
+            agents=agents,
+            approval_callback=approval_callback,
+        )
+        sm.initialize("test-run")
+
+        def submit_skip():
+            import time
+            for _ in range(100):
+                if sm.awaiting_approval:
+                    sm.submit_approval("approved")
+                    return
+                time.sleep(0.05)
+
+        t = threading.Thread(target=submit_skip)
+        t.start()
+
+        result = sm.run()
+        t.join()
+
+        # Should have reached "done" via skip, not halted
+        assert result["final_state"] == "done"
+        assert len(approval_calls) == 1
+        assert "Loop detected:" in approval_calls[0]["content"]
+
+    def test_circuit_break_abort_halts(self, tmp_path):
+        """Circuit breaker with approval_callback halts on 'abort'."""
+        config = {
+            "states": {
+                "start": {"type": "initial", "next": "loop"},
+                "loop": {
+                    "type": "single",
+                    "agent": "claude",
+                    "output": str(tmp_path / "out.md"),
+                    "next": "loop",
+                    "transitions": {
+                        "proceed": "done",
+                    },
+                },
+                "done": {"type": "terminal"},
+                "halt": {"type": "terminal"},
+            },
+            "circuit_breaker": {
+                "rules": [{"name": "state_visit_limit", "limit": 3}]
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+        agents = {"claude": MockAgent(["ok"])}
+
+        def approval_callback(data):
+            pass
+
+        sm = StateMachine(
+            config,
+            agents=agents,
+            approval_callback=approval_callback,
+        )
+        sm.initialize("test-run")
+
+        def submit_abort():
+            import time
+            for _ in range(100):
+                if sm.awaiting_approval:
+                    sm.submit_approval("abort")
+                    return
+                time.sleep(0.05)
+
+        t = threading.Thread(target=submit_abort)
+        t.start()
+
+        result = sm.run()
+        t.join()
+
+        assert result["final_state"] == "halt"
+        assert result.get("user_aborted") is True
