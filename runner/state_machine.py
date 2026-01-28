@@ -408,7 +408,10 @@ class StateMachine:
             input_specs = [input_path]
 
         input_files = self._resolve_input_files(input_path)
-        persona_content = self._load_persona(state.get("persona", ""))
+
+        # Per-agent persona mapping (falls back to shared persona)
+        personas_map = state.get("personas", {})
+        shared_persona = state.get("persona", "")
 
         # For draft state, include audit feedback from previous iteration if available
         if state_name == "draft":
@@ -419,7 +422,14 @@ class StateMachine:
                 else:
                     context = audit_feedback
 
-        prompt = self._build_prompt(persona_content, input_files, context, input_specs=input_specs)
+        # Build per-agent prompts
+        agent_prompts: dict[str, str] = {}
+        for agent_name in agent_names:
+            persona_slug = personas_map.get(agent_name, shared_persona)
+            persona_content = self._load_persona(persona_slug)
+            agent_prompts[agent_name] = self._build_prompt(
+                persona_content, input_files, context, input_specs=input_specs
+            )
 
         outputs: dict[str, FanOutResult] = {}
         total_tokens = TokenUsage(input_tokens=0, output_tokens=0)
@@ -433,7 +443,7 @@ class StateMachine:
                 for agent_name in agent_names:
                     output_path = self._resolve_output_path(output_template, agent=agent_name)
                     future = executor.submit(
-                        self._invoke_agent, agent_name, prompt, output_path, state_name
+                        self._invoke_agent, agent_name, agent_prompts[agent_name], output_path, state_name
                     )
                     futures[future] = agent_name
 
@@ -470,7 +480,7 @@ class StateMachine:
         else:
             for agent_name in agent_names:
                 output_path = self._resolve_output_path(output_template, agent=agent_name)
-                result = self._invoke_agent(agent_name, prompt, output_path, state_name)
+                result = self._invoke_agent(agent_name, agent_prompts[agent_name], output_path, state_name)
                 outputs[agent_name] = result
                 if result.tokens:
                     total_tokens.input_tokens += result.tokens.input_tokens
@@ -478,6 +488,26 @@ class StateMachine:
 
         success_count = sum(1 for r in outputs.values() if r.status == "success")
         total_count = len(agent_names)
+
+        # For audit-type fan-outs, parse and aggregate audit results
+        output_type = state.get("output_type", "")
+        if output_type in ("audit", "review", "final_audit") and success_count > 0:
+            audit_results = []
+            for name, fan_result in outputs.items():
+                if fan_result.status == "success":
+                    audit = self._parse_audit_result(fan_result)
+                    if audit:
+                        audit_results.append((name, audit))
+
+            if audit_results:
+                transition, feedback = self._aggregate_audit_results(audit_results, state)
+                return StateResult(
+                    state_name=state_name,
+                    transition=transition,
+                    outputs=outputs,
+                    total_tokens=total_tokens,
+                    total_cost_usd=total_cost,
+                )
 
         if success_count == total_count:
             transition = "all_success"
@@ -930,6 +960,7 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
                     agent=agent_name,
                     status="success",
                     output_path=output_path,
+                    content=result.content,
                     tokens=result.tokens,
                     cost_usd=result.cost_usd or 0.0,
                     duration_s=duration,
@@ -1284,6 +1315,45 @@ Your output will be cross-checked against source material. Fabrications = automa
 
         return "\n\n".join(parts)
 
+    def _aggregate_audit_results(
+        self, audit_results: list[tuple[str, AuditResult]], state: dict
+    ) -> tuple[str, str]:
+        """Aggregate multiple audit results — strictest decision wins.
+
+        Returns:
+            (transition, combined_feedback) tuple.
+        """
+        decisions = [ar.decision for _, ar in audit_results]
+        scores = [ar.score for _, ar in audit_results]
+
+        # Track minimum score for circuit breaker
+        self.last_audit_score = min(scores)
+
+        # Strictest wins: halt > retry > proceed
+        if "halt" in decisions:
+            transition = "halt"
+        elif "retry" in decisions:
+            transition = "retry"
+        else:
+            transition = "proceed"
+
+        # Combine feedback from all auditors
+        feedback_parts = []
+        for name, audit in audit_results:
+            feedback_parts.append(
+                f"### {name} (score: {audit.score}, decision: {audit.decision})\n\n"
+                f"{audit.feedback}"
+            )
+        combined_feedback = "\n\n".join(feedback_parts)
+
+        # Store feedback for retry target
+        if transition == "retry":
+            target = self._get_transitions(state).get("retry")
+            if target:
+                self.retry_feedback[target] = combined_feedback
+
+        return transition, combined_feedback
+
     def _parse_audit_result(self, result: FanOutResult) -> Optional[AuditResult]:
         """Try to parse agent output as audit result.
 
@@ -1291,13 +1361,15 @@ Your output will be cross-checked against source material. Fabrications = automa
         decision on parse failure (fail-closed behavior) only if content
         looks like it was intended to be JSON.
         """
-        if not result.output_path or not os.path.exists(result.output_path):
-            return None
+        # Try content field first, then fall back to file
+        content = result.content
+        if not content:
+            if not result.output_path or not os.path.exists(result.output_path):
+                return None
+            with open(result.output_path) as f:
+                content = f.read()
 
         import json
-
-        with open(result.output_path) as f:
-            content = f.read()
 
         json_str = self._extract_json(content)
 

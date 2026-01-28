@@ -33,6 +33,22 @@ agents:
     cost_per_1k:
       input: 0.0
       output: 0.0
+  fabrication-auditor:
+    type: ollama
+    enabled: true
+    model: gpt-oss:20b
+    context_window: 128000
+    cost_per_1k:
+      input: 0.0
+      output: 0.0
+  style-auditor:
+    type: ollama
+    enabled: true
+    model: gpt-oss:20b
+    context_window: 128000
+    cost_per_1k:
+      input: 0.0
+      output: 0.0
 
 # ============================================================================
 # PERSONA DEFINITIONS
@@ -111,19 +127,22 @@ states:
       success: audit
 
   audit:
-    type: single
-    description: "Audit draft against source material"
-    agent: ollama
-    persona: auditor
+    type: fan-out
+    description: "Split audit: fabrication + style checks"
+    agents: [fabrication-auditor, style-auditor]
+    personas:
+      fabrication-auditor: fabrication-auditor
+      style-auditor: style-auditor
     input:
       - "workflow/processed/processed_story.md"
       - "workflow/input/story_input.md"
       - "workflow/drafts/draft.md"
-    output: "workflow/audits/audit.json"
+    output: "workflow/audits/{agent}_audit.json"
     output_type: audit
     transitions:
+      proceed: human-approval
       retry: revise
-      success: human-approval
+      halt: halt
 
   revise:
     type: single
@@ -140,18 +159,21 @@ states:
       failure: draft
 
   final-audit:
-    type: single
-    description: "Final quality check"
-    agent: ollama
-    persona: auditor
+    type: fan-out
+    description: "Final split audit: fabrication + style checks"
+    agents: [fabrication-auditor, style-auditor]
+    personas:
+      fabrication-auditor: fabrication-auditor
+      style-auditor: style-auditor
     input:
       - "workflow/processed/processed_story.md"
       - "workflow/final/final_post.md"
-    output: "workflow/audits/final_audit.json"
-    output_type: audit
+    output: "workflow/final/{agent}_final_audit.json"
+    output_type: final_audit
     transitions:
+      proceed: human-approval
       retry: revise
-      success: human-approval
+      halt: halt
 
   human-approval:
     type: human-approval

@@ -66,6 +66,7 @@ class FanOutResult(BaseModel):
     agent: str
     status: Literal["success", "failed", "timeout"]
     output_path: Optional[str] = None
+    content: Optional[str] = None
     tokens: Optional[TokenUsage] = None
     cost_usd: float = 0.0
     duration_s: float = 0.0
