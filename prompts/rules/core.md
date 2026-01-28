@@ -21,6 +21,7 @@ When the source indicates someone said, claimed, told, or asked something:
 
 ## Punctuation
 
-- **No em-dashes (--).** Use periods, commas, or short sentences instead
+- **No em-dashes.** Never use — (em dash), – (en dash), --, or ---. Use periods, commas, or short sentences instead
+  - BAD: "I tried everything—nothing worked"
   - BAD: "I tried everything--nothing worked"
   - GOOD: "I tried everything. Nothing worked."

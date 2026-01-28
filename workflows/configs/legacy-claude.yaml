@@ -317,7 +317,7 @@ states:
     transitions:
       proceed: human-approval
       retry: final-audit-feedback
-      halt: halt
+      halt: final-audit-feedback
 
   final-audit-feedback:
     type: human-approval

@@ -38,6 +38,7 @@ class WorkflowService:
         self.current_run_id: Optional[str] = None
         self.current_story: Optional[str] = None
         self.current_user_id: Optional[str] = None  # Set during execute()
+        self.current_workspace_id: Optional[UUID] = None  # Set during execute()
         self.started_at: Optional[datetime] = None
         self.running = False
         self.awaiting_approval = False
@@ -81,6 +82,7 @@ class WorkflowService:
 
         self.current_story = story
         self.current_user_id = user_id
+        self.current_workspace_id = workspace_id
         uid = normalize_user_id(user_id)
         if not uid:
             return {"error": "Invalid user ID"}
@@ -561,6 +563,22 @@ class WorkflowService:
                                 logging.info(f"Updated post {post_number} status to 'ready'")
             except Exception as e:
                 logging.warning(f"Failed to update post status: {e}")
+
+        # Deduct credit for completed workflow
+        if self.current_workspace_id and result.get("final_state") == "complete":
+            try:
+                from api.services.usage_service import UsageService
+                usage_svc = UsageService()
+                idempotency_key = f"workflow-run:{self.current_run_id}"
+                usage_svc.reserve_credit(
+                    workspace_id=self.current_workspace_id,
+                    resource_type="post",
+                    idempotency_key=idempotency_key,
+                    amount=1,
+                )
+                usage_svc.confirm_usage(idempotency_key)
+            except Exception as e:
+                logging.warning(f"Credit deduction failed for run {self.current_run_id}: {e}")
 
         await manager.broadcast(
             {
