@@ -232,7 +232,22 @@ states:
     transitions:
       all_success: human-approval
       partial_success: human-approval
-      all_failure: synthesize
+      all_failure: final-audit-feedback
+
+  final-audit-feedback:
+    type: human-approval
+    description: "Review audit feedback on final post"
+    input: "workflow/final/final_post.md"
+    prompt: |
+      The auditors flagged issues with the final post.
+      Review the post above and either:
+      - Type 'approve' to publish as-is
+      - Type 'abort' to cancel
+      - Provide feedback to guide the revision
+    transitions:
+      approved: complete
+      feedback: synthesize
+      abort: halt
 
   human-approval:
     type: human-approval
