@@ -53,7 +53,7 @@ const DEFAULT_WORKFLOW_STATES: WorkflowStateDisplay[] = [
   { id: 'start', label: 'Start', description: 'Initialize workflow' },
   { id: 'story-review', label: 'Review', description: 'Review raw story for completeness' },
   { id: 'story-feedback', label: 'Feedback', description: 'Get more details from user' },
-  { id: 'story-process', label: 'Process', description: 'Extract elements, determine shape' },
+  { id: 'story-process', label: 'Processing', description: 'Extract elements, determine shape' },
   { id: 'draft', label: 'Draft', description: 'Generate post drafts' },
   { id: 'cross-audit', label: 'Audit', description: 'Cross-audit all drafts' },
   { id: 'synthesize', label: 'Synthesize', description: 'Combine best elements' },
@@ -62,8 +62,14 @@ const DEFAULT_WORKFLOW_STATES: WorkflowStateDisplay[] = [
   { id: 'complete', label: 'Complete', description: 'Workflow complete' },
 ]
 
+// Custom label overrides for state IDs
+const STATE_LABEL_OVERRIDES: Record<string, string> = {
+  'story-process': 'Story Processing',
+}
+
 // Helper to format state id to label
 function stateIdToLabel(id: string): string {
+  if (STATE_LABEL_OVERRIDES[id]) return STATE_LABEL_OVERRIDES[id]
   return id.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
