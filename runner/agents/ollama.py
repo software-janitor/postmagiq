@@ -241,9 +241,9 @@ class OllamaAgent(BaseAgent):
         system_content = None
         user_content = full_prompt
 
-        # Look for "## Input Files" or "## Context" as the split point
+        # Look for content markers as the split point
         # Everything before is system instructions, everything after is user input
-        for marker in ["## Input Files", "## Context", "## File:"]:
+        for marker in ["## Input Files", "## Reviewer Context", "## USER FEEDBACK", "## Context", "## File:"]:
             if marker in full_prompt:
                 idx = full_prompt.find(marker)
                 system_content = full_prompt[:idx].strip()

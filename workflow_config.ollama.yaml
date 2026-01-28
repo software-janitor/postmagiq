@@ -28,7 +28,7 @@ agents:
   ollama:
     type: ollama
     enabled: true
-    model: gpt-oss:120b
+    model: gpt-oss:20b
     context_window: 128000
     cost_per_1k:
       input: 0.0
@@ -39,11 +39,13 @@ agents:
 # ============================================================================
 
 personas:
-  story-reviewer: prompts/story_reviewer_persona.md
-  story-processor: prompts/story_processor_persona.md
-  writer: prompts/writer_persona.md
-  auditor: prompts/auditor_persona.md
-  synthesizer: prompts/synthesizer_persona.md
+  story-reviewer: prompts/templates/story_reviewer.md
+  story-processor: prompts/templates/story_processor.md
+  writer: prompts/templates/writer.md
+  auditor: prompts/templates/auditor.md
+  synthesizer: prompts/templates/synthesizer.md
+  fabrication-auditor: prompts/templates/fabrication_auditor.md
+  style-auditor: prompts/templates/style_auditor.md
 
 # ============================================================================
 # STATE MACHINE - Linear Pipeline (No Fan-out)

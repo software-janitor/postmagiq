@@ -682,6 +682,35 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
             total_tokens=result.tokens,
         )
 
+    def _wait_for_approval(self, timeout: int = 3600) -> tuple[str, Optional[str]]:
+        """Wait for approval response from API.
+
+        Sets up the approval event, waits for submit_approval() to be called,
+        and returns the decision and optional feedback.
+
+        Args:
+            timeout: Max seconds to wait for approval response.
+
+        Returns:
+            Tuple of (decision, feedback). Decision is one of 'approved',
+            'feedback', 'abort', 'force_complete'. Returns ('abort', None)
+            on timeout.
+        """
+        with self._approval_lock:
+            self._approval_event.clear()
+            self._approval_response = None
+            self.awaiting_approval = True
+
+        got_response = self._approval_event.wait(timeout=timeout)
+
+        with self._approval_lock:
+            self.awaiting_approval = False
+            if not got_response:
+                return ("abort", None)
+            decision = self._approval_response.get("decision", "abort")
+            feedback = self._approval_response.get("feedback")
+            return (decision, feedback)
+
     def _execute_human_approval(self, state: dict) -> StateResult:
         """Execute human approval state.
 
@@ -722,30 +751,18 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
 
         if self.approval_callback:
             # API mode: notify callback and wait for submit_approval()
-            with self._approval_lock:
-                self._approval_event.clear()
-                self._approval_response = None
-                self.awaiting_approval = True
-
-            # Notify the callback that approval is needed
-            self.approval_callback({
+            callback_data = {
                 "input_path": actual_path or input_path,
                 "content": content,
                 "prompt": prompt_text,
                 "run_id": self.run_id,
-            })
+            }
+            # Include reviewer context for feedback states
+            if state.get("type") == "human-approval" and content:
+                callback_data["reviewer_context"] = content
+            self.approval_callback(callback_data)
 
-            # Wait for approval response
-            got_response = self._approval_event.wait(timeout=timeout)
-
-            with self._approval_lock:
-                self.awaiting_approval = False
-                if not got_response:
-                    decision = "abort"
-                    feedback = None
-                else:
-                    decision = self._approval_response.get("decision", "abort")
-                    feedback = self._approval_response.get("feedback")
+            decision, feedback = self._wait_for_approval(timeout=timeout)
         else:
             # CLI mode: use interactive input
             print(f"\n{'='*60}")
@@ -779,7 +796,14 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
         if decision == "feedback" and feedback:
             target = self._get_transitions(state).get("feedback")
             if target:
-                self.retry_feedback[target] = feedback
+                # Combine reviewer context with user answers for stronger signal
+                combined = f"## USER FEEDBACK — MUST INCORPORATE\n\n{feedback}"
+                if content:
+                    combined = (
+                        f"## Reviewer Context\n\n{content}\n\n"
+                        f"## USER FEEDBACK — MUST INCORPORATE\n\n{feedback}"
+                    )
+                self.retry_feedback[target] = combined
 
         self.log_callback({
             "event": "human_approval",
