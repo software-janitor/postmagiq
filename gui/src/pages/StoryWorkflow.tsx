@@ -675,14 +675,20 @@ Include specific details: error messages, tools used, time spent, etc."
                       {progressPercent}%
                     </span>
                   </div>
-                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden flex">
                     <div
                       className={clsx(
-                        'h-full rounded-full transition-all duration-500 ease-out',
-                        isWorkflowComplete ? 'bg-green-500' : 'bg-blue-500',
+                        'h-full transition-all duration-500 ease-out',
+                        isWorkflowComplete ? 'bg-green-500 rounded-full' : 'bg-blue-500 rounded-l-full',
                       )}
                       style={{ width: `${progressPercent}%` }}
                     />
+                    {!isWorkflowComplete && progressPercent < 100 && (
+                      <div
+                        className="h-full rounded-r-full progress-wave"
+                        style={{ width: `${100 - progressPercent}%` }}
+                      />
+                    )}
                   </div>
                 </div>
               )
