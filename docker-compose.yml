@@ -61,9 +61,7 @@ services:
     volumes:
       # Mount local directories for file storage
       - ./workflow:/app/workflow
-      - ./workflow_config.yaml:/app/workflow_config.yaml
-      - ./workflow_config.groq.yaml:/app/workflow_config.groq.yaml
-      - ./workflow_config.ollama.yaml:/app/workflow_config.ollama.yaml
+      - ./workflows/configs:/app/workflows/configs
       - ./prompts:/app/prompts
       # Mount content tracker from parent directory
       - ../linkedin_content_tracker.md:/app/linkedin_content_tracker.md:ro

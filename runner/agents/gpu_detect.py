@@ -131,7 +131,7 @@ def _detect_apple_metal() -> Optional[GPUInfo]:
 def get_model_tier(gpu_info: GPUInfo) -> str:
     """Determine model tier based on VRAM.
 
-    Tiers are defined in workflow_config.yaml with these ranges:
+    Tiers are defined in workflows/configs/ollama.yaml with these ranges:
     - tier_cpu: 0-6 GB (or no GPU)
     - tier_8gb: 6-10 GB
     - tier_16gb: 12-18 GB

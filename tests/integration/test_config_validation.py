@@ -39,8 +39,9 @@ def _agent_resolves(name: str, agent_type: str = "") -> bool:
 
 
 def _load_all_configs() -> list[tuple[str, dict]]:
-    """Load all workflow_config*.yaml files."""
-    pattern = os.path.join(PROJECT_ROOT, "workflow_config*.yaml")
+    """Load all workflow configs from workflows/configs/*.yaml."""
+    configs_dir = os.path.join(PROJECT_ROOT, "workflows", "configs")
+    pattern = os.path.join(configs_dir, "*.yaml")
     configs = []
     for path in sorted(glob.glob(pattern)):
         with open(path) as f:

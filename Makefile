@@ -147,9 +147,9 @@ check-env:
 # WORKFLOW COMMANDS
 # ============================================================================
 
-# CONFIG defaults to workflow_config.yaml (legacy symlink) for backward compatibility
-# Can be a name (groq-production) or path (workflows/configs/groq-production.yaml)
-CONFIG ?= workflow_config.yaml
+# CONFIG defaults to workflows/configs/claude.yaml
+# Can be a name (groq) or path (workflows/configs/groq.yaml)
+CONFIG ?= workflows/configs/claude.yaml
 
 workflow:
 ifndef STORY
@@ -214,7 +214,7 @@ endif
 # ============================================================================
 
 logs:
-	@python3 -m runner.runner --config workflow_config.yaml --list-runs
+	@python3 -m runner.runner --config workflows/configs/claude.yaml --list-runs
 
 log-states:
 ifndef RUN

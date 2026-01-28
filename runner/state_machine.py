@@ -858,7 +858,7 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
     def _state_to_output_type(self, state: str) -> str:
         """Get output type from state config.
 
-        Reads output_type from workflow_config.yaml state definition.
+        Reads output_type from workflow config state definition.
         Falls back to state name if not configured.
         """
         state_config = self.states.get(state, {})

@@ -11,11 +11,11 @@ def get_default_config_path() -> str:
     """Get config path based on LLM_PROVIDER environment variable."""
     provider = os.environ.get("LLM_PROVIDER", "cli")
     config_map = {
-        "groq": "workflow_config.groq.yaml",
-        "ollama": "workflow_config.ollama.yaml",
-        "cli": "workflow_config.yaml",  # Original CLI agents (claude, gemini, gpt)
+        "groq": "workflows/configs/groq.yaml",
+        "ollama": "workflows/configs/ollama.yaml",
+        "cli": "workflows/configs/claude.yaml",
     }
-    return config_map.get(provider, "workflow_config.yaml")
+    return config_map.get(provider, "workflows/configs/claude.yaml")
 
 
 class ConfigService:

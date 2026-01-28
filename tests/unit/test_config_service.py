@@ -16,31 +16,31 @@ class TestGetDefaultConfigPath:
             # Remove LLM_PROVIDER if it exists
             os.environ.pop("LLM_PROVIDER", None)
             path = get_default_config_path()
-            assert path == "workflow_config.yaml"
+            assert path == "workflows/configs/claude.yaml"
 
     def test_groq_provider(self):
         """LLM_PROVIDER=groq selects groq config."""
         with patch.dict(os.environ, {"LLM_PROVIDER": "groq"}):
             path = get_default_config_path()
-            assert path == "workflow_config.groq.yaml"
+            assert path == "workflows/configs/groq.yaml"
 
     def test_ollama_provider(self):
         """LLM_PROVIDER=ollama selects ollama config."""
         with patch.dict(os.environ, {"LLM_PROVIDER": "ollama"}):
             path = get_default_config_path()
-            assert path == "workflow_config.ollama.yaml"
+            assert path == "workflows/configs/ollama.yaml"
 
     def test_cli_provider(self):
-        """LLM_PROVIDER=cli selects legacy config."""
+        """LLM_PROVIDER=cli selects claude config."""
         with patch.dict(os.environ, {"LLM_PROVIDER": "cli"}):
             path = get_default_config_path()
-            assert path == "workflow_config.yaml"
+            assert path == "workflows/configs/claude.yaml"
 
     def test_unknown_provider_falls_back_to_default(self):
         """Unknown provider falls back to default config."""
         with patch.dict(os.environ, {"LLM_PROVIDER": "unknown"}):
             path = get_default_config_path()
-            assert path == "workflow_config.yaml"
+            assert path == "workflows/configs/claude.yaml"
 
 
 class TestConfigService:
