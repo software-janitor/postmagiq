@@ -33,7 +33,7 @@ agents:
     cost_per_1k:
       input: 0.0
       output: 0.0
-  fabrication-auditor:
+  ollama-fabrication-auditor:
     type: ollama
     enabled: true
     model: gpt-oss:20b
@@ -41,7 +41,7 @@ agents:
     cost_per_1k:
       input: 0.0
       output: 0.0
-  style-auditor:
+  ollama-style-auditor:
     type: ollama
     enabled: true
     model: gpt-oss:20b
@@ -129,10 +129,10 @@ states:
   audit:
     type: fan-out
     description: "Split audit: fabrication + style checks"
-    agents: [fabrication-auditor, style-auditor]
+    agents: [ollama-fabrication-auditor, ollama-style-auditor]
     personas:
-      fabrication-auditor: fabrication-auditor
-      style-auditor: style-auditor
+      ollama-fabrication-auditor: fabrication-auditor
+      ollama-style-auditor: style-auditor
     input:
       - "workflow/processed/processed_story.md"
       - "workflow/input/story_input.md"
@@ -161,10 +161,10 @@ states:
   final-audit:
     type: fan-out
     description: "Final split audit: fabrication + style checks"
-    agents: [fabrication-auditor, style-auditor]
+    agents: [ollama-fabrication-auditor, ollama-style-auditor]
     personas:
-      fabrication-auditor: fabrication-auditor
-      style-auditor: style-auditor
+      ollama-fabrication-auditor: fabrication-auditor
+      ollama-style-auditor: style-auditor
     input:
       - "workflow/processed/processed_story.md"
       - "workflow/final/final_post.md"
