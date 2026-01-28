@@ -353,6 +353,10 @@ ollama-list:
 seed-personas:
 	@python3 scripts/seed_personas.py
 
+# Seed voice profile presets from prompts/voice_profiles/
+seed-voices:
+	@python3 scripts/seed_voice_profiles.py
+
 # Sync workflow configs from registry.yaml to database
 # DEPLOYMENT_ENV can be: production, development, staging
 sync-workflows:

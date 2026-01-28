@@ -18,8 +18,8 @@ def prompts_dir(tmp_path):
     # Create voice_profiles directory and file
     voice_profiles = prompts / "voice_profiles"
     voice_profiles.mkdir()
-    voice_file = voice_profiles / "matthew-garcia.md"
-    voice_file.write_text("# Voice Profile: Matthew Garcia\n\nDistinguished Engineer voice.")
+    voice_file = voice_profiles / "servant-leader.md"
+    voice_file.write_text("# Voice Profile: Servant Leader\n\nThoughtful technical leader voice.")
 
     # Create templates directory and files
     templates = prompts / "templates"
@@ -133,7 +133,7 @@ class TestComposePersonaPromptIntegration:
 
             # Check for voice profile content
             has_voice = (
-                "matthew" in result.lower() or
+                "servant" in result.lower() or
                 "voice" in result.lower() or
                 "tone" in result.lower()
             )
