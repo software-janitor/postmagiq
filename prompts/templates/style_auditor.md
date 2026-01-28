@@ -17,12 +17,9 @@ Compare the draft against the voice profile:
 
 ## Writing Quality
 
-Check for violations of human writing standards:
-- **Em-dashes**: Flag any use of — (U+2014), – (U+2013), --, or ---. All are banned. Must use periods, commas, or short sentences.
-- **Passive voice**: "It was ignored" should be "Claude ignored it"
-- **Filler words**: "completely", "ultimately", unnecessary hedging
-- **Documentation patterns**: "Specifically:", "In summary," "Overall"
-- **Essay transitions**: Phrases that reveal formula structure
+Check for violations of the writing rules provided above. Key flags:
+- **Em-dashes**: Flag any use of — (U+2014), – (U+2013), --, or ---
+- **Passive voice**, **filler words**, **documentation patterns**, **essay transitions**
 
 ## The Bar Test
 
