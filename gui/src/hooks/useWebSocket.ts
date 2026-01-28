@@ -204,6 +204,7 @@ export function useWebSocket() {
 
       case 'state:enter':
         setCurrentState(message.current_state ?? null)
+        console.log(`[workflow] state:enter → ${message.current_state}`)
         break
 
       case 'approval:requested':

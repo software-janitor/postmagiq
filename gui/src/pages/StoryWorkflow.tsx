@@ -634,7 +634,6 @@ Include specific details: error messages, tools used, time spent, etc."
                   {awaitingApproval && <MessageCircle className="w-4 h-4" />}
                   {aborted && <XCircle className="w-4 h-4" />}
                   {paused && !aborted && !awaitingApproval && <Pause className="w-4 h-4" />}
-                  {running && !paused && !awaitingApproval && <Loader2 className="w-4 h-4 animate-spin" />}
                   {!running && !workflowError && !aborted && <CheckCircle2 className="w-4 h-4" />}
                   {workflowError && <AlertCircle className="w-4 h-4" />}
                   {awaitingApproval
@@ -644,13 +643,50 @@ Include specific details: error messages, tools used, time spent, etc."
                     : paused
                     ? (showInternals ? `Paused: ${currentState}` : 'Paused')
                     : running
-                    ? (showInternals ? `State: ${currentState || 'starting'}` : 'Processing')
+                    ? (showInternals ? `State: ${currentState || 'starting'}` : '')
                     : workflowError
                     ? 'Failed'
                     : 'Complete'}
                 </div>
               </div>
             </div>
+
+            {/* Progress bar — visible to all users */}
+            {(running || (!running && !workflowError && !aborted && currentState === 'complete')) && (() => {
+              const effectiveState = currentState || previousRun?.final_state
+              const totalStates = WORKFLOW_STATES.length
+              const currentIdx = WORKFLOW_STATES.findIndex(s => s.id === effectiveState)
+              // If complete, fill to 100%. Otherwise use index position.
+              const isWorkflowComplete = effectiveState === 'complete' || (!running && !workflowError && !aborted)
+              const progressPercent = isWorkflowComplete
+                ? 100
+                : currentIdx >= 0
+                ? Math.round(((currentIdx + 1) / totalStates) * 100)
+                : 0
+              const currentLabel = WORKFLOW_STATES.find(s => s.id === effectiveState)?.label || effectiveState || 'Starting'
+
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">
+                      {isWorkflowComplete ? 'Complete' : currentLabel}
+                    </span>
+                    <span className="text-slate-500 text-xs">
+                      {progressPercent}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                    <div
+                      className={clsx(
+                        'h-full rounded-full transition-all duration-500 ease-out',
+                        isWorkflowComplete ? 'bg-green-500' : 'bg-blue-500',
+                      )}
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Metrics - only shown when show_internal_workflow flag is true */}
             {showInternals && (tokens > 0 || cost > 0) && (
