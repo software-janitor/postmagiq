@@ -2,7 +2,7 @@
 
 import os
 import time
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 import requests
 
@@ -10,6 +10,9 @@ from runner.agents.base import BaseAgent
 from runner.agents.gpu_detect import detect_gpu, get_model_tier, GPUInfo
 from runner.models import AgentResult, TokenUsage
 from runner.sessions.file_based import FileBasedSessionManager
+
+if TYPE_CHECKING:
+    from runner.logging.dev_logger import DevLogger
 
 
 # Model tier configurations
@@ -103,7 +106,15 @@ class OllamaAgent(BaseAgent):
         self.model = config.get("model") or self.tier_config["models"].get(
             "writer", "llama3.2"
         )
-        self.context_window = self.tier_config["max_context"]
+
+        # Context window: config override > per-model config > tier default
+        models_config = config.get("models", {})
+        model_config = models_config.get(self.model, {})
+        self.context_window = (
+            model_config.get("context_window")
+            or config.get("context_window")
+            or self.tier_config["max_context"]
+        )
 
         # File-based session manager
         self.session_manager = FileBasedSessionManager(
@@ -131,24 +142,47 @@ class OllamaAgent(BaseAgent):
         return self.tier_config["models"].get(tier, self.model)
 
     def invoke(
-        self, prompt: str, input_files: Optional[list[str]] = None
+        self, prompt: str, input_files: Optional[list[str]] = None,
+        json_mode: bool = None
     ) -> AgentResult:
         """One-shot invocation without session context.
 
         Args:
             prompt: The prompt to send
             input_files: Optional list of files to include as context
+            json_mode: If True, force JSON output format. If None, auto-detect from prompt.
 
         Returns:
             AgentResult with response and metadata
         """
-        return self._invoke_internal(prompt, input_files, use_session=False)
+        # Auto-detect JSON mode if not explicitly set
+        if json_mode is None:
+            json_mode = self._should_use_json_mode(prompt)
+        return self._invoke_internal(prompt, input_files, use_session=False, json_mode=json_mode)
+
+    def _should_use_json_mode(self, prompt: str) -> bool:
+        """Detect if prompt requires JSON output.
+
+        Looks for indicators that the persona expects JSON output format.
+        """
+        json_indicators = [
+            "Return ONLY valid JSON",
+            "Output Format",
+            '{"score":',
+            '"decision":',
+            "Required fields:",
+            "# Auditor Persona",
+            "# Story Reviewer Persona",
+            "output_type: review",
+        ]
+        return any(indicator in prompt for indicator in json_indicators)
 
     def invoke_with_session(
         self,
         session_id: str,
         prompt: str,
         input_files: Optional[list[str]] = None,
+        json_mode: bool = False,
     ) -> AgentResult:
         """Invocation with session context.
 
@@ -158,6 +192,7 @@ class OllamaAgent(BaseAgent):
             session_id: Session identifier
             prompt: The prompt to send
             input_files: Optional list of files to include as context
+            json_mode: If True, force JSON output format
 
         Returns:
             AgentResult with response and metadata
@@ -166,13 +201,14 @@ class OllamaAgent(BaseAgent):
         if not self.session_manager.load_session(session_id):
             self.session_manager.create_session(session_id)
 
-        return self._invoke_internal(prompt, input_files, use_session=True)
+        return self._invoke_internal(prompt, input_files, use_session=True, json_mode=json_mode)
 
     def _invoke_internal(
         self,
         prompt: str,
         input_files: Optional[list[str]],
         use_session: bool,
+        json_mode: bool = False,
     ) -> AgentResult:
         """Internal invocation logic.
 
@@ -180,6 +216,7 @@ class OllamaAgent(BaseAgent):
             prompt: The prompt to send
             input_files: Optional list of files to include
             use_session: Whether to use session context
+            json_mode: If True, force JSON output format
 
         Returns:
             AgentResult with response and metadata
@@ -199,30 +236,91 @@ class OllamaAgent(BaseAgent):
         full_prompt = f"{context}\n\n{prompt}" if context else prompt
 
         # Build messages for chat API
+        # Split prompt into system (persona/instructions) and user (task/input) messages
         messages = []
+        system_content = None
+        user_content = full_prompt
+
+        # Look for content markers as the split point
+        # Everything before is system instructions, everything after is user input
+        for marker in ["## Input Files", "## Reviewer Context", "## USER FEEDBACK", "## Context", "## File:"]:
+            if marker in full_prompt:
+                idx = full_prompt.find(marker)
+                system_content = full_prompt[:idx].strip()
+                user_content = full_prompt[idx:].strip()
+                break
+
         if use_session:
             messages = self.session_manager.get_context_for_ollama()
-        messages.append({"role": "user", "content": full_prompt})
+
+        # Add system message if we extracted persona instructions
+        if system_content and not any(m.get("role") == "system" for m in messages):
+            messages.insert(0, {"role": "system", "content": system_content})
+
+        messages.append({"role": "user", "content": user_content})
+
+        # Extract system and user messages for dev logging
+        system_prompt = None
+        user_message_parts = []
+        for m in messages:
+            if m.get("role") == "system":
+                system_prompt = m.get("content", "")
+            elif m.get("role") == "user":
+                user_message_parts.append(m.get("content", ""))
+        user_message_combined = "\n\n".join(user_message_parts)
+
+        # Dev logging: log request before API call
+        if self._dev_logger and self._current_run_id and self._current_state:
+            self._dev_logger.log_llm_request(
+                run_id=self._current_run_id,
+                state=self._current_state,
+                agent=self.name,
+                model=self.model,
+                system_prompt=system_prompt,
+                user_message=user_message_combined,
+                context_window=self.context_window,
+            )
 
         try:
             # Ensure model is available
             if self.auto_pull and not self._ensure_model_available(self.model):
+                error_msg = f"Model {self.model} not available and could not be pulled"
+                # Dev logging: log error
+                if self._dev_logger and self._current_run_id and self._current_state:
+                    self._dev_logger.log_llm_response(
+                        run_id=self._current_run_id,
+                        state=self._current_state,
+                        agent=self.name,
+                        model=self.model,
+                        content="",
+                        input_tokens=0,
+                        output_tokens=0,
+                        duration_ms=int((time.time() - start_time) * 1000),
+                        context_window=self.context_window,
+                        success=False,
+                        error=error_msg,
+                    )
                 return AgentResult(
                     success=False,
                     content="",
                     tokens=TokenUsage(input_tokens=0, output_tokens=0),
                     duration_s=time.time() - start_time,
-                    error=f"Model {self.model} not available and could not be pulled",
+                    error=error_msg,
                 )
 
             # Use chat API for proper multi-turn support
+            request_body = {
+                "model": self.model,
+                "messages": messages,
+                "stream": False,
+            }
+            # Force JSON output format if requested
+            if json_mode:
+                request_body["format"] = "json"
+
             response = requests.post(
                 f"{self.host}/api/chat",
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    "stream": False,
-                },
+                json=request_body,
                 timeout=self.timeout,
             )
             response.raise_for_status()
@@ -236,6 +334,21 @@ class OllamaAgent(BaseAgent):
                 input_tokens=data.get("prompt_eval_count", 0),
                 output_tokens=data.get("eval_count", 0),
             )
+
+            # Dev logging: log successful response
+            if self._dev_logger and self._current_run_id and self._current_state:
+                self._dev_logger.log_llm_response(
+                    run_id=self._current_run_id,
+                    state=self._current_state,
+                    agent=self.name,
+                    model=self.model,
+                    content=content,
+                    input_tokens=tokens.input_tokens,
+                    output_tokens=tokens.output_tokens,
+                    duration_ms=int(duration * 1000),
+                    context_window=self.context_window,
+                    success=True,
+                )
 
             # Save to session if using sessions
             if use_session:
@@ -262,20 +375,54 @@ class OllamaAgent(BaseAgent):
             )
 
         except requests.exceptions.Timeout:
+            error_msg = f"Ollama request timed out after {self.timeout}s"
+            duration = time.time() - start_time
+            # Dev logging: log timeout error
+            if self._dev_logger and self._current_run_id and self._current_state:
+                self._dev_logger.log_llm_response(
+                    run_id=self._current_run_id,
+                    state=self._current_state,
+                    agent=self.name,
+                    model=self.model,
+                    content="",
+                    input_tokens=0,
+                    output_tokens=0,
+                    duration_ms=int(duration * 1000),
+                    context_window=self.context_window,
+                    success=False,
+                    error=error_msg,
+                )
             return AgentResult(
                 success=False,
                 content="",
                 tokens=TokenUsage(input_tokens=0, output_tokens=0),
-                duration_s=time.time() - start_time,
-                error=f"Ollama request timed out after {self.timeout}s",
+                duration_s=duration,
+                error=error_msg,
             )
         except requests.exceptions.RequestException as e:
+            error_msg = f"Ollama request failed: {e}"
+            duration = time.time() - start_time
+            # Dev logging: log request error
+            if self._dev_logger and self._current_run_id and self._current_state:
+                self._dev_logger.log_llm_response(
+                    run_id=self._current_run_id,
+                    state=self._current_state,
+                    agent=self.name,
+                    model=self.model,
+                    content="",
+                    input_tokens=0,
+                    output_tokens=0,
+                    duration_ms=int(duration * 1000),
+                    context_window=self.context_window,
+                    success=False,
+                    error=error_msg,
+                )
             return AgentResult(
                 success=False,
                 content="",
                 tokens=TokenUsage(input_tokens=0, output_tokens=0),
-                duration_s=time.time() - start_time,
-                error=f"Ollama request failed: {e}",
+                duration_s=duration,
+                error=error_msg,
             )
 
     def _ensure_model_available(self, model_name: str) -> bool:

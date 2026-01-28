@@ -39,6 +39,7 @@ async def execute_workflow(
         input_path=request.input_path,
         content=request.content,
         config=request.config,
+        workspace_id=request.workspace_id,
     )
 
 

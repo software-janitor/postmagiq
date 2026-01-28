@@ -33,6 +33,7 @@ class StateMachine:
         agent_logger=None,
         approval_callback: Optional[Callable[[dict], None]] = None,
         database=None,  # Database for primary storage
+        dev_logger=None,  # Dev logger for LLM message visibility
     ):
         self.config = config
         self.states = config.get("states", {})
@@ -43,6 +44,7 @@ class StateMachine:
         self.agent_logger = agent_logger
         self.approval_callback = approval_callback
         self.db = database  # Primary storage
+        self.dev_logger = dev_logger  # Dev logger for LLM visibility
 
         self.agents = agents or {}
         self._agent_configs = config.get("agents", {})
@@ -241,7 +243,7 @@ class StateMachine:
                 # If last audit score >= 8, auto-proceed (story is good enough)
                 if self.last_audit_score is not None and self.last_audit_score >= AUTO_PROCEED_THRESHOLD:
                     # Look for success/proceed transition (different states use different names)
-                    transitions = state_config.get("transitions", {})
+                    transitions = self._get_transitions(state_config)
                     skip_target = transitions.get("success") or transitions.get("proceed")
                     if skip_target:
                         self.log_callback({
@@ -274,7 +276,7 @@ class StateMachine:
 
                     if decision == "approved" or decision == "feedback":
                         # User wants to skip forward - find the "success" or "proceed" transition
-                        transitions = state_config.get("transitions", {})
+                        transitions = self._get_transitions(state_config)
                         skip_target = transitions.get("success") or transitions.get("proceed")
                         if skip_target:
                             self.log_callback({
@@ -327,7 +329,16 @@ class StateMachine:
 
         feedback = self.retry_feedback.pop(state_name, None)
         if feedback:
-            state["context"] = f"Previous attempt feedback:\n{feedback}"
+            # If feedback already has structured markers (from human approval),
+            # preserve them. Otherwise wrap audit feedback with a marker so
+            # _build_prompt places it after input files in the user message.
+            if "## USER FEEDBACK" in feedback or "## Reviewer Context" in feedback:
+                state["context"] = feedback
+            else:
+                state["context"] = (
+                    f"## USER FEEDBACK — MUST INCORPORATE\n\n"
+                    f"Previous attempt feedback:\n{feedback}"
+                )
 
         self.log_callback({
             "event": "state_enter",
@@ -498,18 +509,21 @@ class StateMachine:
         result = self._invoke_agent(agent_name, prompt, output_path, state_name)
 
         if result.status == "success":
-            audit = self._parse_audit_result(result)
-            if audit:
-                if audit.decision == "retry":
-                    target = state.get("transitions", {}).get("retry")
-                    if target:
-                        self.retry_feedback[target] = audit.feedback
-                return StateResult(
-                    state_name=state_name,
-                    transition=audit.decision,
-                    outputs={agent_name: result},
-                    total_tokens=result.tokens,
-                )
+            # Only parse as audit result for audit/review output types
+            output_type = state.get("output_type", "")
+            if output_type in ("audit", "review", "final_audit"):
+                audit = self._parse_audit_result(result)
+                if audit:
+                    if audit.decision == "retry":
+                        target = self._get_transitions(state).get("retry")
+                        if target:
+                            self.retry_feedback[target] = audit.feedback
+                    return StateResult(
+                        state_name=state_name,
+                        transition=audit.decision,
+                        outputs={agent_name: result},
+                        total_tokens=result.tokens,
+                    )
 
         transition = "success" if result.status == "success" else "failure"
         return StateResult(
@@ -627,9 +641,17 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
                 "message": "Starting new session (no previous session found)",
             })
 
+        # Set dev logger for LLM visibility (if enabled)
+        if self.dev_logger and self.run_id:
+            agent.set_dev_logger(self.dev_logger, self.run_id, state_name)
+
         # Use session ID based on run_id for continuity
         session_id = f"orchestrator_{self.run_id}"
         result = agent.invoke_with_session(session_id, prompt)
+
+        # Clear dev logger after invocation
+        if self.dev_logger:
+            agent.clear_dev_logger()
 
         duration = time.time() - start_time
 
@@ -669,6 +691,35 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
             total_tokens=result.tokens,
         )
 
+    def _wait_for_approval(self, timeout: int = 3600) -> tuple[str, Optional[str]]:
+        """Wait for approval response from API.
+
+        Sets up the approval event, waits for submit_approval() to be called,
+        and returns the decision and optional feedback.
+
+        Args:
+            timeout: Max seconds to wait for approval response.
+
+        Returns:
+            Tuple of (decision, feedback). Decision is one of 'approved',
+            'feedback', 'abort', 'force_complete'. Returns ('abort', None)
+            on timeout.
+        """
+        with self._approval_lock:
+            self._approval_event.clear()
+            self._approval_response = None
+            self.awaiting_approval = True
+
+        got_response = self._approval_event.wait(timeout=timeout)
+
+        with self._approval_lock:
+            self.awaiting_approval = False
+            if not got_response:
+                return ("abort", None)
+            decision = self._approval_response.get("decision", "abort")
+            feedback = self._approval_response.get("feedback")
+            return (decision, feedback)
+
     def _execute_human_approval(self, state: dict) -> StateResult:
         """Execute human approval state.
 
@@ -685,38 +736,42 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
                 input_path = input_path[len("workflow/"):]
             input_path = os.path.join(self.run_dir, input_path)
 
-        # Read content for approval if available
+        # Read content for approval - try primary path first, then fallbacks
         content = None
+        actual_path = None
+
+        # Try the configured input path first
         if input_path and os.path.exists(input_path):
-            with open(input_path) as f:
+            actual_path = input_path
+        elif self.run_dir:
+            # Fallback paths for post content (when audit passes without revise)
+            fallback_paths = [
+                os.path.join(self.run_dir, "final/final_post.md"),
+                os.path.join(self.run_dir, "drafts/draft.md"),
+            ]
+            for fallback in fallback_paths:
+                if os.path.exists(fallback):
+                    actual_path = fallback
+                    break
+
+        if actual_path:
+            with open(actual_path) as f:
                 content = f.read()
 
         if self.approval_callback:
             # API mode: notify callback and wait for submit_approval()
-            with self._approval_lock:
-                self._approval_event.clear()
-                self._approval_response = None
-                self.awaiting_approval = True
-
-            # Notify the callback that approval is needed
-            self.approval_callback({
-                "input_path": input_path,
+            callback_data = {
+                "input_path": actual_path or input_path,
                 "content": content,
                 "prompt": prompt_text,
                 "run_id": self.run_id,
-            })
+            }
+            # Include reviewer context for feedback states
+            if state.get("type") == "human-approval" and content:
+                callback_data["reviewer_context"] = content
+            self.approval_callback(callback_data)
 
-            # Wait for approval response
-            got_response = self._approval_event.wait(timeout=timeout)
-
-            with self._approval_lock:
-                self.awaiting_approval = False
-                if not got_response:
-                    decision = "abort"
-                    feedback = None
-                else:
-                    decision = self._approval_response.get("decision", "abort")
-                    feedback = self._approval_response.get("feedback")
+            decision, feedback = self._wait_for_approval(timeout=timeout)
         else:
             # CLI mode: use interactive input
             print(f"\n{'='*60}")
@@ -724,9 +779,10 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
             print(f"{'='*60}")
 
             if content:
-                print(f"\n--- {input_path} ---")
+                display_path = actual_path or input_path
+                print(f"\n--- {display_path} ---")
                 print(content)
-                print(f"--- end {input_path} ---\n")
+                print(f"--- end {display_path} ---\n")
 
             print(prompt_text)
 
@@ -747,9 +803,16 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
 
         # Store feedback for retry state if applicable
         if decision == "feedback" and feedback:
-            target = state.get("transitions", {}).get("feedback")
+            target = self._get_transitions(state).get("feedback")
             if target:
-                self.retry_feedback[target] = feedback
+                # Combine reviewer context with user answers for stronger signal
+                combined = f"## USER FEEDBACK — MUST INCORPORATE\n\n{feedback}"
+                if content:
+                    combined = (
+                        f"## Reviewer Context\n\n{content}\n\n"
+                        f"## USER FEEDBACK — MUST INCORPORATE\n\n{feedback}"
+                    )
+                self.retry_feedback[target] = combined
 
         self.log_callback({
             "event": "human_approval",
@@ -786,7 +849,16 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
 
         try:
             agent = self.get_agent(agent_name)
+
+            # Set dev logger for LLM visibility (if enabled)
+            if self.dev_logger and self.run_id:
+                agent.set_dev_logger(self.dev_logger, self.run_id, state)
+
             result = agent.invoke(prompt)
+
+            # Clear dev logger after invocation
+            if self.dev_logger:
+                agent.clear_dev_logger()
             duration = time.time() - start_time
 
             if result.success:
@@ -897,15 +969,44 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
                 error=str(e),
             )
 
-    def _get_next_state(self, state_config: dict, result: StateResult) -> Optional[str]:
-        """Determine next state from transitions."""
-        transitions = state_config.get("transitions", {})
-        next_state = state_config.get("next")
+    def _get_transitions(self, state_config: dict) -> dict:
+        """Get transitions for a state, merging with defaults.
 
-        if result.transition in transitions:
-            return transitions[result.transition]
-        elif next_state:
-            return next_state
+        Default transitions from config are used as base, then
+        state-specific transitions override them.
+        """
+        # Get default transitions from config (if defined)
+        defaults = self.config.get("default_transitions", {})
+        # Get state-specific transitions
+        state_transitions = state_config.get("transitions", {})
+        # Merge: state-specific overrides defaults
+        return {**defaults, **state_transitions}
+
+    def _get_next_state(self, state_config: dict, result: StateResult) -> Optional[str]:
+        """Determine next state from transitions.
+
+        For states with explicit transitions: use merged transitions (state overrides defaults)
+        For states without explicit transitions: use 'next' field first, then defaults
+        """
+        next_state = state_config.get("next")
+        has_explicit_transitions = "transitions" in state_config
+
+        if has_explicit_transitions:
+            # Use merged transitions (state overrides defaults)
+            transitions = self._get_transitions(state_config)
+            if result.transition in transitions:
+                return transitions[result.transition]
+            # Fall back to next if transition not found
+            if next_state:
+                return next_state
+        else:
+            # No explicit transitions - check 'next' first (for initial states)
+            if next_state:
+                return next_state
+            # Then check defaults
+            defaults = self.config.get("default_transitions", {})
+            if result.transition in defaults:
+                return defaults[result.transition]
 
         return None
 
@@ -1004,14 +1105,18 @@ Your output will be cross-checked against source material. Fabrications = automa
 """
 
     def _get_content_from_db(self, output_type: str) -> Optional[str]:
-        """Get content from database by output type."""
+        """Get content from database by output type.
+
+        Returns only the latest record for this output type to avoid
+        duplicate content from re-runs or multiple submissions.
+        """
         if not self.db or not self.run_id:
             return None
         try:
             outputs = self.db.get_workflow_outputs_by_type(self.run_id, output_type)
             if outputs:
-                # Return all outputs of this type, combined
-                return "\n\n---\n\n".join(o.content for o in outputs)
+                # Use only the latest record to avoid duplicate content
+                return outputs[-1].content
         except Exception:
             pass
         return None
@@ -1110,6 +1215,12 @@ Your output will be cross-checked against source material. Fabrications = automa
     ) -> str:
         """Build full prompt from persona, database content, and files.
 
+        Layout: [preamble] [persona] [input files] [feedback context]
+
+        Feedback context is placed AFTER input files so the Ollama agent's
+        message split logic puts it in the user message (not system).
+        Non-feedback context goes before input files.
+
         Args:
             input_files: Resolved file paths that exist on disk
             input_specs: Original input specs from config (for database lookup even if files don't exist)
@@ -1122,8 +1233,17 @@ Your output will be cross-checked against source material. Fabrications = automa
         if persona:
             parts.append(persona)
 
-        if context:
-            parts.append(f"## Context\n\n{context}")
+        # Separate feedback context from regular context.
+        # Feedback markers (from retry_feedback) go AFTER input files
+        # so the Ollama split puts them in the user message.
+        feedback_context = None
+        regular_context = context
+        if context and ("## USER FEEDBACK" in context or "## Reviewer Context" in context):
+            feedback_context = context
+            regular_context = None
+
+        if regular_context:
+            parts.append(f"## Context\n\n{regular_context}")
 
         # Collect all paths to try (both resolved files and original specs)
         paths_to_try = list(input_files) if input_files else []
@@ -1156,6 +1276,11 @@ Your output will be cross-checked against source material. Fabrications = automa
 
                 if content:
                     parts.append(f"### {source}\n\n{content}")
+
+        # Feedback context goes AFTER input files so Ollama splits it into
+        # the user message (split markers: ## Reviewer Context, ## USER FEEDBACK)
+        if feedback_context:
+            parts.append(feedback_context)
 
         return "\n\n".join(parts)
 

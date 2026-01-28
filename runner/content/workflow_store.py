@@ -27,18 +27,17 @@ class WorkflowStore:
     # ---------------------------------------------------------------------
     # Workflow runs
     # ---------------------------------------------------------------------
-    def create_workflow_run(self, user_id, run_id: str, story: str):
+    def create_workflow_run(self, user_id, run_id: str, story: str, workspace_id: Optional[UUID] = None):
         with get_session() as session:
             repo = WorkflowRunRepository(session)
-            return repo.create(
-                repo.model.model_validate(
-                    {
-                        "user_id": normalize_user_id(user_id),
-                        "run_id": run_id,
-                        "story": story,
-                    }
-                )
-            )
+            data = {
+                "user_id": normalize_user_id(user_id),
+                "run_id": run_id,
+                "story": story,
+            }
+            if workspace_id:
+                data["workspace_id"] = workspace_id
+            return repo.create(repo.model.model_validate(data))
 
     def update_workflow_run(self, run_id: str, **kwargs) -> bool:
         with get_session() as session:
@@ -245,36 +244,100 @@ class WorkflowStore:
             return repo.get_by_slug(normalize_user_id(user_id), slug)
 
     @staticmethod
+    def _parse_frontmatter(content: str) -> tuple[dict, str]:
+        """Parse YAML frontmatter from template content.
+
+        Returns (frontmatter_dict, body) where body has frontmatter stripped.
+        """
+        if not content.startswith("---"):
+            return {}, content
+
+        end = content.find("---", 3)
+        if end == -1:
+            return {}, content
+
+        frontmatter_raw = content[3:end].strip()
+        body = content[end + 3:].strip()
+
+        # Simple key: value parser (avoids PyYAML dependency for 2 fields)
+        fm = {}
+        for line in frontmatter_raw.splitlines():
+            line = line.strip()
+            if ":" in line:
+                key, value = line.split(":", 1)
+                value = value.strip()
+                if value.lower() in ("true", "false"):
+                    value = value.lower() == "true"
+                fm[key.strip()] = value
+        return fm, body
+
+    @staticmethod
     def compose_persona_prompt(
         persona_slug: str,
-        voice_profile_slug: str = "matthew-garcia",
+        voice_profile_slug: str = "servant-leader",
     ) -> str:
-        """Compose a full persona prompt from universal_rules + voice_profile + template."""
+        """Compose a full persona prompt from rules + voice_profile + template.
+
+        Reads frontmatter from the template to decide which components to include:
+        - needs_voice: true|false — include voice profile (default true)
+        - needs_rules: full|core|none — which rules tier (default full)
+        """
         import os
 
         base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
         prompts_dir = os.path.join(base_dir, "prompts")
 
-        parts = []
-        universal_path = os.path.join(prompts_dir, "universal_rules.md")
-        if os.path.exists(universal_path):
-            with open(universal_path) as f:
-                parts.append(f.read().strip())
-
-        voice_path = os.path.join(prompts_dir, "voice_profiles", f"{voice_profile_slug}.md")
-        if os.path.exists(voice_path):
-            with open(voice_path) as f:
-                parts.append(f.read().strip())
-
+        # Load template first to read frontmatter
         filename_slug = persona_slug.replace("-", "_")
         template_path = os.path.join(prompts_dir, "templates", f"{filename_slug}.md")
+        template_content = ""
         if os.path.exists(template_path):
             with open(template_path) as f:
-                parts.append(f.read().strip())
-        else:
-            legacy_path = os.path.join(prompts_dir, f"{filename_slug}_persona.md")
-            if os.path.exists(legacy_path):
-                with open(legacy_path) as f:
+                template_content = f.read().strip()
+
+        fm, template_body = WorkflowStore._parse_frontmatter(template_content)
+        needs_voice = fm.get("needs_voice", True)
+        needs_rules = fm.get("needs_rules", "full")
+
+        parts = []
+
+        # Include rules based on frontmatter
+        if needs_rules == "full":
+            # core + writing rules
+            core_path = os.path.join(prompts_dir, "rules", "core.md")
+            writing_path = os.path.join(prompts_dir, "rules", "writing.md")
+            for rpath in (core_path, writing_path):
+                if os.path.exists(rpath):
+                    with open(rpath) as f:
+                        parts.append(f.read().strip())
+            # Fallback to universal_rules.md if split files don't exist yet
+            if not parts:
+                universal_path = os.path.join(prompts_dir, "universal_rules.md")
+                if os.path.exists(universal_path):
+                    with open(universal_path) as f:
+                        parts.append(f.read().strip())
+        elif needs_rules == "core":
+            core_path = os.path.join(prompts_dir, "rules", "core.md")
+            if os.path.exists(core_path):
+                with open(core_path) as f:
                     parts.append(f.read().strip())
+            else:
+                # Fallback to universal_rules.md if core.md doesn't exist yet
+                universal_path = os.path.join(prompts_dir, "universal_rules.md")
+                if os.path.exists(universal_path):
+                    with open(universal_path) as f:
+                        parts.append(f.read().strip())
+        # needs_rules == "none" -> skip rules entirely
+
+        # Include voice profile if needed
+        if needs_voice:
+            voice_path = os.path.join(prompts_dir, "voice_profiles", f"{voice_profile_slug}.md")
+            if os.path.exists(voice_path):
+                with open(voice_path) as f:
+                    parts.append(f.read().strip())
+
+        # Append template body (frontmatter stripped)
+        if template_body:
+            parts.append(template_body)
 
         return "\n\n".join(parts)

@@ -80,20 +80,11 @@ def _extract_title(content: str) -> str:
     return "Untitled"
 
 
-def _get_workflow_run_with_final(workspace_id: UUID, story: str):
-    """Get the latest workflow run that has a 'final' output for workspace."""
+def _get_workflow_run_with_final(workspace_id: UUID, story: str, user_id: UUID):
+    """Get the latest workflow run that has a 'final' output for this workspace."""
     with get_session() as session:
         repo = WorkflowRunRepository(session)
-        # Use workspace-filtered query
-        runs = repo.list_by_workspace(workspace_id, limit=100)
-        for run in runs:
-            if run.story == story:
-                output_repo = WorkflowOutputRepository(session)
-                outputs = output_repo.list_by_run(run.run_id)
-                for output in outputs:
-                    if output.output_type == "final":
-                        return run
-    return None
+        return repo.get_latest_with_final_output(user_id, story, workspace_id=workspace_id)
 
 
 def _get_workflow_outputs(run_id: str):
@@ -138,7 +129,7 @@ async def list_finished_posts(
 
             # Try to get content from workflow output
             story_id = f"post_{post.post_number:02d}"
-            run = _get_workflow_run_with_final(ctx.workspace_id, story_id)
+            run = _get_workflow_run_with_final(ctx.workspace_id, story_id, ctx.user_id)
 
             final_content = None
             file_path = "no_workflow_run"
@@ -208,7 +199,7 @@ async def get_finished_post(
 
         # Try to get workflow content
         story_id = f"post_{post_num:02d}"
-        run = _get_workflow_run_with_final(ctx.workspace_id, story_id)
+        run = _get_workflow_run_with_final(ctx.workspace_id, story_id, ctx.user_id)
 
         final_content = None
         file_path = "no_workflow_run"

@@ -62,8 +62,8 @@ class WritingSampleRead(WritingSampleBase):
 class VoiceProfileBase(SQLModel):
     """Base voice profile fields."""
 
-    name: str  # e.g., "Matthew Garcia", "Professional", "Conversational"
-    slug: str  # unique identifier like "matthew-garcia"
+    name: str  # e.g., "Servant Leader", "Professional", "Conversational"
+    slug: str  # unique identifier like "servant-leader"
     description: Optional[str] = None
     is_preset: bool = Field(default=False)  # True for system presets
     tone_description: Optional[str] = None  # how the voice sounds

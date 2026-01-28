@@ -7,8 +7,10 @@ import tempfile
 from datetime import datetime
 from typing import Optional, Any
 from threading import Thread
+from uuid import UUID
 
 from api.models.api_models import WorkflowStatus
+from api.services.config_service import get_default_config_path
 from api.websocket.manager import manager
 from runner.content.ids import normalize_user_id
 from runner.content.repository import PostRepository
@@ -30,8 +32,9 @@ def _broadcast_from_thread(loop: asyncio.AbstractEventLoop, coro):
 class WorkflowService:
     """Service for controlling workflow execution."""
 
-    def __init__(self, config_path: str = "workflow_config.yaml"):
-        self.config_path = config_path
+    def __init__(self, config_path: str = None):
+        # Use LLM_PROVIDER-based config selection if no explicit path provided
+        self.config_path = config_path or get_default_config_path()
         self.current_run_id: Optional[str] = None
         self.current_story: Optional[str] = None
         self.current_user_id: Optional[str] = None  # Set during execute()
@@ -61,6 +64,7 @@ class WorkflowService:
         input_path: Optional[str] = None,
         content: Optional[str] = None,
         config: Optional[str] = None,
+        workspace_id: Optional[UUID] = None,
     ) -> dict:
         """Start workflow execution in background.
 
@@ -70,6 +74,7 @@ class WorkflowService:
             input_path: Optional path to input file
             content: Optional input content
             config: Optional workflow config slug (e.g., "groq-production")
+            workspace_id: Optional workspace for multi-tenant scoping
         """
         if self.running:
             return {"error": "Workflow already running", "run_id": self.current_run_id}
@@ -100,7 +105,7 @@ class WorkflowService:
         self.current_run_id = runner._generate_run_id(story)
 
         # Create workflow run in database
-        self._store.create_workflow_run(self.current_user_id, self.current_run_id, story)
+        self._store.create_workflow_run(self.current_user_id, self.current_run_id, story, workspace_id=workspace_id)
 
         # Save content to database (primary) and try file (secondary)
         if content:
@@ -320,6 +325,53 @@ class WorkflowService:
                             "session_id": event.get("session_id"),
                             "message": event.get("message"),
                             "timestamp": datetime.utcnow().isoformat(),
+                        },
+                        run_id,
+                    )
+                )
+            elif event_type == "llm:request":
+                # DEV_MODE: Broadcast full LLM request for dev console
+                _broadcast_from_thread(
+                    main_loop,
+                    manager.broadcast(
+                        {
+                            "type": "llm:request",
+                            "run_id": run_id,
+                            "state": event.get("state"),
+                            "agent": event.get("agent"),
+                            "model": event.get("model"),
+                            "system_prompt": event.get("system_prompt"),
+                            "user_message": event.get("user_message"),
+                            "context_window": event.get("context_window"),
+                            "estimated_tokens": event.get("estimated_tokens"),
+                            "context_usage_percent": event.get("context_usage_percent"),
+                            "context_warning": event.get("context_warning"),
+                            "timestamp": event.get("timestamp"),
+                        },
+                        run_id,
+                    )
+                )
+            elif event_type == "llm:response":
+                # DEV_MODE: Broadcast full LLM response for dev console
+                _broadcast_from_thread(
+                    main_loop,
+                    manager.broadcast(
+                        {
+                            "type": "llm:response",
+                            "run_id": run_id,
+                            "state": event.get("state"),
+                            "agent": event.get("agent"),
+                            "model": event.get("model"),
+                            "content": event.get("content"),
+                            "tokens": event.get("tokens"),
+                            "duration_ms": event.get("duration_ms"),
+                            "context_window": event.get("context_window"),
+                            "context_usage_percent": event.get("context_usage_percent"),
+                            "context_remaining": event.get("context_remaining"),
+                            "context_warning": event.get("context_warning"),
+                            "success": event.get("success"),
+                            "error": event.get("error"),
+                            "timestamp": event.get("timestamp"),
                         },
                         run_id,
                     )

@@ -303,8 +303,9 @@ dev:
 	docker compose $(COMPOSE_FILES) up -d postgres pgbouncer
 	@sleep 3
 	@docker compose exec postgres pg_isready -U orchestrator || (echo "Waiting for postgres..." && sleep 5)
-	cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5433/orchestrator alembic upgrade head
+	cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator alembic upgrade head
 	@echo "Migrations complete. Starting all services..."
+	@trap 'docker compose $(COMPOSE_FILES) down' INT TERM; \
 	docker compose $(COMPOSE_FILES) up --build
 
 # Development mode (Local) - starts API and GUI on host machine
@@ -351,6 +352,10 @@ ollama-list:
 # Update system personas from prompts/ directory (refreshes content)
 seed-personas:
 	@python3 scripts/seed_personas.py
+
+# Seed voice profile presets from prompts/voice_profiles/
+seed-voices:
+	@python3 scripts/seed_voice_profiles.py
 
 # Sync workflow configs from registry.yaml to database
 # DEPLOYMENT_ENV can be: production, development, staging

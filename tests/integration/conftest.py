@@ -2,21 +2,23 @@
 
 import asyncio
 import importlib
+import os
 import pytest
 from httpx import ASGITransport, AsyncClient
 from typing import Any
 
 from sqlmodel import Session, SQLModel
 
-from api.main import app
-from api.services.content_service import ContentService
-from api.services.voice_service import VoiceService
-from api.services.onboarding_service import OnboardingService
-from api.routes import content, voice, onboarding, platforms
-from runner.db import models  # noqa: F401
-from runner.db.models import User, Goal, Chapter, Post
+# Skip API imports if JWT_SECRET not set (for standalone agent tests)
+if os.environ.get("JWT_SECRET"):
+    from api.main import app
+else:
+    app = None
 
-from tests.db_utils import create_test_engine, drop_test_schema
+from runner.db import models  # noqa: F401
+from runner.db.models.user import User
+
+from tests.db_utils import create_test_engine, drop_test_schema, is_database_available
 
 db_engine = importlib.import_module("runner.db.engine")
 
@@ -73,110 +75,26 @@ def test_engine(monkeypatch):
 
 @pytest.fixture
 def seeded_user(test_engine):
-    """Seed the test database with core content data."""
+    """Seed the test database with a test user."""
     with Session(test_engine) as session:
         user = User(full_name="Test User", email="test@example.com")
         session.add(user)
         session.commit()
         session.refresh(user)
-
-        goal = Goal(
-            user_id=user.id,
-            positioning="Senior Engineer",
-            signature_thesis="Test thesis",
-            target_audience="Engineers",
-            content_style="teaching",
-            onboarding_mode="quick",
-        )
-        session.add(goal)
-        session.commit()
-
-        chapters = []
-        for i in range(1, 4):
-            chapter = Chapter(
-                user_id=user.id,
-                chapter_number=i,
-                title=f"Chapter {i}",
-                description=f"Description for chapter {i}",
-                theme=f"Theme {i}",
-                theme_description=f"Theme description {i}",
-                weeks_start=(i - 1) * 4 + 1,
-                weeks_end=i * 4,
-            )
-            session.add(chapter)
-            session.commit()
-            session.refresh(chapter)
-            chapters.append(chapter)
-
-        post_specs = [
-            (chapters[0], "published"),
-            (chapters[0], "ready"),
-            (chapters[0], "draft"),
-            (chapters[1], "needs_story"),
-            (chapters[1], "not_started"),
-            (chapters[2], "not_started"),
-        ]
-        for i, (chapter, status) in enumerate(post_specs, start=1):
-            post = Post(
-                user_id=user.id,
-                chapter_id=chapter.id,
-                post_number=i,
-                topic=f"Post {i} topic",
-                shape="FULL" if i % 2 == 0 else "PARTIAL",
-                cadence="Teaching" if i % 2 == 0 else "Field Note",
-                status=status,
-            )
-            session.add(post)
-        session.commit()
-
     return user
 
 
 @pytest.fixture
-def test_content_service(test_engine):
-    """ContentService using test database."""
-    return ContentService()
-
-
-@pytest.fixture
-def seeded_content_service(seeded_user):
-    """ContentService with seeded test database."""
-    return ContentService()
-
-
-@pytest.fixture
-def test_voice_service(test_engine):
-    """VoiceService using test database."""
-    return VoiceService(content_service=ContentService())
-
-
-@pytest.fixture
-def client(test_engine, monkeypatch):
+def client(test_engine):
     """SyncClient with test database injected."""
-    test_content_service = ContentService()
-    test_voice_service = VoiceService(content_service=test_content_service)
-    test_onboarding_service = OnboardingService(content_service=test_content_service)
-
-    monkeypatch.setattr(content, "content_service", test_content_service)
-    monkeypatch.setattr(voice, "voice_service", test_voice_service)
-    monkeypatch.setattr(onboarding, "content_service", test_content_service)
-    monkeypatch.setattr(onboarding, "onboarding_service", test_onboarding_service)
-    monkeypatch.setattr(platforms, "content_service", test_content_service)
-
+    if app is None:
+        pytest.skip("JWT_SECRET not set - API not available")
     return SyncClient(app)
 
 
 @pytest.fixture
-def seeded_client(seeded_user, monkeypatch):
+def seeded_client(seeded_user):
     """SyncClient with seeded test database."""
-    test_content_service = ContentService()
-    test_voice_service = VoiceService(content_service=test_content_service)
-    test_onboarding_service = OnboardingService(content_service=test_content_service)
-
-    monkeypatch.setattr(content, "content_service", test_content_service)
-    monkeypatch.setattr(voice, "voice_service", test_voice_service)
-    monkeypatch.setattr(onboarding, "content_service", test_content_service)
-    monkeypatch.setattr(onboarding, "onboarding_service", test_onboarding_service)
-    monkeypatch.setattr(platforms, "content_service", test_content_service)
-
+    if app is None:
+        pytest.skip("JWT_SECRET not set - API not available")
     return SyncClient(app)
