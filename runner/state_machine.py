@@ -1516,20 +1516,37 @@ Your output will be cross-checked against source material. Fabrications = automa
             )
 
     def _extract_json(self, content: str) -> Optional[str]:
-        """Extract JSON from content, handling markdown fences."""
+        """Extract JSON from content, handling markdown fences and extra braces."""
         import re
+        import json as _json
 
         content = content.strip()
 
-        if content.startswith("{") and content.endswith("}"):
-            return content
-
+        # Try markdown fence extraction first
         fence_pattern = r"```(?:json)?\s*\n?(.*?)\n?```"
         match = re.search(fence_pattern, content, re.DOTALL)
         if match:
-            return match.group(1).strip()
+            content = match.group(1).strip()
 
+        # Find first { and work from there
         brace_start = content.find("{")
+        if brace_start == -1:
+            return None
+
+        # Try progressively shorter substrings from the end
+        # to handle extra trailing braces like }}}
+        candidate = content[brace_start:]
+        while candidate.endswith("}"):
+            try:
+                _json.loads(candidate)
+                return candidate
+            except _json.JSONDecodeError:
+                # Strip one trailing brace and retry
+                candidate = candidate[:-1]
+                if not candidate.endswith("}"):
+                    break
+
+        # Fallback: return from first { to last }
         brace_end = content.rfind("}")
         if brace_start != -1 and brace_end > brace_start:
             return content[brace_start:brace_end + 1]

@@ -171,6 +171,32 @@ class TestCollectAuditResults:
         result = sm._try_parse_audit_json("not json at all")
         assert result is None
 
+    def test_try_parse_audit_json_extra_braces(self):
+        """LLMs sometimes add extra closing braces - should still parse."""
+        sm = StateMachine(make_config())
+        # Double closing brace
+        content = '{"score": 8, "decision": "proceed", "feedback": "Good"}}'
+        result = sm._try_parse_audit_json(content)
+        assert result is not None
+        assert result["score"] == 8
+        assert result["decision"] == "proceed"
+
+    def test_try_parse_audit_json_triple_braces(self):
+        """Handle triple closing braces."""
+        sm = StateMachine(make_config())
+        content = '{"score": 7, "decision": "retry", "feedback": "Needs work"}}}'
+        result = sm._try_parse_audit_json(content)
+        assert result is not None
+        assert result["score"] == 7
+
+    def test_extract_json_extra_braces_in_fence(self):
+        """Handle extra braces inside markdown fence."""
+        sm = StateMachine(make_config())
+        content = '```json\n{"score": 9, "decision": "proceed", "feedback": "Great"}}}\n```'
+        result = sm._try_parse_audit_json(content)
+        assert result is not None
+        assert result["score"] == 9
+
     def test_collect_audit_results_from_files(self, tmp_path):
         sm = StateMachine(make_config())
         sm.run_dir = str(tmp_path)
