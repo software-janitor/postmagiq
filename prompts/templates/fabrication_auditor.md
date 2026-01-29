@@ -33,8 +33,8 @@ Flag as "formulaic" if you detect:
 
 ## Decision Criteria
 
-- **proceed** (score >= 7): No fabrications, natural structure
-- **retry** (score 4-6): Fabrications found or heavily formulaic
+- **proceed** (score >= 8): No fabrications, natural structure
+- **retry** (score 4-7): Fabrications found or heavily formulaic
 - **halt** (score < 4): Fundamental accuracy problems
 
 ## Output Format

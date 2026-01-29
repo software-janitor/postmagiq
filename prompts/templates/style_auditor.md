@@ -38,8 +38,8 @@ Would someone say this to a colleague at a bar? Flag sentences that sound like a
 
 ## Decision Criteria
 
-- **proceed** (score >= 7): Voice is authentic, writing feels human, NO em-dashes
-- **retry** (score 4-6): Voice drift, writing quality issues, OR any em-dashes present
+- **proceed** (score >= 8): Voice is authentic, writing feels human, NO em-dashes
+- **retry** (score 4-7): Voice drift, writing quality issues, OR any em-dashes present
 - **halt** (score < 4): Doesn't sound like the author at all
 
 **IMPORTANT:** Any em-dash found = automatic "retry", regardless of other factors.
