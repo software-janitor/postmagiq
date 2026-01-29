@@ -2,7 +2,8 @@
 # WORKFLOW ORCHESTRATOR CONFIGURATION - GROQ (Cloud API)
 # ============================================================================
 # Uses Groq's fast inference API for all agents
-# Set LLM_PROVIDER=groq to use this config
+# Production models only: https://console.groq.com/docs/models
+# Pricing is auto-set from runner/agents/groq_api.py MODEL_PRICING
 
 orchestrator:
   agent: groq
@@ -15,98 +16,61 @@ orchestrator:
 
 tiers:
   standard:
-    draft_agents: [groq-70b, groq-scout, groq-8b]
-    audit_agents: [groq-70b, groq-scout]
+    draft_agents: [groq-gpt-oss-120b, groq-gpt-oss-20b, groq-8b]
+    audit_agents: [groq-gpt-oss-120b, groq-gpt-oss-20b]
   premium:
-    draft_agents: [groq-70b, groq-scout, groq-maverick]
-    audit_agents: [groq-70b, groq-maverick]
+    draft_agents: [groq-gpt-oss-120b, groq-70b, groq-gpt-oss-20b]
+    audit_agents: [groq-gpt-oss-120b, groq-70b]
 
 credit_weights:
   base_cost: 2
   standard:
-    - groq-70b
+    - groq-gpt-oss-120b
+    - groq-gpt-oss-20b
     - groq-8b
-    - groq-scout
   premium:
-    - groq-maverick
+    - groq-70b
 
 # ============================================================================
-# AGENT DEFINITIONS - Groq Models
+# AGENT DEFINITIONS - Groq Production Models
 # ============================================================================
 
 agents:
   groq:
     type: api
-    enabled: true
     model: llama-70b
-    context_window: 128000
-    cost_per_1k:
-      input: 0.00059
-      output: 0.00079
+    context_window: 131072
 
   groq-70b:
     type: api
-    enabled: true
     model: llama-70b
-    context_window: 128000
-    cost_per_1k:
-      input: 0.00059
-      output: 0.00079
+    context_window: 131072
 
   groq-8b:
     type: api
-    enabled: true
     model: llama-8b
-    context_window: 128000
-    cost_per_1k:
-      input: 0.00005
-      output: 0.00008
+    context_window: 131072
 
-  groq-scout:
+  groq-gpt-oss-120b:
     type: api
-    enabled: true
-    model: llama4-scout
-    context_window: 128000
-    cost_per_1k:
-      input: 0.00011
-      output: 0.00034
+    model: gpt-oss-120b
+    context_window: 131072
 
-  groq-maverick:
+  groq-gpt-oss-20b:
     type: api
-    enabled: true
-    model: llama4-maverick
-    context_window: 128000
-    cost_per_1k:
-      input: 0.00020
-      output: 0.00060
-
-  groq-mixtral:
-    type: api
-    enabled: true
-    model: mixtral
-    context_window: 32768
-    cost_per_1k:
-      input: 0.00024
-      output: 0.00024
+    model: gpt-oss-20b
+    context_window: 131072
 
   # Split auditor agents (same models, different personas)
   groq-fabrication-auditor:
     type: api
-    enabled: true
-    model: llama-70b
-    context_window: 128000
-    cost_per_1k:
-      input: 0.00059
-      output: 0.00079
+    model: gpt-oss-120b
+    context_window: 131072
 
   groq-style-auditor:
     type: api
-    enabled: true
-    model: llama4-scout
-    context_window: 128000
-    cost_per_1k:
-      input: 0.00011
-      output: 0.00034
+    model: gpt-oss-120b
+    context_window: 131072
 
 # ============================================================================
 # PERSONA DEFINITIONS
@@ -137,7 +101,7 @@ states:
   story-review:
     type: single
     description: "Review raw story for completeness - ask questions if needed"
-    agent: groq-70b
+    agent: groq-gpt-oss-120b
     persona: story-reviewer
     input: "workflow/input/story_input.md"
     output: "workflow/review/review_result.json"
@@ -165,7 +129,7 @@ states:
   story-process:
     type: single
     description: "Extract 5 elements, determine shape, create processed template"
-    agent: groq-70b
+    agent: groq-gpt-oss-120b
     persona: story-processor
     input: "workflow/input/story_input.md"
     output: "workflow/processed/processed_story.md"
@@ -181,7 +145,7 @@ states:
   draft:
     type: fan-out
     description: "Generate post drafts from processed story"
-    agents: [groq-70b, groq-scout, groq-8b]
+    agents: [groq-70b, groq-gpt-oss-120b, groq-gpt-oss-20b]
     persona: writer
     input: "workflow/processed/processed_story.md"
     output: "workflow/drafts/{agent}_draft.md"
@@ -216,7 +180,7 @@ states:
   synthesize:
     type: orchestrator-task
     description: "Combine best elements from drafts based on audits"
-    agent: groq-70b
+    agent: groq-gpt-oss-120b
     persona: synthesizer
     input:
       - "workflow/drafts/*.md"

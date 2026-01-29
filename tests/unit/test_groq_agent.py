@@ -33,15 +33,15 @@ class TestGroqAPIAgent:
     @patch.dict("os.environ", {"GROQ_API_KEY": "test_key"})
     @patch("runner.agents.groq_api.Groq")
     def test_model_alias_resolution(self, mock_groq, groq_config):
-        """Model aliases resolve to actual model IDs."""
+        """Model aliases resolve to actual model IDs (production models only)."""
         agent = GroqAPIAgent(groq_config)
 
-        # Test various aliases
+        # Test production model aliases
         assert agent.MODEL_MAP["llama-70b"] == "llama-3.3-70b-versatile"
         assert agent.MODEL_MAP["llama-8b"] == "llama-3.1-8b-instant"
-        assert agent.MODEL_MAP["mixtral"] == "mixtral-8x7b-32768"
-        assert agent.MODEL_MAP["llama4-scout"] == "meta-llama/llama-4-scout-17b-16e-instruct"
-        assert agent.MODEL_MAP["llama4-maverick"] == "meta-llama/llama-4-maverick-17b-128e-instruct"
+        assert agent.MODEL_MAP["llama-guard"] == "meta-llama/llama-guard-4-12b"
+        assert agent.MODEL_MAP["gpt-oss-120b"] == "openai/gpt-oss-120b"
+        assert agent.MODEL_MAP["gpt-oss-20b"] == "openai/gpt-oss-20b"
 
     @patch.dict("os.environ", {"GROQ_API_KEY": "test_key"})
     @patch("runner.agents.groq_api.Groq")
