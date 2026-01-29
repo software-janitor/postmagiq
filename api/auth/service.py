@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID, uuid4
 
-from sqlmodel import Session, select
+from sqlmodel import Session, select, func
 
 import secrets
 
@@ -43,6 +43,7 @@ class AuthService:
         email: str,
         password: str,
         full_name: str,
+        ip_address: Optional[str] = None,
     ) -> User:
         """Register a new user.
 
@@ -50,12 +51,14 @@ class AuthService:
             email: User email address (unique)
             password: Plain text password (will be hashed)
             full_name: User's full name
+            ip_address: Client IP address for rate limiting free account creation
 
         Returns:
             Created User instance
 
         Raises:
             ValueError: If email already exists
+            PermissionError: If too many free accounts from this IP
         """
         # Check if email already exists
         existing = self._session.exec(
@@ -68,6 +71,18 @@ class AuthService:
         user_count = self._session.exec(select(User)).first()
         is_first_user = user_count is None
 
+        # Rate limit free account creation per IP (max 2 free accounts per IP)
+        # Skip check for first user (owner) and if no IP provided
+        if not is_first_user and ip_address:
+            free_accounts_from_ip = self._session.exec(
+                select(func.count(User.id)).where(
+                    User.registration_ip == ip_address,
+                    User.role == UserRole.user,  # Only count regular users (free tier)
+                )
+            ).one()
+            if free_accounts_from_ip >= 2:
+                raise PermissionError("Too many free accounts from this IP address")
+
         # Create user with hashed password
         user = User(
             full_name=full_name,
@@ -76,6 +91,7 @@ class AuthService:
             is_active=True,
             is_superuser=is_first_user,  # First user is also superuser
             role=UserRole.owner if is_first_user else UserRole.user,
+            registration_ip=ip_address,
         )
         self._session.add(user)
         self._session.commit()

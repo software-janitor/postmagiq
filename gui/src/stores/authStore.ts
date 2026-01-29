@@ -11,6 +11,7 @@ export interface User {
   is_active: boolean
   is_superuser: boolean
   role: UserRole
+  view_as_tier_id: string | null  // Owner can simulate other tiers for testing
 }
 
 // Helper to get display name
@@ -38,6 +39,7 @@ interface AuthState {
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   toggleViewAsUser: () => void  // Toggle owner/user view mode
+  setViewAsTier: (tierId: string | null) => Promise<void>  // Set tier to simulate
   login: (email: string, password: string) => Promise<void>
   register: (email: string, password: string, name?: string) => Promise<void>
   logout: () => Promise<void>
@@ -63,6 +65,32 @@ export const useAuthStore = create<AuthState>()(
       setLoading: (isLoading) => set({ isLoading }),
       setError: (error) => set({ error }),
       toggleViewAsUser: () => set((state) => ({ viewAsUser: !state.viewAsUser })),
+
+      setViewAsTier: async (tierId) => {
+        const { tokens, user } = get()
+        if (!tokens?.access_token || !user || user.role !== 'owner') return
+
+        try {
+          const response = await fetch(`${API_BASE}/auth/me/view-as-tier`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${tokens.access_token}`,
+            },
+            body: JSON.stringify({ tier_id: tierId }),
+          })
+
+          if (!response.ok) {
+            throw new Error('Failed to set view-as-tier')
+          }
+
+          const updatedUser = await response.json()
+          set({ user: updatedUser })
+        } catch (error) {
+          console.error('Failed to set view-as-tier:', error)
+          throw error
+        }
+      },
 
       login: async (email, password) => {
         set({ isLoading: true, error: null })

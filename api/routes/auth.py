@@ -126,12 +126,13 @@ def get_current_user(
 
     return UserRead(
         id=user.id,
-        name=user.name,
+        full_name=user.full_name,
         email=user.email,
         created_at=user.created_at,
         is_active=user.is_active,
         is_superuser=user.is_superuser,
         role=user.role,
+        view_as_tier_id=user.view_as_tier_id,
     )
 
 
@@ -149,22 +150,29 @@ def register(
     """Register a new user.
 
     Creates a new user account and returns access tokens.
+    Rate limits free account creation to 2 per IP address.
     """
+    # Get client info for registration rate limiting and session
+    user_agent = req.headers.get("user-agent")
+    ip_address = req.client.host if req.client else None
+
     try:
         user = auth_service.register(
             email=request.email,
             password=request.password,
             full_name=request.full_name,
+            ip_address=ip_address,
         )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
-
-    # Get client info for session
-    user_agent = req.headers.get("user-agent")
-    ip_address = req.client.host if req.client else None
+    except PermissionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=str(e),
+        )
 
     tokens = auth_service.create_session(
         user_id=user.id,
@@ -330,6 +338,51 @@ def get_my_flags(
     return FlagsResponse(**flags)
 
 
+@router.put("/me/view-as-tier", response_model=UserRead)
+def set_view_as_tier(
+    request: ViewAsTierRequest,
+    current_user: UserRead = Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> UserRead:
+    """Set the tier to simulate for testing (owner-only).
+
+    Allows owners to view the application as if they were on a different tier.
+    This affects usage limits and feature visibility without changing the actual subscription.
+
+    Set tier_id to null to reset to the actual subscription tier.
+    """
+    if current_user.role != UserRole.owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only owners can use the view-as-tier feature",
+        )
+
+    # Get the user from DB (not the UserRead which is a snapshot)
+    user = auth_service.get_user_by_id(current_user.id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
+
+    # Update view_as_tier_id
+    user.view_as_tier_id = request.tier_id
+    auth_service.session.add(user)
+    auth_service.session.commit()
+    auth_service.session.refresh(user)
+
+    return UserRead(
+        id=user.id,
+        full_name=user.full_name,
+        email=user.email,
+        created_at=user.created_at,
+        is_active=user.is_active,
+        is_superuser=user.is_superuser,
+        role=user.role,
+        view_as_tier_id=user.view_as_tier_id,
+    )
+
+
 class ForgotPasswordRequest(BaseModel):
     """Request body for forgot password."""
 
@@ -347,6 +400,12 @@ class UpdateRoleRequest(BaseModel):
     """Request body for updating a user's role."""
 
     role: UserRole
+
+
+class ViewAsTierRequest(BaseModel):
+    """Request body for setting view-as-tier (owner testing feature)."""
+
+    tier_id: Optional[UUID] = None  # None resets to actual tier
 
 
 @router.put("/users/{user_id}/role", response_model=UserRead)

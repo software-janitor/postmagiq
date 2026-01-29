@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from api.auth.dependencies import get_current_user, require_scope
 from api.auth.scopes import Scope
 from api.services.usage_service import UsageService
-from runner.db.models import User
+from runner.db.models import User, UserRole
 
 router = APIRouter(prefix="/v1/w/{workspace_id}/usage", tags=["usage"])
 
@@ -58,8 +58,32 @@ async def get_usage_summary(
 
     Returns usage stats for posts, storage, and API calls along with
     the current subscription tier information.
+
+    If the user is an owner with view_as_tier_id set, the response will
+    show limits as if they were on that tier (for testing/preview purposes).
     """
     summary = usage_service.get_usage_summary(workspace_id)
+
+    # Owner tier simulation: override tier info in response if view_as_tier_id is set
+    if current_user.role == UserRole.owner and current_user.view_as_tier_id:
+        simulated_tier = usage_service.get_tier(current_user.view_as_tier_id)
+        if simulated_tier:
+            # Override subscription tier info with simulated tier
+            summary["subscription"] = {
+                "tier_name": f"{simulated_tier.name} (Simulated)",
+                "tier_slug": simulated_tier.slug,
+                "status": "simulated",
+                "overage_enabled": simulated_tier.overage_enabled,
+            }
+            # Override limits with simulated tier's limits
+            summary["posts"]["limit"] = simulated_tier.posts_per_month
+            summary["posts"]["unlimited"] = simulated_tier.posts_per_month == 0
+            summary["storage"]["limit_bytes"] = simulated_tier.storage_gb * 1024 * 1024 * 1024
+            summary["storage"]["limit_gb"] = simulated_tier.storage_gb
+            summary["storage"]["unlimited"] = simulated_tier.storage_gb == 0
+            summary["api_calls"]["limit"] = 10000 if simulated_tier.api_access else 0
+            summary["api_calls"]["unlimited"] = simulated_tier.api_access
+
     return UsageSummaryResponse(**summary)
 
 

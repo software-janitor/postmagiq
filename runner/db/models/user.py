@@ -54,6 +54,12 @@ class User(UUIDModel, UserBase, TimestampMixin, table=True):
     # User-level role for feature flags
     role: UserRole = Field(default=UserRole.user)
 
+    # IP address at registration (for rate limiting free account creation)
+    registration_ip: Optional[str] = Field(default=None, index=True)
+
+    # Owner can simulate other tiers for testing (nullable = use actual tier)
+    view_as_tier_id: Optional[UUID] = Field(default=None, foreign_key="subscription_tiers.id")
+
 
 class UserCreate(UserBase):
     """Schema for creating a new user."""
@@ -69,6 +75,7 @@ class UserRead(UserBase):
     is_active: bool = True
     is_superuser: bool = False
     role: UserRole = UserRole.user
+    view_as_tier_id: Optional[UUID] = None
 
 
 class PasswordResetToken(UUIDModel, table=True):

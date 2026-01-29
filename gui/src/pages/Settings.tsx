@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CreditCard, Check, Zap, Settings2 } from 'lucide-react'
+import { CreditCard, Check, Zap, Settings2, Loader2, Eye } from 'lucide-react'
 import { clsx } from 'clsx'
 import { apiGet, apiPost } from '../api/client'
 import { useWorkspaceStore } from '../stores/workspaceStore'
+import { useAuthStore } from '../stores/authStore'
 import { useThemeClasses } from '../hooks/useThemeClasses'
 import { useEffectiveFlags } from '../stores/flagsStore'
 import UsageBar from '../components/UsageBar'
@@ -41,9 +42,13 @@ export default function Settings() {
   const theme = useThemeClasses()
   const flags = useEffectiveFlags()
   const { currentWorkspaceId, currentRole } = useWorkspaceStore()
+  const { user, setViewAsTier } = useAuthStore()
+  const queryClient = useQueryClient()
   const [selectedWorkflowConfig, setSelectedWorkflowConfig] = useState<string | null>(null)
+  const [viewAsTierLoading, setViewAsTierLoading] = useState(false)
 
   const canChangeWorkflowConfig = currentRole === 'owner' || currentRole === 'admin'
+  const isOwner = user?.role === 'owner'
 
   const { data: usage, isLoading: usageLoading } = useQuery({
     queryKey: ['usage', currentWorkspaceId],
@@ -65,6 +70,20 @@ export default function Settings() {
   const { data: personas } = useQuery({
     queryKey: ['personas'],
     queryFn: () => apiGet<{ personas: Array<{ name: string; path: string }> }>('/config/personas'),
+  })
+
+  const checkoutMutation = useMutation({
+    mutationFn: (tierSlug: string) =>
+      apiPost<{ url: string }>(`/v1/w/${currentWorkspaceId}/billing/checkout`, {
+        tier_slug: tierSlug,
+        success_url: `${window.location.origin}/settings?upgraded=true`,
+        cancel_url: window.location.href,
+      }),
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url
+      }
+    },
   })
 
   return (
@@ -134,6 +153,52 @@ export default function Settings() {
         </div>
       </div>
 
+      {/* Owner Tier Simulation (owner only) */}
+      {isOwner && tiers && tiers.length > 0 && (
+        <div className="bg-zinc-900 rounded-lg border border-zinc-800">
+          <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
+            <Eye className={clsx('w-5 h-5', theme.iconPrimary)} />
+            <h2 className="text-lg font-semibold text-white">View As Different Tier</h2>
+            <span className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded">Owner Only</span>
+          </div>
+          <div className="p-4">
+            <p className="text-sm text-zinc-400 mb-3">
+              Preview the app as if you were on a different subscription tier. This shows simulated limits but doesn't affect actual functionality.
+            </p>
+            <div className="flex items-center gap-3">
+              <select
+                value={user?.view_as_tier_id || ''}
+                onChange={async (e) => {
+                  setViewAsTierLoading(true)
+                  try {
+                    await setViewAsTier(e.target.value || null)
+                    // Refresh usage data to show new limits
+                    queryClient.invalidateQueries({ queryKey: ['usage'] })
+                  } finally {
+                    setViewAsTierLoading(false)
+                  }
+                }}
+                disabled={viewAsTierLoading}
+                className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-amber-500"
+              >
+                <option value="">Actual Tier</option>
+                {tiers.map((tier) => (
+                  <option key={tier.id} value={tier.id}>
+                    {tier.name}
+                  </option>
+                ))}
+              </select>
+              {viewAsTierLoading && <Loader2 className="w-4 h-4 animate-spin text-amber-400" />}
+              {user?.view_as_tier_id && (
+                <span className="text-sm text-amber-400">
+                  Viewing as simulated tier
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Available Plans */}
       {tiers && tiers.length > 0 && (
         <div className="bg-zinc-900 rounded-lg border border-zinc-800">
@@ -200,8 +265,24 @@ export default function Settings() {
                       )}
                     </ul>
                     {!isCurrent && (
-                      <button className={clsx('w-full mt-4 px-4 py-2 text-white rounded-lg font-medium transition-colors bg-gradient-to-r', theme.gradient, theme.gradientHover)}>
-                        Upgrade
+                      <button
+                        onClick={() => checkoutMutation.mutate(tier.slug)}
+                        disabled={checkoutMutation.isPending}
+                        className={clsx(
+                          'w-full mt-4 px-4 py-2 text-white rounded-lg font-medium transition-colors bg-gradient-to-r',
+                          theme.gradient,
+                          theme.gradientHover,
+                          checkoutMutation.isPending && 'opacity-50 cursor-not-allowed'
+                        )}
+                      >
+                        {checkoutMutation.isPending ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Processing...
+                          </span>
+                        ) : (
+                          'Upgrade'
+                        )}
                       </button>
                     )}
                   </div>
