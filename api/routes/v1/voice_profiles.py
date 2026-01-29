@@ -3,7 +3,7 @@
 All voice profile operations are scoped to a workspace via /api/v1/w/{workspace_id}/...
 This ensures multi-tenancy by requiring workspace context for all queries.
 
-Presets (is_library=True) are included in list results but cannot be deleted.
+Presets (is_preset=True) are included in list results but cannot be deleted.
 """
 
 from typing import Annotated, Optional
@@ -36,42 +36,41 @@ class VoiceProfileResponse(BaseModel):
 
     id: UUID
     workspace_id: Optional[UUID]
-    name: Optional[str]
-    tone: Optional[str]
-    sentence_patterns: Optional[str]
-    vocabulary_level: Optional[str]
+    name: str
+    slug: str
+    description: Optional[str]
+    is_preset: bool
+    tone_description: Optional[str]
     signature_phrases: Optional[str]
-    storytelling_style: Optional[str]
-    emotional_register: Optional[str]
-    is_library: bool
-    is_shared: bool
-    source_sample_count: int
+    word_choices: Optional[str]
+    example_excerpts: Optional[str]
+    avoid_patterns: Optional[str]
 
 
 class CreateVoiceProfileRequest(BaseModel):
     """Request to create a voice profile."""
 
-    name: Optional[str] = None
-    tone: Optional[str] = None
-    sentence_patterns: Optional[str] = None
-    vocabulary_level: Optional[str] = None
+    name: str
+    slug: str
+    description: Optional[str] = None
+    tone_description: Optional[str] = None
     signature_phrases: Optional[str] = None
-    storytelling_style: Optional[str] = None
-    emotional_register: Optional[str] = None
-    raw_analysis: Optional[str] = None
+    word_choices: Optional[str] = None
+    example_excerpts: Optional[str] = None
+    avoid_patterns: Optional[str] = None
 
 
 class UpdateVoiceProfileRequest(BaseModel):
     """Request to update a voice profile."""
 
     name: Optional[str] = None
-    tone: Optional[str] = None
-    sentence_patterns: Optional[str] = None
-    vocabulary_level: Optional[str] = None
+    slug: Optional[str] = None
+    description: Optional[str] = None
+    tone_description: Optional[str] = None
     signature_phrases: Optional[str] = None
-    storytelling_style: Optional[str] = None
-    emotional_register: Optional[str] = None
-    raw_analysis: Optional[str] = None
+    word_choices: Optional[str] = None
+    example_excerpts: Optional[str] = None
+    avoid_patterns: Optional[str] = None
 
 
 # =============================================================================
@@ -85,15 +84,14 @@ def _to_response(profile: VoiceProfile) -> VoiceProfileResponse:
         id=profile.id,
         workspace_id=profile.workspace_id,
         name=profile.name,
-        tone=profile.tone,
-        sentence_patterns=profile.sentence_patterns,
-        vocabulary_level=profile.vocabulary_level,
+        slug=profile.slug,
+        description=profile.description,
+        is_preset=profile.is_preset,
+        tone_description=profile.tone_description,
         signature_phrases=profile.signature_phrases,
-        storytelling_style=profile.storytelling_style,
-        emotional_register=profile.emotional_register,
-        is_library=profile.is_library,
-        is_shared=profile.is_shared,
-        source_sample_count=profile.source_sample_count,
+        word_choices=profile.word_choices,
+        example_excerpts=profile.example_excerpts,
+        avoid_patterns=profile.avoid_patterns,
     )
 
 
@@ -111,15 +109,13 @@ async def list_voice_profiles(
 
     Includes:
     - Workspace-specific profiles
-    - Library presets (is_library=True, workspace_id=None)
-    - Shared profiles (is_shared=True)
+    - System presets (is_preset=True)
     """
-    # Get workspace profiles + library presets + shared profiles
+    # Get workspace profiles + system presets (is_preset=True with workspace_id=None)
     statement = select(VoiceProfile).where(
         or_(
             VoiceProfile.workspace_id == ctx.workspace_id,
-            VoiceProfile.is_library == True,
-            VoiceProfile.is_shared == True,
+            VoiceProfile.is_preset == True,
         )
     )
     profiles = session.exec(statement).all()
@@ -137,8 +133,7 @@ async def get_voice_profile(
 
     Accessible if:
     - Profile belongs to the workspace
-    - Profile is a library preset
-    - Profile is shared
+    - Profile is a system preset
     """
     profile = session.get(VoiceProfile, profile_id)
 
@@ -148,11 +143,10 @@ async def get_voice_profile(
             detail="Voice profile not found",
         )
 
-    # Check access: workspace match, library preset, or shared
+    # Check access: workspace match or system preset
     if (
         profile.workspace_id != ctx.workspace_id
-        and not profile.is_library
-        and not profile.is_shared
+        and not profile.is_preset
     ):
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -171,21 +165,19 @@ async def create_voice_profile(
     """Create a new voice profile.
 
     Requires strategy:write scope.
-    New profiles are workspace-scoped (not library presets).
+    New profiles are workspace-scoped (not system presets).
     """
     profile = VoiceProfile(
         workspace_id=ctx.workspace_id,
-        user_id=ctx.user_id,
         name=request.name,
-        tone=request.tone,
-        sentence_patterns=request.sentence_patterns,
-        vocabulary_level=request.vocabulary_level,
+        slug=request.slug,
+        description=request.description,
+        tone_description=request.tone_description,
         signature_phrases=request.signature_phrases,
-        storytelling_style=request.storytelling_style,
-        emotional_register=request.emotional_register,
-        raw_analysis=request.raw_analysis,
-        is_library=False,
-        is_shared=False,
+        word_choices=request.word_choices,
+        example_excerpts=request.example_excerpts,
+        avoid_patterns=request.avoid_patterns,
+        is_preset=False,
     )
     session.add(profile)
     session.commit()
@@ -204,7 +196,7 @@ async def update_voice_profile(
     """Update a voice profile.
 
     Requires strategy:write scope.
-    Only workspace-owned profiles can be updated (not library presets).
+    Only workspace-owned profiles can be updated (not system presets).
     """
     profile = session.get(VoiceProfile, profile_id)
 
@@ -214,10 +206,10 @@ async def update_voice_profile(
             detail="Voice profile not found",
         )
 
-    if profile.is_library:
+    if profile.is_preset:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot modify library preset profiles",
+            detail="Cannot modify system preset profiles",
         )
 
     # Apply updates
@@ -241,7 +233,7 @@ async def delete_voice_profile(
     """Delete a voice profile.
 
     Requires strategy:write scope.
-    Only workspace-owned profiles can be deleted (not library presets).
+    Only workspace-owned profiles can be deleted (not system presets).
     """
     profile = session.get(VoiceProfile, profile_id)
 
@@ -251,10 +243,10 @@ async def delete_voice_profile(
             detail="Voice profile not found",
         )
 
-    if profile.is_library:
+    if profile.is_preset:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot delete library preset profiles",
+            detail="Cannot delete system preset profiles",
         )
 
     session.delete(profile)
