@@ -17,10 +17,11 @@ import {
   saveSample,
   fetchSampleStatus,
   analyzeVoice,
-  fetchVoiceUserProfile,
+  fetchWorkspaceVoiceProfile,
   VoicePrompt,
   VoiceProfile,
 } from '../api/voice'
+import { useWorkspaceStore } from '../stores/workspaceStore'
 import AIAssistant from '../components/AIAssistant'
 
 type Mode = 'select' | 'write' | 'upload'
@@ -29,14 +30,14 @@ type Step = 'existing' | 'mode' | 'input' | 'analyze' | 'complete'
 export default function VoiceLearning() {
   const [step, setStep] = useState<Step>('existing')
   const [mode, setMode] = useState<Mode>('select')
-  const [userId] = useState(1) // TODO: Get from auth context
+  const workspaceId = useWorkspaceStore((state) => state.currentWorkspaceId)
   const [hasExistingProfile, setHasExistingProfile] = useState(false)
 
   // Check for existing voice profile
   const { data: existingProfile, isLoading: profileLoading, isError: profileError } = useQuery({
-    queryKey: ['existing-voice-profile', userId],
-    queryFn: () => fetchVoiceUserProfile(userId),
-    enabled: !!userId && step === 'existing',
+    queryKey: ['existing-voice-profile', workspaceId],
+    queryFn: () => fetchWorkspaceVoiceProfile(workspaceId!),
+    enabled: !!workspaceId && step === 'existing',
     retry: false,
   })
 
@@ -72,13 +73,15 @@ export default function VoiceLearning() {
 
   // Queries
   const { data: promptsData } = useQuery({
-    queryKey: ['voice-prompts'],
-    queryFn: fetchVoicePrompts,
+    queryKey: ['voice-prompts', workspaceId],
+    queryFn: () => fetchVoicePrompts(workspaceId!),
+    enabled: !!workspaceId,
   })
 
   const { refetch: refetchStatus } = useQuery({
-    queryKey: ['sample-status', userId],
-    queryFn: () => fetchSampleStatus(userId),
+    queryKey: ['sample-status', workspaceId],
+    queryFn: () => fetchSampleStatus(workspaceId!),
+    enabled: !!workspaceId,
   })
 
   useEffect(() => {
@@ -89,23 +92,30 @@ export default function VoiceLearning() {
 
   // Mutations
   const saveSampleMutation = useMutation({
-    mutationFn: saveSample,
+    mutationFn: (request: { source_type: 'prompt' | 'upload'; content: string; prompt_id?: string; title?: string }) =>
+      saveSample(workspaceId!, request),
     onSuccess: () => {
       refetchStatus()
     },
   })
 
   const analyzeMutation = useMutation({
-    mutationFn: () => analyzeVoice(userId),
+    mutationFn: () => analyzeVoice(workspaceId!),
     onSuccess: (data) => {
+      const analysis = data.analysis
       setProfile({
         id: data.profile_id,
-        tone: data.tone,
-        sentence_patterns: data.sentence_patterns,
-        vocabulary_level: data.vocabulary_level,
-        signature_phrases: data.signature_phrases,
-        storytelling_style: data.storytelling_style,
-        emotional_register: data.emotional_register,
+        workspace_id: workspaceId,
+        name: null,
+        tone: analysis.tone,
+        sentence_patterns: JSON.stringify(analysis.sentence_patterns),
+        vocabulary_level: analysis.vocabulary_level,
+        signature_phrases: analysis.signature_phrases.join(', '),
+        storytelling_style: analysis.storytelling_style,
+        emotional_register: analysis.emotional_register,
+        is_library: false,
+        is_shared: false,
+        source_sample_count: 0,
       })
       setStep('complete')
     },
@@ -133,7 +143,6 @@ export default function VoiceLearning() {
     const currentPromptId = selectedPrompts[currentPromptIndex]
 
     await saveSampleMutation.mutateAsync({
-      user_id: userId,
       source_type: 'prompt',
       content: responses[currentPromptId],
       prompt_id: currentPromptId,
@@ -164,7 +173,6 @@ export default function VoiceLearning() {
     for (const upload of uploads) {
       if (upload.content.trim()) {
         await saveSampleMutation.mutateAsync({
-          user_id: userId,
           source_type: 'upload',
           content: upload.content,
           title: upload.title || undefined,
@@ -175,6 +183,12 @@ export default function VoiceLearning() {
   }
 
   const getWordCount = (text: string) => text.split(/\s+/).filter(Boolean).length
+
+  // Parse signature_phrases string to array for display
+  const parseSignaturePhrases = (phrases: string | null): string[] => {
+    if (!phrases) return []
+    return phrases.split(',').map(p => p.trim()).filter(Boolean)
+  }
 
   const getTotalUploadWords = () =>
     uploads.reduce((sum, u) => sum + getWordCount(u.content), 0)
@@ -269,13 +283,13 @@ export default function VoiceLearning() {
                 </div>
               )}
 
-              {profile.signature_phrases && profile.signature_phrases.length > 0 && (
+              {profile.signature_phrases && parseSignaturePhrases(profile.signature_phrases).length > 0 && (
                 <div>
                   <h3 className="text-blue-400 text-sm font-medium mb-1">
                     Signature Phrases
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    {profile.signature_phrases.map((phrase, index) => (
+                    {parseSignaturePhrases(profile.signature_phrases).map((phrase, index) => (
                       <span
                         key={index}
                         className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300"
@@ -636,13 +650,13 @@ export default function VoiceLearning() {
                 <p className="text-white">{profile.vocabulary_level}</p>
               </div>
 
-              {profile.signature_phrases && profile.signature_phrases.length > 0 && (
+              {profile.signature_phrases && parseSignaturePhrases(profile.signature_phrases).length > 0 && (
                 <div>
                   <h3 className="text-blue-400 text-sm font-medium mb-1">
                     Signature Phrases
                   </h3>
                   <div className="flex flex-wrap gap-2">
-                    {profile.signature_phrases.map((phrase, index) => (
+                    {parseSignaturePhrases(profile.signature_phrases).map((phrase, index) => (
                       <span
                         key={index}
                         className="px-2 py-1 bg-slate-800 rounded text-sm text-slate-300"
