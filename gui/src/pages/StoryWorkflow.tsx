@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   ChevronRight,
@@ -16,7 +16,12 @@ import {
   Zap,
   Pause,
   PlayCircle,
-  Square
+  Square,
+  Mic,
+  Youtube,
+  Upload,
+  Lock,
+  Crown
 } from 'lucide-react'
 import { fetchAvailablePosts, PostMetadata } from '../api/posts'
 import { getLatestRunForStory, getWorkflowStates, startWorkflow } from '../api/workflow'
@@ -29,6 +34,7 @@ import { useEffectiveFlags } from '../stores/flagsStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { pauseWorkflow, resumeWorkflow, abortWorkflow, submitApproval } from '../api/workflow'
 import { Send, MessageCircle, XCircle } from 'lucide-react'
+import { transcribeAudio, transcribeYouTube, getUsageSummary, isPremiumTier } from '../api/transcription'
 
 type Step = 'select' | 'raw' | 'workflow' | 'complete'
 
@@ -101,6 +107,15 @@ export default function StoryWorkflow() {
   const [submittingApproval, setSubmittingApproval] = useState(false)
   const [approvalError, setApprovalError] = useState<string | null>(null)
   const startFreshRef = useRef(false)  // Skip loading existing outputs (ref to avoid race condition)
+
+  // Input method state for raw content step
+  type InputMethod = 'type' | 'voice' | 'youtube'
+  const [inputMethod, setInputMethod] = useState<InputMethod>('type')
+  const [youtubeUrl, setYoutubeUrl] = useState('')
+  const [audioFile, setAudioFile] = useState<File | null>(null)
+  const [isTranscribing, setIsTranscribing] = useState(false)
+  const [transcribeError, setTranscribeError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [previousRun, setPreviousRun] = useState<{ run_id: string; status: string; final_state: string | null } | null>(null)
   const eventLogRef = useRef<HTMLDivElement>(null)
 
@@ -147,6 +162,18 @@ export default function StoryWorkflow() {
     queryFn: getWorkflowStates,
     staleTime: 60000, // Cache for 1 minute
   })
+
+  // Fetch workspace usage to check tier for premium features
+  const { data: usageSummary } = useQuery({
+    queryKey: ['workspace-usage', currentWorkspace?.id],
+    queryFn: () => currentWorkspace ? getUsageSummary(currentWorkspace.id) : Promise.reject('No workspace'),
+    enabled: !!currentWorkspace?.id,
+    staleTime: 60000, // Cache for 1 minute
+  })
+
+  const hasPremiumFeatures = usageSummary?.subscription?.tier_slug
+    ? isPremiumTier(usageSummary.subscription.tier_slug)
+    : false
 
   // Build workflow states from API data or use defaults
   const WORKFLOW_STATES = workflowStatesData?.states
@@ -272,6 +299,66 @@ export default function StoryWorkflow() {
   const prevStep = () => {
     const prev = STEPS[currentStepIndex - 1]
     if (prev) setCurrentStep(prev.id)
+  }
+
+  // Handle audio file selection
+  const handleFileSelect = useCallback((file: File) => {
+    const validTypes = ['audio/mpeg', 'audio/wav', 'audio/mp4', 'audio/m4a', 'audio/webm', 'audio/ogg', 'video/mp4', 'video/webm']
+    const validExtensions = ['.mp3', '.wav', '.m4a', '.mp4', '.webm', '.ogg', '.mpeg', '.mpga']
+    const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+
+    if (!validTypes.includes(file.type) && !validExtensions.includes(ext)) {
+      setTranscribeError('Invalid file type. Supported: MP3, WAV, M4A, MP4, WebM, OGG')
+      return
+    }
+
+    if (file.size > 25 * 1024 * 1024) {
+      setTranscribeError('File too large. Maximum size is 25MB.')
+      return
+    }
+
+    setAudioFile(file)
+    setTranscribeError(null)
+  }, [])
+
+  // Handle file drop
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0]
+    if (file) handleFileSelect(file)
+  }, [handleFileSelect])
+
+  // Handle transcription
+  const handleTranscribe = async () => {
+    if (!currentWorkspace) return
+
+    setIsTranscribing(true)
+    setTranscribeError(null)
+
+    try {
+      let result
+      if (inputMethod === 'voice' && audioFile) {
+        result = await transcribeAudio(currentWorkspace.id, audioFile)
+      } else if (inputMethod === 'youtube' && youtubeUrl) {
+        result = await transcribeYouTube(currentWorkspace.id, youtubeUrl)
+      } else {
+        setTranscribeError('Please provide an audio file or YouTube URL')
+        setIsTranscribing(false)
+        return
+      }
+
+      // Set the transcribed text as raw content
+      setRawContent(result.text)
+      // Switch to type view so user can edit
+      setInputMethod('type')
+      // Clear the inputs
+      setAudioFile(null)
+      setYoutubeUrl('')
+    } catch (error) {
+      setTranscribeError(error instanceof Error ? error.message : 'Transcription failed')
+    } finally {
+      setIsTranscribing(false)
+    }
   }
 
   const handleStartWorkflow = async () => {
@@ -480,16 +567,205 @@ export default function StoryWorkflow() {
               </div>
             )}
 
-            <textarea
-              value={rawContent}
-              onChange={(e) => setRawContent(e.target.value)}
-              placeholder="Paste your raw story content here...
+            {/* Input method tabs */}
+            <div className="flex gap-1 bg-slate-800 p-1 rounded-lg">
+              <button
+                onClick={() => setInputMethod('type')}
+                className={clsx(
+                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
+                  inputMethod === 'type'
+                    ? 'bg-slate-700 text-white'
+                    : 'text-slate-400 hover:text-white'
+                )}
+              >
+                <FileText className="w-4 h-4" />
+                Type
+              </button>
+              <button
+                onClick={() => hasPremiumFeatures ? setInputMethod('voice') : null}
+                disabled={!hasPremiumFeatures}
+                className={clsx(
+                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
+                  inputMethod === 'voice'
+                    ? 'bg-slate-700 text-white'
+                    : hasPremiumFeatures
+                      ? 'text-slate-400 hover:text-white'
+                      : 'text-slate-600 cursor-not-allowed'
+                )}
+              >
+                {hasPremiumFeatures ? (
+                  <Mic className="w-4 h-4" />
+                ) : (
+                  <Lock className="w-4 h-4" />
+                )}
+                Voice
+                {!hasPremiumFeatures && <Crown className="w-3 h-3 text-amber-500" />}
+              </button>
+              <button
+                onClick={() => hasPremiumFeatures ? setInputMethod('youtube') : null}
+                disabled={!hasPremiumFeatures}
+                className={clsx(
+                  'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
+                  inputMethod === 'youtube'
+                    ? 'bg-slate-700 text-white'
+                    : hasPremiumFeatures
+                      ? 'text-slate-400 hover:text-white'
+                      : 'text-slate-600 cursor-not-allowed'
+                )}
+              >
+                {hasPremiumFeatures ? (
+                  <Youtube className="w-4 h-4" />
+                ) : (
+                  <Lock className="w-4 h-4" />
+                )}
+                YouTube
+                {!hasPremiumFeatures && <Crown className="w-3 h-3 text-amber-500" />}
+              </button>
+            </div>
+
+            {/* Premium upgrade prompt */}
+            {!hasPremiumFeatures && (inputMethod === 'type') && (
+              <div className="flex items-center gap-2 text-sm text-slate-400 bg-slate-800/50 rounded-lg px-3 py-2">
+                <Crown className="w-4 h-4 text-amber-500" />
+                <span>Upgrade to Premium to unlock Voice and YouTube transcription</span>
+              </div>
+            )}
+
+            {/* Type input */}
+            {inputMethod === 'type' && (
+              <textarea
+                value={rawContent}
+                onChange={(e) => setRawContent(e.target.value)}
+                placeholder="Paste your raw story content here...
 
 What happened? What did you learn? What went wrong?
 Include specific details: error messages, tools used, time spent, etc."
-              rows={15}
-              className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-sm"
-            />
+                rows={15}
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 font-mono text-sm"
+              />
+            )}
+
+            {/* Voice input */}
+            {inputMethod === 'voice' && (
+              <div className="space-y-4">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="audio/*,video/mp4,video/webm"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0]
+                    if (file) handleFileSelect(file)
+                  }}
+                  className="hidden"
+                />
+
+                {/* Drop zone */}
+                <div
+                  onDrop={handleDrop}
+                  onDragOver={(e) => e.preventDefault()}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={clsx(
+                    'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
+                    audioFile
+                      ? 'border-green-500 bg-green-500/10'
+                      : 'border-slate-600 hover:border-slate-500 bg-slate-900/50'
+                  )}
+                >
+                  {audioFile ? (
+                    <div className="space-y-2">
+                      <CheckCircle2 className="w-12 h-12 mx-auto text-green-500" />
+                      <p className="text-white font-medium">{audioFile.name}</p>
+                      <p className="text-sm text-slate-400">
+                        {(audioFile.size / 1024 / 1024).toFixed(1)} MB
+                      </p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setAudioFile(null)
+                        }}
+                        className="text-sm text-red-400 hover:text-red-300"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Upload className="w-12 h-12 mx-auto text-slate-500" />
+                      <p className="text-white">Drop audio file here or click to browse</p>
+                      <p className="text-sm text-slate-500">
+                        Supports MP3, WAV, M4A, MP4, WebM, OGG (max 25MB)
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Transcribe button */}
+                <button
+                  onClick={handleTranscribe}
+                  disabled={!audioFile || isTranscribing}
+                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isTranscribing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Transcribing...
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-5 h-5" />
+                      Transcribe Audio
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* YouTube input */}
+            {inputMethod === 'youtube' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-2">YouTube Video URL</label>
+                  <input
+                    type="url"
+                    value={youtubeUrl}
+                    onChange={(e) => setYoutubeUrl(e.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=..."
+                    className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
+                  />
+                  <p className="text-xs text-slate-500 mt-2">
+                    Maximum video duration: 1 hour. Audio will be extracted and transcribed.
+                  </p>
+                </div>
+
+                {/* Transcribe button */}
+                <button
+                  onClick={handleTranscribe}
+                  disabled={!youtubeUrl || isTranscribing}
+                  className="w-full px-4 py-3 bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isTranscribing ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Transcribing...
+                    </>
+                  ) : (
+                    <>
+                      <Youtube className="w-5 h-5" />
+                      Transcribe YouTube Video
+                    </>
+                  )}
+                </button>
+              </div>
+            )}
+
+            {/* Transcription error */}
+            {transcribeError && (
+              <div className="flex items-center gap-2 text-red-400 bg-red-900/20 rounded-lg px-4 py-3">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <span>{transcribeError}</span>
+              </div>
+            )}
+
             <div className="flex justify-between">
               <button
                 onClick={prevStep}
