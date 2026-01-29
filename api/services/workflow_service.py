@@ -263,17 +263,9 @@ class WorkflowService:
                     output_type = "output:final"
                     db_output_type = "final"
 
-                if output_type and db_output_type:
-                    # Save to database
-                    service._store.save_workflow_output(
-                        run_id=run_id,
-                        state_name=state,
-                        output_type=db_output_type,
-                        content=content,
-                        agent=agent,
-                    )
-
-                    # Broadcast via WebSocket
+                if output_type:
+                    # Note: Database save already handled by state_machine._invoke_agent
+                    # Here we only broadcast via WebSocket
                     _broadcast_from_thread(
                         main_loop,
                         manager.broadcast(

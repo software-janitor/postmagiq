@@ -1,11 +1,11 @@
-"""Tests for abort mechanism and audit results in approval callback."""
+"""Tests for abort mechanism, audit results, and database save behavior."""
 
 import json
 import os
 import threading
 import time
 from copy import deepcopy
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, patch, call
 
 import pytest
 
@@ -350,3 +350,46 @@ class TestApprovalCallbackIncludesAuditResults:
 
         # audit_results should not be present when empty
         assert "audit_results" not in callback_data
+
+
+class TestDatabaseSaveBehavior:
+    """Test that outputs are saved exactly once to database."""
+
+    def test_invoke_agent_saves_once_to_database(self, tmp_path):
+        """_invoke_agent should save to database exactly once per successful call."""
+        config = make_config()
+        sm = StateMachine(config, log_callback=lambda x: None)
+        sm.run_id = "test-run"
+        sm.run_dir = str(tmp_path)
+
+        # Setup mock database
+        mock_db = MagicMock()
+        sm.db = mock_db
+
+        # Setup mock agent
+        mock_agent = MagicMock()
+        mock_agent.invoke.return_value = AgentResult(
+            success=True,
+            content='{"score": 8, "decision": "proceed", "feedback": "Good"}',
+            tokens=TokenUsage(input_tokens=100, output_tokens=50),
+        )
+        mock_agent.context_window = 128000
+        sm.agents["mock"] = mock_agent
+
+        # Create output directory
+        (tmp_path / "audits").mkdir()
+
+        # Invoke agent
+        result = sm._invoke_agent(
+            "mock",
+            "test prompt",
+            str(tmp_path / "audits" / "mock_audit.json"),
+            "cross-audit"
+        )
+
+        # Verify database was called exactly once
+        assert mock_db.save_workflow_output.call_count == 1
+        call_args = mock_db.save_workflow_output.call_args
+        assert call_args.kwargs["run_id"] == "test-run"
+        assert call_args.kwargs["state_name"] == "cross-audit"
+        assert call_args.kwargs["agent"] == "mock"
