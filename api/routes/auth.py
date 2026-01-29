@@ -338,6 +338,12 @@ def get_my_flags(
     return FlagsResponse(**flags)
 
 
+class ViewAsTierRequest(BaseModel):
+    """Request body for setting view-as-tier (owner testing feature)."""
+
+    tier_id: Optional[UUID] = None  # None resets to actual tier
+
+
 @router.put("/me/view-as-tier", response_model=UserRead)
 def set_view_as_tier(
     request: ViewAsTierRequest,
@@ -400,12 +406,6 @@ class UpdateRoleRequest(BaseModel):
     """Request body for updating a user's role."""
 
     role: UserRole
-
-
-class ViewAsTierRequest(BaseModel):
-    """Request body for setting view-as-tier (owner testing feature)."""
-
-    tier_id: Optional[UUID] = None  # None resets to actual tier
 
 
 @router.put("/users/{user_id}/role", response_model=UserRead)
