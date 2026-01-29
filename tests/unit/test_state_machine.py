@@ -1314,7 +1314,7 @@ class TestCircuitBreakerApproval:
         # Should have reached "done" via skip, not halted
         assert result["final_state"] == "done"
         assert len(approval_calls) == 1
-        assert "Loop detected:" in approval_calls[0]["content"]
+        assert "Quality Score:" in approval_calls[0]["content"]
 
     def test_circuit_break_abort_halts(self, tmp_path):
         """Circuit breaker with approval_callback halts on 'abort'."""
@@ -1366,3 +1366,179 @@ class TestCircuitBreakerApproval:
 
         assert result["final_state"] == "halt"
         assert result.get("user_aborted") is True
+
+    def test_circuit_break_feedback_retries_with_guidance(self, tmp_path):
+        """Circuit breaker 'feedback' decision stores user guidance and goes to synthesize."""
+        config = {
+            "states": {
+                "start": {"type": "initial", "next": "loop"},
+                "loop": {
+                    "type": "single",
+                    "agent": "claude",
+                    "output": str(tmp_path / "out.md"),
+                    "next": "loop",
+                    "transitions": {"proceed": "done"},
+                },
+                "synthesize": {
+                    "type": "single",
+                    "agent": "synth",
+                    "output": str(tmp_path / "synth.md"),
+                    "transitions": {"success": "done"},
+                },
+                "done": {"type": "terminal"},
+            },
+            "circuit_breaker": {
+                "rules": [{"name": "state_visit_limit", "limit": 3}]
+            },
+        }
+        agents = {
+            "claude": MockAgent(["ok"]),
+            "synth": MockAgent(["synthesized"]),
+        }
+
+        approval_calls = []
+
+        def approval_callback(data):
+            approval_calls.append(data)
+
+        sm = StateMachine(
+            config,
+            agents=agents,
+            approval_callback=approval_callback,
+        )
+        sm.initialize("test-run")
+        sm.run_dir = str(tmp_path)
+
+        def submit_feedback():
+            import time
+            for _ in range(100):
+                if sm.awaiting_approval:
+                    sm.submit_approval("feedback", "Make it more conversational")
+                    return
+                time.sleep(0.05)
+
+        t = threading.Thread(target=submit_feedback)
+        t.start()
+        result = sm.run()
+        t.join()
+
+        # Should have received approval call with quality score
+        assert len(approval_calls) == 1
+        assert "Quality Score:" in approval_calls[0]["content"]
+        # Should have gone to synthesize and then done
+        assert result["final_state"] == "done"
+        # Synthesize agent should have been called (feedback was used)
+        assert agents["synth"].call_count == 1
+
+    def test_circuit_break_includes_audit_results(self, tmp_path):
+        """Circuit breaker popup includes audit feedback from auditors."""
+        config = {
+            "states": {
+                "start": {"type": "initial", "next": "loop"},
+                "loop": {
+                    "type": "single",
+                    "agent": "claude",
+                    "output": str(tmp_path / "out.md"),
+                    "next": "loop",
+                    "transitions": {"proceed": "done"},
+                },
+                "done": {"type": "terminal"},
+            },
+            "circuit_breaker": {
+                "rules": [{"name": "state_visit_limit", "limit": 3}]
+            },
+        }
+        agents = {"claude": MockAgent(["ok"])}
+
+        approval_data = {}
+
+        def approval_callback(data):
+            approval_data.update(data)
+
+        sm = StateMachine(
+            config,
+            agents=agents,
+            approval_callback=approval_callback,
+        )
+        sm.initialize("test-run")
+        sm.run_dir = str(tmp_path)
+
+        # Create audit files that _collect_audit_results will find
+        final_dir = tmp_path / "final"
+        final_dir.mkdir()
+        import json
+        (final_dir / "test_final_audit.json").write_text(
+            json.dumps({"score": 6, "decision": "retry", "feedback": "Remove em-dashes"})
+        )
+
+        def submit_approved():
+            import time
+            for _ in range(100):
+                if sm.awaiting_approval:
+                    sm.submit_approval("approved")
+                    return
+                time.sleep(0.05)
+
+        t = threading.Thread(target=submit_approved)
+        t.start()
+        sm.run()
+        t.join()
+
+        # Verify audit_results were included in the callback
+        assert "audit_results" in approval_data
+        assert len(approval_data["audit_results"]) == 1
+        assert approval_data["audit_results"][0]["feedback"] == "Remove em-dashes"
+
+
+class TestSynthesizerAuditLoop:
+    """Tests for the synthesizer -> final-audit -> synthesize retry loop."""
+
+    def test_final_audit_retry_goes_to_synthesize(self, tmp_path):
+        """When final-audit returns 'retry', it should go back to synthesize."""
+        config = {
+            "states": {
+                "start": {"type": "initial", "next": "synthesize"},
+                "synthesize": {
+                    "type": "single",
+                    "agent": "synth",
+                    "output": str(tmp_path / "final.md"),
+                    "transitions": {"success": "final-audit"},
+                },
+                "final-audit": {
+                    "type": "fan-out",
+                    "agents": ["auditor"],
+                    "output": str(tmp_path / "{agent}_audit.json"),
+                    "output_type": "final_audit",
+                    "transitions": {
+                        "proceed": "done",
+                        "retry": "synthesize",  # Key: retry goes back to synthesize
+                        "halt": "halt",
+                    },
+                },
+                "done": {"type": "terminal"},
+                "halt": {"type": "terminal"},
+            },
+            "settings": {"timeout_per_agent": 30},
+        }
+
+        # First audit returns retry (score 7), second returns proceed (score 8)
+        audit_retry = '{"score": 7, "decision": "retry", "feedback": "Almost there"}'
+        audit_proceed = '{"score": 8, "decision": "proceed", "feedback": "Good"}'
+
+        agents = {
+            "synth": MockAgent(["draft 1", "draft 2"]),
+            "auditor": MockAgent([audit_retry, audit_proceed]),
+        }
+
+        sm = StateMachine(config, agents=agents)
+        sm.initialize("test-run")
+        sm.run_dir = str(tmp_path)
+
+        result = sm.run()
+
+        # Should complete successfully after retry loop
+        assert result["final_state"] == "done"
+        # Synthesizer should have been called twice
+        assert agents["synth"].call_count == 2
+        # Auditor should have been called twice
+        assert agents["auditor"].call_count == 2

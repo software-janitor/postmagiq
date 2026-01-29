@@ -288,28 +288,37 @@ class StateMachine:
                         next_state = skip_target
                     # Continue to next iteration with new next_state
                 elif self.approval_callback:
-                    # Score < 8, ask user what to do
-                    visits = ctx.get("state_visits", {})
+                    # Score < 8, show quality feedback and ask user what to do
+                    audit_results = self._collect_audit_results()
+
+                    # Build user-friendly content with audit feedback
+                    content_parts = []
+                    content_parts.append(f"Quality Score: {self.last_audit_score or 'N/A'}/10\n")
+
+                    if audit_results:
+                        content_parts.append("Auditor Feedback:\n")
+                        for ar in audit_results:
+                            auditor = ar.get("agent", "Unknown")
+                            score = ar.get("score", "N/A")
+                            feedback = ar.get("feedback", "No feedback")
+                            content_parts.append(f"• {auditor}: {score}/10 - {feedback}\n")
+                    else:
+                        content_parts.append("No audit feedback available.\n")
+
+                    content_parts.append("\nThe post needs improvement to reach the quality threshold (8/10).")
 
                     self.approval_callback({
                         "type": "circuit_break",
-                        "content": (
-                            f"Loop detected: {rule}\n\n"
-                            f"Last score: {self.last_audit_score or 'N/A'}\n"
-                            f"State visits: {visits}\n"
-                            f"Transitions: {ctx.get('transition_count', 0)}\n\n"
-                            f"Current state: {self.current_state}\n"
-                            f"Would transition to: {next_state}\n\n"
-                            "Choose 'Skip' to force proceed to the next stage, or 'Abort' to stop."
-                        ),
-                        "prompt": "The workflow has looped too many times. What would you like to do?",
+                        "content": "".join(content_parts),
+                        "prompt": "Review the feedback above and provide guidance to improve the post, or choose to publish as-is.",
+                        "audit_results": audit_results,
                     })
 
                     # Wait for user decision
-                    decision, feedback = self._wait_for_approval()
+                    decision, user_feedback = self._wait_for_approval()
 
-                    if decision == "approved" or decision == "feedback":
-                        # User wants to skip forward - find the "success" or "proceed" transition
+                    if decision == "approved":
+                        # User wants to publish as-is - skip forward
                         transitions = self._get_transitions(state_config)
                         skip_target = transitions.get("success") or transitions.get("proceed")
                         if skip_target:
@@ -320,11 +329,23 @@ class StateMachine:
                             })
                             next_state = skip_target
                         else:
-                            # No success transition, just continue to next_state
                             self.log_callback({
                                 "event": "circuit_break_continue",
                                 "continuing_to": next_state,
                             })
+                    elif decision == "feedback":
+                        # User wants to try again with guidance - loop back to synthesize
+                        self.log_callback({
+                            "event": "circuit_break_retry",
+                            "user_feedback": user_feedback,
+                        })
+                        # Reset circuit breaker to allow more iterations
+                        self.circuit_breaker.reset()
+                        # Store user feedback for synthesizer
+                        if user_feedback:
+                            self.retry_feedback["synthesize"] = f"## USER FEEDBACK — MUST INCORPORATE\n\n{user_feedback}"
+                        # Go back to synthesize
+                        next_state = "synthesize"
                     else:
                         # User chose to abort
                         return {
