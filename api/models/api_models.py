@@ -11,7 +11,7 @@ class RunSummary(BaseModel):
 
     run_id: str
     story: str = "unknown"
-    status: Literal["running", "complete", "failed", "halted", "error"]
+    status: Literal["running", "complete", "failed", "halted", "error", "aborted"]
     started_at: datetime
     completed_at: Optional[datetime] = None
     total_tokens: int = 0
