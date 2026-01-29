@@ -116,6 +116,14 @@ export default function StoryWorkflow() {
   const [isTranscribing, setIsTranscribing] = useState(false)
   const [transcribeError, setTranscribeError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Live recording state
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingDuration, setRecordingDuration] = useState(0)
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const recordingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [previousRun, setPreviousRun] = useState<{ run_id: string; status: string; final_state: string | null } | null>(null)
   const eventLogRef = useRef<HTMLDivElement>(null)
 
@@ -328,6 +336,88 @@ export default function StoryWorkflow() {
     if (file) handleFileSelect(file)
   }, [handleFileSelect])
 
+  // Start live recording
+  const startRecording = useCallback(async () => {
+    try {
+      setTranscribeError(null)
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+
+      // Determine best supported format
+      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+        ? 'audio/webm'
+        : 'audio/mp4'
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType })
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(audioChunksRef.current, { type: mimeType })
+        setRecordedBlob(blob)
+        // Stop all tracks to release microphone
+        stream.getTracks().forEach(track => track.stop())
+      }
+
+      mediaRecorder.start(1000) // Collect data every second
+      setIsRecording(true)
+      setRecordingDuration(0)
+      setRecordedBlob(null)
+      setAudioFile(null)
+
+      // Start duration timer
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingDuration(d => d + 1)
+      }, 1000)
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'NotAllowedError') {
+        setTranscribeError('Microphone access denied. Please allow microphone access in your browser settings.')
+      } else if (error instanceof DOMException && error.name === 'NotFoundError') {
+        setTranscribeError('No microphone found. Please connect a microphone and try again.')
+      } else {
+        setTranscribeError(error instanceof Error ? error.message : 'Failed to start recording')
+      }
+    }
+  }, [])
+
+  // Stop live recording
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current)
+        recordingTimerRef.current = null
+      }
+    }
+  }, [isRecording])
+
+  // Format duration as mm:ss
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60)
+    const secs = seconds % 60
+    return `${mins}:${secs.toString().padStart(2, '0')}`
+  }
+
+  // Cleanup recording on unmount
+  useEffect(() => {
+    return () => {
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current)
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop()
+      }
+    }
+  }, [])
+
   // Handle transcription
   const handleTranscribe = async () => {
     if (!currentWorkspace) return
@@ -337,12 +427,18 @@ export default function StoryWorkflow() {
 
     try {
       let result
-      if (inputMethod === 'voice' && audioFile) {
-        result = await transcribeAudio(currentWorkspace.id, audioFile)
+      if (inputMethod === 'voice' && (audioFile || recordedBlob)) {
+        // Convert recorded blob to File if needed
+        const fileToUpload = audioFile || new File(
+          [recordedBlob!],
+          `recording-${Date.now()}.webm`,
+          { type: recordedBlob!.type }
+        )
+        result = await transcribeAudio(currentWorkspace.id, fileToUpload)
       } else if (inputMethod === 'youtube' && youtubeUrl) {
         result = await transcribeYouTube(currentWorkspace.id, youtubeUrl)
       } else {
-        setTranscribeError('Please provide an audio file or YouTube URL')
+        setTranscribeError('Please provide an audio file, recording, or YouTube URL')
         setIsTranscribing(false)
         return
       }
@@ -353,6 +449,8 @@ export default function StoryWorkflow() {
       setInputMethod('type')
       // Clear the inputs
       setAudioFile(null)
+      setRecordedBlob(null)
+      setRecordingDuration(0)
       setYoutubeUrl('')
     } catch (error) {
       setTranscribeError(error instanceof Error ? error.message : 'Transcription failed')
@@ -659,50 +757,141 @@ Include specific details: error messages, tools used, time spent, etc."
                   className="hidden"
                 />
 
-                {/* Drop zone */}
-                <div
-                  onDrop={handleDrop}
-                  onDragOver={(e) => e.preventDefault()}
-                  onClick={() => fileInputRef.current?.click()}
-                  className={clsx(
-                    'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
-                    audioFile
-                      ? 'border-green-500 bg-green-500/10'
-                      : 'border-slate-600 hover:border-slate-500 bg-slate-900/50'
-                  )}
-                >
-                  {audioFile ? (
-                    <div className="space-y-2">
-                      <CheckCircle2 className="w-12 h-12 mx-auto text-green-500" />
-                      <p className="text-white font-medium">{audioFile.name}</p>
-                      <p className="text-sm text-slate-400">
-                        {(audioFile.size / 1024 / 1024).toFixed(1)} MB
-                      </p>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setAudioFile(null)
-                        }}
-                        className="text-sm text-red-400 hover:text-red-300"
-                      >
-                        Remove
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <Upload className="w-12 h-12 mx-auto text-slate-500" />
-                      <p className="text-white">Drop audio file here or click to browse</p>
-                      <p className="text-sm text-slate-500">
-                        Supports MP3, WAV, M4A, MP4, WebM, OGG (max 25MB)
-                      </p>
-                    </div>
-                  )}
+                {/* Live recording section */}
+                <div className="bg-slate-900 rounded-lg p-6 border border-slate-700">
+                  <div className="text-center space-y-4">
+                    {isRecording ? (
+                      <>
+                        {/* Recording in progress */}
+                        <div className="flex items-center justify-center gap-3">
+                          <div className="w-4 h-4 bg-red-500 rounded-full animate-pulse" />
+                          <span className="text-red-400 font-medium">Recording...</span>
+                          <span className="text-white font-mono text-lg">{formatDuration(recordingDuration)}</span>
+                        </div>
+                        {/* Audio level indicator */}
+                        <div className="flex justify-center gap-1">
+                          {[...Array(12)].map((_, i) => (
+                            <div
+                              key={i}
+                              className="w-1 bg-red-500 rounded-full animate-pulse"
+                              style={{
+                                height: `${Math.random() * 24 + 8}px`,
+                                animationDelay: `${i * 0.1}s`
+                              }}
+                            />
+                          ))}
+                        </div>
+                        <button
+                          onClick={stopRecording}
+                          className="px-6 py-3 bg-red-600 text-white rounded-full hover:bg-red-500 flex items-center justify-center gap-2 mx-auto"
+                        >
+                          <Square className="w-5 h-5 fill-current" />
+                          Stop Recording
+                        </button>
+                      </>
+                    ) : recordedBlob ? (
+                      <>
+                        {/* Recording complete */}
+                        <CheckCircle2 className="w-12 h-12 mx-auto text-green-500" />
+                        <p className="text-white font-medium">Recording Complete</p>
+                        <p className="text-sm text-slate-400">{formatDuration(recordingDuration)} recorded</p>
+                        {/* Audio preview */}
+                        <audio
+                          controls
+                          src={URL.createObjectURL(recordedBlob)}
+                          className="mx-auto"
+                        />
+                        <div className="flex gap-2 justify-center">
+                          <button
+                            onClick={() => {
+                              setRecordedBlob(null)
+                              setRecordingDuration(0)
+                            }}
+                            className="px-4 py-2 text-sm text-slate-400 hover:text-white"
+                          >
+                            Discard
+                          </button>
+                          <button
+                            onClick={startRecording}
+                            className="px-4 py-2 text-sm bg-slate-700 text-white rounded-lg hover:bg-slate-600"
+                          >
+                            Record Again
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Ready to record */}
+                        <Mic className="w-12 h-12 mx-auto text-slate-500" />
+                        <p className="text-white">Record your story</p>
+                        <p className="text-sm text-slate-500">Click to start recording from your microphone</p>
+                        <button
+                          onClick={startRecording}
+                          className="px-6 py-3 bg-blue-600 text-white rounded-full hover:bg-blue-500 flex items-center justify-center gap-2 mx-auto"
+                        >
+                          <Mic className="w-5 h-5" />
+                          Start Recording
+                        </button>
+                      </>
+                    )}
+                  </div>
                 </div>
+
+                {/* Divider */}
+                {!isRecording && !recordedBlob && (
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 border-t border-slate-700" />
+                    <span className="text-slate-500 text-sm">or upload a file</span>
+                    <div className="flex-1 border-t border-slate-700" />
+                  </div>
+                )}
+
+                {/* Drop zone - only show when not recording */}
+                {!isRecording && !recordedBlob && (
+                  <div
+                    onDrop={handleDrop}
+                    onDragOver={(e) => e.preventDefault()}
+                    onClick={() => fileInputRef.current?.click()}
+                    className={clsx(
+                      'border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors',
+                      audioFile
+                        ? 'border-green-500 bg-green-500/10'
+                        : 'border-slate-600 hover:border-slate-500 bg-slate-900/50'
+                    )}
+                  >
+                    {audioFile ? (
+                      <div className="space-y-2">
+                        <CheckCircle2 className="w-10 h-10 mx-auto text-green-500" />
+                        <p className="text-white font-medium">{audioFile.name}</p>
+                        <p className="text-sm text-slate-400">
+                          {(audioFile.size / 1024 / 1024).toFixed(1)} MB
+                        </p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setAudioFile(null)
+                          }}
+                          className="text-sm text-red-400 hover:text-red-300"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Upload className="w-10 h-10 mx-auto text-slate-500" />
+                        <p className="text-white text-sm">Drop audio file or click to browse</p>
+                        <p className="text-xs text-slate-500">
+                          MP3, WAV, M4A, MP4, WebM, OGG (max 25MB)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Transcribe button */}
                 <button
                   onClick={handleTranscribe}
-                  disabled={!audioFile || isTranscribing}
+                  disabled={(!audioFile && !recordedBlob) || isTranscribing || isRecording}
                   className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {isTranscribing ? (
@@ -713,7 +902,7 @@ Include specific details: error messages, tools used, time spent, etc."
                   ) : (
                     <>
                       <Mic className="w-5 h-5" />
-                      Transcribe Audio
+                      Transcribe {recordedBlob ? 'Recording' : 'Audio'}
                     </>
                   )}
                 </button>
