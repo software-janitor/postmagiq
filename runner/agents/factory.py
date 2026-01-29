@@ -100,28 +100,38 @@ def create_agent(
 ) -> BaseAgent:
     """Factory to create agent instances.
 
-    Creates either a CLI-based agent (subprocess) or API-based agent (SDK)
-    depending on the AGENT_MODE configuration or explicit mode parameter.
+    Creates either a CLI-based agent (subprocess) or API-based agent (SDK).
+    Mode is determined by (in priority order):
+    1. Explicit mode parameter
+    2. config["type"] from workflow YAML (e.g., type: api)
+    3. AGENT_MODE environment variable
+    4. Auto-detect: try API registry first, fall back to CLI
 
     Args:
         name: Agent name (claude, gemini, openai) or variant (claude-sonnet)
-        config: Agent configuration dict including 'model', 'timeout', etc.
+        config: Agent configuration dict including 'model', 'type', 'timeout', etc.
         session_dir: Directory for session files (CLI agents only)
-        mode: Override AGENT_MODE config. One of 'cli', 'api', or None (use config)
+        mode: Override mode. One of 'cli', 'api', or None (auto-detect)
 
     Returns:
         Agent instance (either CLIAgent or APIAgent subclass)
 
     Raises:
-        ValueError: If agent name is not recognized for the selected mode
+        ValueError: If agent name is not recognized
     """
     _lazy_load_registries()
 
-    effective_mode = mode or AGENT_MODE
+    # Determine mode: explicit > config type > env var > auto-detect
+    effective_mode = mode or config.get("type") or AGENT_MODE
 
     if effective_mode == "api":
         return _create_api_agent(name, config)
+    elif effective_mode == "cli":
+        return _create_cli_agent(name, config, session_dir)
     else:
+        # Auto-detect: try API first (if agent exists there), else CLI
+        if _get_base_agent(name, API_AGENT_REGISTRY):
+            return _create_api_agent(name, config)
         return _create_cli_agent(name, config, session_dir)
 
 
