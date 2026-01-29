@@ -17,8 +17,19 @@ Compare the draft against the voice profile:
 
 ## Writing Quality
 
-Check for violations of the writing rules provided above. Key flags:
-- **Em-dashes**: Flag any use of — (U+2014), – (U+2013), --, or ---
+Check for violations of the writing rules provided above.
+
+### MANDATORY: Em-Dash Detection
+
+**CRITICAL:** Scan the ENTIRE draft for em-dashes. If you find ANY of these characters, you MUST set decision to "retry":
+- — (em dash, U+2014)
+- – (en dash, U+2013)
+- -- (double hyphen)
+- --- (triple hyphen)
+
+Search each sentence. Report the exact sentence containing the em-dash in style_issues.
+
+### Other Flags
 - **Passive voice**, **filler words**, **documentation patterns**, **essay transitions**
 
 ## The Bar Test
@@ -27,9 +38,11 @@ Would someone say this to a colleague at a bar? Flag sentences that sound like a
 
 ## Decision Criteria
 
-- **proceed** (score >= 7): Voice is authentic, writing feels human
-- **retry** (score 4-6): Voice drift or writing quality issues
+- **proceed** (score >= 7): Voice is authentic, writing feels human, NO em-dashes
+- **retry** (score 4-6): Voice drift, writing quality issues, OR any em-dashes present
 - **halt** (score < 4): Doesn't sound like the author at all
+
+**IMPORTANT:** Any em-dash found = automatic "retry", regardless of other factors.
 
 ## Output Format
 
