@@ -46,6 +46,29 @@ input::placeholder {
   @apply text-zinc-500;
 }
 
+/* Progress bar wave animation for unfilled portion */
+@keyframes progress-wave {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.progress-wave {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(59, 130, 246, 0.15) 25%,
+    rgba(59, 130, 246, 0.3) 50%,
+    rgba(59, 130, 246, 0.15) 75%,
+    transparent 100%
+  );
+  background-size: 50% 100%;
+  animation: progress-wave 2s ease-in-out infinite;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;

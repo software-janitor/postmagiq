@@ -53,7 +53,7 @@ const DEFAULT_WORKFLOW_STATES: WorkflowStateDisplay[] = [
   { id: 'start', label: 'Start', description: 'Initialize workflow' },
   { id: 'story-review', label: 'Review', description: 'Review raw story for completeness' },
   { id: 'story-feedback', label: 'Feedback', description: 'Get more details from user' },
-  { id: 'story-process', label: 'Process', description: 'Extract elements, determine shape' },
+  { id: 'story-process', label: 'Processing', description: 'Extract elements, determine shape' },
   { id: 'draft', label: 'Draft', description: 'Generate post drafts' },
   { id: 'cross-audit', label: 'Audit', description: 'Cross-audit all drafts' },
   { id: 'synthesize', label: 'Synthesize', description: 'Combine best elements' },
@@ -62,8 +62,14 @@ const DEFAULT_WORKFLOW_STATES: WorkflowStateDisplay[] = [
   { id: 'complete', label: 'Complete', description: 'Workflow complete' },
 ]
 
+// Custom label overrides for state IDs
+const STATE_LABEL_OVERRIDES: Record<string, string> = {
+  'story-process': 'Story Processing',
+}
+
 // Helper to format state id to label
 function stateIdToLabel(id: string): string {
+  if (STATE_LABEL_OVERRIDES[id]) return STATE_LABEL_OVERRIDES[id]
   return id.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
 }
 
@@ -94,6 +100,7 @@ export default function StoryWorkflow() {
     awaitingApproval,
     approvalContent,
     approvalPrompt,
+    auditResults,
     events,
     outputs,
     error: workflowError,
@@ -634,7 +641,6 @@ Include specific details: error messages, tools used, time spent, etc."
                   {awaitingApproval && <MessageCircle className="w-4 h-4" />}
                   {aborted && <XCircle className="w-4 h-4" />}
                   {paused && !aborted && !awaitingApproval && <Pause className="w-4 h-4" />}
-                  {running && !paused && !awaitingApproval && <Loader2 className="w-4 h-4 animate-spin" />}
                   {!running && !workflowError && !aborted && <CheckCircle2 className="w-4 h-4" />}
                   {workflowError && <AlertCircle className="w-4 h-4" />}
                   {awaitingApproval
@@ -644,13 +650,56 @@ Include specific details: error messages, tools used, time spent, etc."
                     : paused
                     ? (showInternals ? `Paused: ${currentState}` : 'Paused')
                     : running
-                    ? (showInternals ? `State: ${currentState || 'starting'}` : 'Processing')
+                    ? (showInternals ? `State: ${currentState || 'starting'}` : '')
                     : workflowError
                     ? 'Failed'
                     : 'Complete'}
                 </div>
               </div>
             </div>
+
+            {/* Progress bar — visible to all users */}
+            {(running || (!running && !workflowError && !aborted && currentState === 'complete')) && (() => {
+              const effectiveState = currentState || previousRun?.final_state
+              const totalStates = WORKFLOW_STATES.length
+              const currentIdx = WORKFLOW_STATES.findIndex(s => s.id === effectiveState)
+              // If complete, fill to 100%. Otherwise use index position.
+              const isWorkflowComplete = effectiveState === 'complete' || (!running && !workflowError && !aborted)
+              const progressPercent = isWorkflowComplete
+                ? 100
+                : currentIdx >= 0
+                ? Math.round(((currentIdx + 1) / totalStates) * 100)
+                : 0
+              const currentLabel = WORKFLOW_STATES.find(s => s.id === effectiveState)?.label || effectiveState || 'Starting'
+
+              return (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-400">
+                      {isWorkflowComplete ? 'Complete' : currentLabel}
+                    </span>
+                    <span className="text-slate-500 text-xs">
+                      {progressPercent}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden flex">
+                    <div
+                      className={clsx(
+                        'h-full transition-all duration-500 ease-out',
+                        isWorkflowComplete ? 'bg-green-500 rounded-full' : 'bg-blue-500 rounded-l-full',
+                      )}
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                    {!isWorkflowComplete && progressPercent < 100 && (
+                      <div
+                        className="h-full rounded-r-full progress-wave"
+                        style={{ width: `${100 - progressPercent}%` }}
+                      />
+                    )}
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Metrics - only shown when show_internal_workflow flag is true */}
             {showInternals && (tokens > 0 || cost > 0) && (
@@ -790,6 +839,49 @@ Include specific details: error messages, tools used, time spent, etc."
                           </div>
                         )
                       })()}
+                    </div>
+                  )}
+
+                  {/* Show audit results from state machine (available to all users) */}
+                  {auditResults && auditResults.length > 0 && (
+                    <div className="bg-amber-900/20 rounded-lg p-4 mb-4 border border-amber-700/50">
+                      <div className="text-xs text-amber-400 uppercase tracking-wide mb-3 font-medium">
+                        Audit Results
+                      </div>
+                      <div className="space-y-3">
+                        {auditResults.map((result, idx) => (
+                          <div key={idx} className="border-b border-amber-700/30 pb-2 last:border-b-0 last:pb-0">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs text-amber-300 font-medium uppercase">{result.agent}</span>
+                              <div className="flex items-center gap-2">
+                                {result.score != null && (
+                                  <span className={clsx(
+                                    'text-xs px-2 py-0.5 rounded',
+                                    result.score >= 7 && 'bg-green-600/20 text-green-400',
+                                    result.score >= 4 && result.score < 7 && 'bg-amber-600/20 text-amber-400',
+                                    result.score < 4 && 'bg-red-600/20 text-red-400',
+                                  )}>
+                                    Score: {result.score}
+                                  </span>
+                                )}
+                                {result.decision && (
+                                  <span className={clsx(
+                                    'text-xs px-2 py-0.5 rounded',
+                                    result.decision === 'proceed' && 'bg-green-600/20 text-green-400',
+                                    result.decision === 'retry' && 'bg-amber-600/20 text-amber-400',
+                                    result.decision === 'halt' && 'bg-red-600/20 text-red-400',
+                                  )}>
+                                    {result.decision}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            {result.feedback && (
+                              <p className="text-amber-200/80 text-sm">{result.feedback}</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
 

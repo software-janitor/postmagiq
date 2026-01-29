@@ -347,7 +347,7 @@ def main():
     parser.add_argument(
         "--config",
         "-c",
-        default="workflow_config.yaml",
+        default="workflows/configs/claude.yaml",
         help="Config name (e.g., groq-production) or path to workflow config",
     )
     parser.add_argument(

@@ -1,42 +1,49 @@
 # ============================================================================
-# WORKFLOW ORCHESTRATOR CONFIGURATION - GROQ (Cloud API)
+# GROQ PRODUCTION WORKFLOW CONFIGURATION
 # ============================================================================
-# Uses Groq's fast inference API for all agents
-# Set LLM_PROVIDER=groq to use this config
+# Groq-only configuration for production launch.
+# All agents use Groq models (llama-70b, llama-8b, mixtral).
 
+# Orchestrator settings
 orchestrator:
-  agent: groq
+  agent: groq-llama-70b
   session:
     enabled: true
 
 # ============================================================================
-# WORKFLOW TIERS
+# WORKFLOW TIERS (Groq-Only)
 # ============================================================================
+# Standard and Premium tiers use Groq agents only for launch.
 
 tiers:
   standard:
-    draft_agents: [groq-70b, groq-scout, groq-8b]
-    audit_agents: [groq-70b, groq-scout]
+    draft_agents: [groq-llama-70b, groq-llama-8b, groq-mixtral]
+    audit_agents: [groq-llama-70b, groq-llama-8b]
   premium:
-    draft_agents: [groq-70b, groq-scout, groq-maverick]
-    audit_agents: [groq-70b, groq-maverick]
+    # Same as standard until premium providers re-enabled
+    draft_agents: [groq-llama-70b, groq-llama-8b, groq-mixtral]
+    audit_agents: [groq-llama-70b, groq-llama-8b]
 
+# Credit weights per model tier (for usage billing)
 credit_weights:
   base_cost: 2
   standard:
-    - groq-70b
-    - groq-8b
-    - groq-scout
+    - groq-llama-70b
+    - groq-llama-8b
+    - groq-mixtral
   premium:
-    - groq-maverick
+    - groq-llama-70b
+    - groq-llama-8b
+    - groq-mixtral
 
 # ============================================================================
-# AGENT DEFINITIONS - Groq Models
+# AGENT DEFINITIONS
 # ============================================================================
 
 agents:
-  groq:
-    type: api
+  # Groq models (enabled for launch)
+  # GroqAPIAgent selected via groq-* name prefix in API mode
+  groq-llama-70b:
     enabled: true
     model: llama-70b
     context_window: 128000
@@ -44,17 +51,7 @@ agents:
       input: 0.00059
       output: 0.00079
 
-  groq-70b:
-    type: api
-    enabled: true
-    model: llama-70b
-    context_window: 128000
-    cost_per_1k:
-      input: 0.00059
-      output: 0.00079
-
-  groq-8b:
-    type: api
+  groq-llama-8b:
     enabled: true
     model: llama-8b
     context_window: 128000
@@ -62,26 +59,7 @@ agents:
       input: 0.00005
       output: 0.00008
 
-  groq-scout:
-    type: api
-    enabled: true
-    model: llama4-scout
-    context_window: 128000
-    cost_per_1k:
-      input: 0.00011
-      output: 0.00034
-
-  groq-maverick:
-    type: api
-    enabled: true
-    model: llama4-maverick
-    context_window: 128000
-    cost_per_1k:
-      input: 0.00020
-      output: 0.00060
-
   groq-mixtral:
-    type: api
     enabled: true
     model: mixtral
     context_window: 32768
@@ -89,22 +67,52 @@ agents:
       input: 0.00024
       output: 0.00024
 
+  # Disable all non-Groq agents
+  claude:
+    enabled: false
+  claude-sonnet:
+    enabled: false
+  claude-opus:
+    enabled: false
+  claude-haiku:
+    enabled: false
+  gemini:
+    enabled: false
+  gemini-2.5-pro:
+    enabled: false
+  gemini-2.5-flash:
+    enabled: false
+  gemini-3-pro:
+    enabled: false
+  codex:
+    enabled: false
+  gpt-5.2-medium:
+    enabled: false
+  gpt-5.2-high:
+    enabled: false
+
 # ============================================================================
 # PERSONA DEFINITIONS
 # ============================================================================
 
 personas:
-  story-reviewer: prompts/templates/story_reviewer.md
-  story-processor: prompts/templates/story_processor.md
-  writer: prompts/templates/writer.md
-  auditor: prompts/templates/auditor.md
-  synthesizer: prompts/templates/synthesizer.md
-  fabrication-auditor: prompts/templates/fabrication_auditor.md
-  style-auditor: prompts/templates/style_auditor.md
+  story-reviewer: prompts/story_reviewer_persona.md
+  story-processor: prompts/story_processor_persona.md
+  writer: prompts/writer_persona.md
+  auditor: prompts/auditor_persona.md
+  synthesizer: prompts/synthesizer_persona.md
 
 # ============================================================================
 # STATE MACHINE
 # ============================================================================
+#
+# Flow:
+#   start -> story-review -> story-process -> draft -> cross-audit ->
+#   synthesize -> final-audit -> human-approval -> complete
+#
+# Story review can loop back for more details:
+#   story-review -> (retry) -> story-feedback -> story-review
+#
 
 states:
   start:
@@ -118,7 +126,7 @@ states:
   story-review:
     type: single
     description: "Review raw story for completeness - ask questions if needed"
-    agent: groq-70b
+    agent: groq-llama-70b
     persona: story-reviewer
     input: "workflow/input/story_input.md"
     output: "workflow/review/review_result.json"
@@ -146,7 +154,7 @@ states:
   story-process:
     type: single
     description: "Extract 5 elements, determine shape, create processed template"
-    agent: groq-70b
+    agent: groq-llama-70b
     persona: story-processor
     input: "workflow/input/story_input.md"
     output: "workflow/processed/processed_story.md"
@@ -162,7 +170,7 @@ states:
   draft:
     type: fan-out
     description: "Generate post drafts from processed story"
-    agents: [groq-70b, groq-scout, groq-8b]
+    agents: [groq-llama-70b, groq-llama-8b, groq-mixtral]
     persona: writer
     input: "workflow/processed/processed_story.md"
     output: "workflow/drafts/{agent}_draft.md"
@@ -179,7 +187,7 @@ states:
   cross-audit:
     type: fan-out
     description: "Each agent audits all drafts against source material"
-    agents: [groq-70b, groq-scout]
+    agents: [groq-llama-70b, groq-llama-8b]
     persona: auditor
     input:
       - "workflow/processed/processed_story.md"
@@ -195,7 +203,7 @@ states:
   synthesize:
     type: orchestrator-task
     description: "Combine best elements from drafts based on audits"
-    agent: groq-70b
+    agent: groq-llama-70b
     persona: synthesizer
     input:
       - "workflow/drafts/*.md"
@@ -213,46 +221,109 @@ states:
   final-audit:
     type: fan-out
     description: "Final quality check on synthesized post against source"
-    agents: [groq-70b, groq-scout]
+    agents: [groq-llama-70b, groq-llama-8b]
     persona: auditor
     input:
       - "workflow/processed/processed_story.md"
       - "workflow/input/story_input.md"
       - "workflow/final/final_post.md"
-    output: "workflow/audits/final_{agent}_audit.json"
-    output_type: audit
+    output: "workflow/final/{agent}_final_audit.json"
+    output_type: final_audit
     transitions:
       all_success: human-approval
       partial_success: human-approval
-      all_failure: synthesize
+      all_failure: final-audit-feedback
+
+  final-audit-feedback:
+    type: human-approval
+    description: "Review audit feedback on final post"
+    input: "workflow/final/final_post.md"
+    prompt: |
+      The auditors flagged issues with the final post.
+      Review the post above and either:
+      - Type 'approve' to publish as-is
+      - Type 'abort' to cancel
+      - Provide feedback to guide the revision
+    transitions:
+      approved: complete
+      feedback: synthesize
+      abort: halt
 
   human-approval:
     type: human-approval
-    description: "Human reviews final post and approves or requests changes"
+    description: "Human reviews and approves final post"
     input: "workflow/final/final_post.md"
     prompt: |
-      Review the final post above and either:
-      - Type 'approve' to finalize
-      - Type 'retry' to generate new drafts
-      - Provide feedback for specific changes
+      Review the final post above.
+      - Type 'approved' to complete the workflow
+      - Type 'abort' to cancel
+      - Provide feedback to revise the post
     transitions:
       approved: complete
-      retry: draft
       feedback: synthesize
+      abort: halt
+
+  # --------------------------------------------------------------------------
+  # Terminal States
+  # --------------------------------------------------------------------------
 
   complete:
     type: terminal
-    description: "Workflow complete - post ready for publishing"
+    on_enter:
+      - log: "Workflow complete - post ready for publishing"
 
   halt:
     type: terminal
-    description: "Workflow halted due to failure or user abort"
+    error: true
+    on_enter:
+      - log: "Workflow halted"
 
 # ============================================================================
-# RUNTIME SETTINGS
+# CIRCUIT BREAKER
 # ============================================================================
 
-runtime:
+circuit_breaker:
+  rules:
+    - name: state_visit_limit
+      limit: 3
+    - name: cycle_detection
+    - name: transition_limit
+      limit: 20
+    - name: timeout
+      seconds: 1800
+    - name: cost_limit
+      limit: 5.00
+
+  safety_limits:
+    max_transitions_hard: 50
+    max_runtime_hard: 3600
+    max_cost_hard: 10.00
+
+# ============================================================================
+# LOGGING
+# ============================================================================
+
+logging:
+  enabled: true
+  runs_dir: "workflow/runs"
+
+  capture:
+    prompts: true
+    input_content: true
+    output_content: true
+    tokens: true
+
+  summaries:
+    generate_markdown: true
+    include_previews: true
+    include_scores: true
+    include_token_summary: true
+
+# ============================================================================
+# SETTINGS
+# ============================================================================
+
+settings:
   working_dir: "workflow"
   parallel_fanout: true
   timeout_per_agent: 300

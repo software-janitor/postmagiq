@@ -67,6 +67,9 @@ class StateMachine:
         self._pause_event = threading.Event()
         self._pause_event.set()  # Start unpaused (event is set = continue)
 
+        # Abort state
+        self._aborted = False
+
     def initialize(self, run_id: str):
         """Initialize for a new run."""
         self.run_id = run_id
@@ -80,6 +83,8 @@ class StateMachine:
         # Reset pause state
         self._paused = False
         self._pause_event.set()
+        # Reset abort state
+        self._aborted = False
 
     def pause(self) -> bool:
         """Pause execution at the next state checkpoint.
@@ -108,6 +113,14 @@ class StateMachine:
     def is_paused(self) -> bool:
         """Check if workflow is paused."""
         return self._paused
+
+    def abort(self):
+        """Abort execution. Unblocks pause and approval waits so the main loop exits."""
+        self._aborted = True
+        # Unblock pause wait if paused
+        self._pause_event.set()
+        # Unblock approval wait if waiting
+        self._approval_event.set()
 
     def submit_approval(self, decision: str, feedback: Optional[str] = None) -> bool:
         """Submit approval response from API.
@@ -161,6 +174,17 @@ class StateMachine:
         error = None
 
         while True:
+            # Check for abort
+            if self._aborted:
+                self.log_callback({
+                    "event": "aborted",
+                    "state": self.current_state,
+                })
+                return {
+                    "final_state": "halt",
+                    "error": "Aborted by user",
+                }
+
             # Check for pause checkpoint
             if self._paused:
                 self.log_callback({
@@ -169,6 +193,16 @@ class StateMachine:
                 })
                 # Wait for resume (blocks until _pause_event is set)
                 self._pause_event.wait()
+                # Check if we were unblocked by abort rather than resume
+                if self._aborted:
+                    self.log_callback({
+                        "event": "aborted",
+                        "state": self.current_state,
+                    })
+                    return {
+                        "final_state": "halt",
+                        "error": "Aborted by user",
+                    }
                 self.log_callback({
                     "event": "resumed",
                     "state": self.current_state,
@@ -408,7 +442,10 @@ class StateMachine:
             input_specs = [input_path]
 
         input_files = self._resolve_input_files(input_path)
-        persona_content = self._load_persona(state.get("persona", ""))
+
+        # Per-agent persona mapping (falls back to shared persona)
+        personas_map = state.get("personas", {})
+        shared_persona = state.get("persona", "")
 
         # For draft state, include audit feedback from previous iteration if available
         if state_name == "draft":
@@ -419,7 +456,14 @@ class StateMachine:
                 else:
                     context = audit_feedback
 
-        prompt = self._build_prompt(persona_content, input_files, context, input_specs=input_specs)
+        # Build per-agent prompts
+        agent_prompts: dict[str, str] = {}
+        for agent_name in agent_names:
+            persona_slug = personas_map.get(agent_name, shared_persona)
+            persona_content = self._load_persona(persona_slug)
+            agent_prompts[agent_name] = self._build_prompt(
+                persona_content, input_files, context, input_specs=input_specs
+            )
 
         outputs: dict[str, FanOutResult] = {}
         total_tokens = TokenUsage(input_tokens=0, output_tokens=0)
@@ -433,7 +477,7 @@ class StateMachine:
                 for agent_name in agent_names:
                     output_path = self._resolve_output_path(output_template, agent=agent_name)
                     future = executor.submit(
-                        self._invoke_agent, agent_name, prompt, output_path, state_name
+                        self._invoke_agent, agent_name, agent_prompts[agent_name], output_path, state_name
                     )
                     futures[future] = agent_name
 
@@ -470,7 +514,7 @@ class StateMachine:
         else:
             for agent_name in agent_names:
                 output_path = self._resolve_output_path(output_template, agent=agent_name)
-                result = self._invoke_agent(agent_name, prompt, output_path, state_name)
+                result = self._invoke_agent(agent_name, agent_prompts[agent_name], output_path, state_name)
                 outputs[agent_name] = result
                 if result.tokens:
                     total_tokens.input_tokens += result.tokens.input_tokens
@@ -478,6 +522,26 @@ class StateMachine:
 
         success_count = sum(1 for r in outputs.values() if r.status == "success")
         total_count = len(agent_names)
+
+        # For audit-type fan-outs, parse and aggregate audit results
+        output_type = state.get("output_type", "")
+        if output_type in ("audit", "review", "final_audit") and success_count > 0:
+            audit_results = []
+            for name, fan_result in outputs.items():
+                if fan_result.status == "success":
+                    audit = self._parse_audit_result(fan_result)
+                    if audit:
+                        audit_results.append((name, audit))
+
+            if audit_results:
+                transition, feedback = self._aggregate_audit_results(audit_results, state)
+                return StateResult(
+                    state_name=state_name,
+                    transition=transition,
+                    outputs=outputs,
+                    total_tokens=total_tokens,
+                    total_cost_usd=total_cost,
+                )
 
         if success_count == total_count:
             transition = "all_success"
@@ -714,6 +778,9 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
 
         with self._approval_lock:
             self.awaiting_approval = False
+            # If aborted, return abort regardless of approval state
+            if self._aborted:
+                return ("abort", None)
             if not got_response:
                 return ("abort", None)
             decision = self._approval_response.get("decision", "abort")
@@ -769,6 +836,12 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
             # Include reviewer context for feedback states
             if state.get("type") == "human-approval" and content:
                 callback_data["reviewer_context"] = content
+
+            # Include audit results so the UI can display scores/feedback
+            audit_results = self._collect_audit_results()
+            if audit_results:
+                callback_data["audit_results"] = audit_results
+
             self.approval_callback(callback_data)
 
             decision, feedback = self._wait_for_approval(timeout=timeout)
@@ -828,7 +901,7 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
     def _state_to_output_type(self, state: str) -> str:
         """Get output type from state config.
 
-        Reads output_type from workflow_config.yaml state definition.
+        Reads output_type from workflow config state definition.
         Falls back to state name if not configured.
         """
         state_config = self.states.get(state, {})
@@ -930,6 +1003,7 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
                     agent=agent_name,
                     status="success",
                     output_path=output_path,
+                    content=result.content,
                     tokens=result.tokens,
                     cost_usd=result.cost_usd or 0.0,
                     duration_s=duration,
@@ -1193,6 +1267,73 @@ Your output will be cross-checked against source material. Fabrications = automa
         """Get final audit feedback for synthesizer."""
         return self._get_audit_feedback("final")
 
+    def _collect_audit_results(self) -> list[dict]:
+        """Collect parsed audit results from database or files for UI display.
+
+        Returns a list of dicts with keys: agent, score, decision, feedback.
+        Tries final_audit first, falls back to cross-audit.
+        """
+        import json as _json
+
+        results = []
+
+        for audit_type, db_type, file_pattern in [
+            ("final_audit", "final_audit", "final/*_final_audit.json"),
+            ("audit", "audit", "audits/*_audit.json"),
+        ]:
+            # Try database first
+            if self.db and self.run_id:
+                try:
+                    outputs = self.db.get_workflow_outputs_by_type(self.run_id, db_type)
+                    for output in outputs:
+                        parsed = self._try_parse_audit_json(output.content)
+                        if parsed:
+                            parsed["agent"] = output.agent or "auditor"
+                            parsed["audit_type"] = audit_type
+                            results.append(parsed)
+                except Exception:
+                    pass
+
+            # Fall back to files
+            if not results and self.run_dir:
+                import glob
+                pattern = os.path.join(self.run_dir, file_pattern)
+                for audit_file in sorted(glob.glob(pattern)):
+                    try:
+                        with open(audit_file) as f:
+                            content = f.read()
+                        parsed = self._try_parse_audit_json(content)
+                        if parsed:
+                            basename = os.path.basename(audit_file)
+                            agent_name = basename.replace("_final_audit.json", "").replace("_audit.json", "")
+                            parsed["agent"] = agent_name
+                            parsed["audit_type"] = audit_type
+                            results.append(parsed)
+                    except Exception:
+                        pass
+
+            if results:
+                return results
+
+        return results
+
+    def _try_parse_audit_json(self, content: str) -> Optional[dict]:
+        """Try to parse audit JSON content, returning score/decision/feedback dict."""
+        import json as _json
+
+        json_str = self._extract_json(content)
+        if not json_str:
+            return None
+        try:
+            data = _json.loads(json_str)
+            return {
+                "score": data.get("score"),
+                "decision": data.get("decision"),
+                "feedback": data.get("feedback"),
+            }
+        except Exception:
+            return None
+
     def _path_to_output_type(self, path: str) -> Optional[str]:
         """Map file path to database output type."""
         if "processed" in path:
@@ -1284,6 +1425,45 @@ Your output will be cross-checked against source material. Fabrications = automa
 
         return "\n\n".join(parts)
 
+    def _aggregate_audit_results(
+        self, audit_results: list[tuple[str, AuditResult]], state: dict
+    ) -> tuple[str, str]:
+        """Aggregate multiple audit results — strictest decision wins.
+
+        Returns:
+            (transition, combined_feedback) tuple.
+        """
+        decisions = [ar.decision for _, ar in audit_results]
+        scores = [ar.score for _, ar in audit_results]
+
+        # Track minimum score for circuit breaker
+        self.last_audit_score = min(scores)
+
+        # Strictest wins: halt > retry > proceed
+        if "halt" in decisions:
+            transition = "halt"
+        elif "retry" in decisions:
+            transition = "retry"
+        else:
+            transition = "proceed"
+
+        # Combine feedback from all auditors
+        feedback_parts = []
+        for name, audit in audit_results:
+            feedback_parts.append(
+                f"### {name} (score: {audit.score}, decision: {audit.decision})\n\n"
+                f"{audit.feedback}"
+            )
+        combined_feedback = "\n\n".join(feedback_parts)
+
+        # Store feedback for retry target
+        if transition == "retry":
+            target = self._get_transitions(state).get("retry")
+            if target:
+                self.retry_feedback[target] = combined_feedback
+
+        return transition, combined_feedback
+
     def _parse_audit_result(self, result: FanOutResult) -> Optional[AuditResult]:
         """Try to parse agent output as audit result.
 
@@ -1291,13 +1471,15 @@ Your output will be cross-checked against source material. Fabrications = automa
         decision on parse failure (fail-closed behavior) only if content
         looks like it was intended to be JSON.
         """
-        if not result.output_path or not os.path.exists(result.output_path):
-            return None
+        # Try content field first, then fall back to file
+        content = result.content
+        if not content:
+            if not result.output_path or not os.path.exists(result.output_path):
+                return None
+            with open(result.output_path) as f:
+                content = f.read()
 
         import json
-
-        with open(result.output_path) as f:
-            content = f.read()
 
         json_str = self._extract_json(content)
 
@@ -1334,20 +1516,37 @@ Your output will be cross-checked against source material. Fabrications = automa
             )
 
     def _extract_json(self, content: str) -> Optional[str]:
-        """Extract JSON from content, handling markdown fences."""
+        """Extract JSON from content, handling markdown fences and extra braces."""
         import re
+        import json as _json
 
         content = content.strip()
 
-        if content.startswith("{") and content.endswith("}"):
-            return content
-
+        # Try markdown fence extraction first
         fence_pattern = r"```(?:json)?\s*\n?(.*?)\n?```"
         match = re.search(fence_pattern, content, re.DOTALL)
         if match:
-            return match.group(1).strip()
+            content = match.group(1).strip()
 
+        # Find first { and work from there
         brace_start = content.find("{")
+        if brace_start == -1:
+            return None
+
+        # Try progressively shorter substrings from the end
+        # to handle extra trailing braces like }}}
+        candidate = content[brace_start:]
+        while candidate.endswith("}"):
+            try:
+                _json.loads(candidate)
+                return candidate
+            except _json.JSONDecodeError:
+                # Strip one trailing brace and retry
+                candidate = candidate[:-1]
+                if not candidate.endswith("}"):
+                    break
+
+        # Fallback: return from first { to last }
         brace_end = content.rfind("}")
         if brace_start != -1 and brace_end > brace_start:
             return content[brace_start:brace_end + 1]

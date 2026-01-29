@@ -33,6 +33,22 @@ agents:
     cost_per_1k:
       input: 0.0
       output: 0.0
+  ollama-fabrication-auditor:
+    type: ollama
+    enabled: true
+    model: gpt-oss:20b
+    context_window: 128000
+    cost_per_1k:
+      input: 0.0
+      output: 0.0
+  ollama-style-auditor:
+    type: ollama
+    enabled: true
+    model: gpt-oss:20b
+    context_window: 128000
+    cost_per_1k:
+      input: 0.0
+      output: 0.0
 
 # ============================================================================
 # PERSONA DEFINITIONS
@@ -111,19 +127,22 @@ states:
       success: audit
 
   audit:
-    type: single
-    description: "Audit draft against source material"
-    agent: ollama
-    persona: auditor
+    type: fan-out
+    description: "Split audit: fabrication + style checks"
+    agents: [ollama-fabrication-auditor, ollama-style-auditor]
+    personas:
+      ollama-fabrication-auditor: fabrication-auditor
+      ollama-style-auditor: style-auditor
     input:
       - "workflow/processed/processed_story.md"
       - "workflow/input/story_input.md"
       - "workflow/drafts/draft.md"
-    output: "workflow/audits/audit.json"
+    output: "workflow/audits/{agent}_audit.json"
     output_type: audit
     transitions:
+      proceed: human-approval
       retry: revise
-      success: human-approval
+      halt: halt
 
   revise:
     type: single
@@ -140,18 +159,36 @@ states:
       failure: draft
 
   final-audit:
-    type: single
-    description: "Final quality check"
-    agent: ollama
-    persona: auditor
+    type: fan-out
+    description: "Final split audit: fabrication + style checks"
+    agents: [ollama-fabrication-auditor, ollama-style-auditor]
+    personas:
+      ollama-fabrication-auditor: fabrication-auditor
+      ollama-style-auditor: style-auditor
     input:
       - "workflow/processed/processed_story.md"
       - "workflow/final/final_post.md"
-    output: "workflow/audits/final_audit.json"
-    output_type: audit
+    output: "workflow/final/{agent}_final_audit.json"
+    output_type: final_audit
     transitions:
-      retry: revise
-      success: human-approval
+      proceed: human-approval
+      retry: final-audit-feedback
+      halt: final-audit-feedback
+
+  final-audit-feedback:
+    type: human-approval
+    description: "Review audit feedback on final post"
+    input: "workflow/final/final_post.md"
+    prompt: |
+      The auditors flagged issues with the final post.
+      Review the post above and either:
+      - Type 'approve' to publish as-is
+      - Type 'abort' to cancel
+      - Provide feedback to guide the revision
+    transitions:
+      approved: complete
+      feedback: revise
+      abort: halt
 
   human-approval:
     type: human-approval

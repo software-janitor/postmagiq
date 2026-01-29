@@ -38,6 +38,7 @@ class WorkflowService:
         self.current_run_id: Optional[str] = None
         self.current_story: Optional[str] = None
         self.current_user_id: Optional[str] = None  # Set during execute()
+        self.current_workspace_id: Optional[UUID] = None  # Set during execute()
         self.started_at: Optional[datetime] = None
         self.running = False
         self.awaiting_approval = False
@@ -81,6 +82,7 @@ class WorkflowService:
 
         self.current_story = story
         self.current_user_id = user_id
+        self.current_workspace_id = workspace_id
         uid = normalize_user_id(user_id)
         if not uid:
             return {"error": "Invalid user ID"}
@@ -136,19 +138,21 @@ class WorkflowService:
             self._approval_content = approval_info.get("content")
             # Store state_machine reference (passed via closure from runner)
             # We need to get it from the runner - will be set after StateMachine init
+            broadcast_data = {
+                "type": "approval:requested",
+                "run_id": self.current_run_id,
+                "input_path": approval_info.get("input_path"),
+                "content": approval_info.get("content"),
+                "prompt": approval_info.get("prompt"),
+                "timestamp": datetime.utcnow().isoformat(),
+            }
+            # Include audit results if available
+            if approval_info.get("audit_results"):
+                broadcast_data["audit_results"] = approval_info["audit_results"]
+
             _broadcast_from_thread(
                 main_loop,
-                manager.broadcast(
-                    {
-                        "type": "approval:requested",
-                        "run_id": self.current_run_id,
-                        "input_path": approval_info.get("input_path"),
-                        "content": approval_info.get("content"),
-                        "prompt": approval_info.get("prompt"),
-                        "timestamp": datetime.utcnow().isoformat(),
-                    },
-                    self.current_run_id,
-                )
+                manager.broadcast(broadcast_data, self.current_run_id)
             )
 
         # Broadcast start event
@@ -259,17 +263,9 @@ class WorkflowService:
                     output_type = "output:final"
                     db_output_type = "final"
 
-                if output_type and db_output_type:
-                    # Save to database
-                    service._store.save_workflow_output(
-                        run_id=run_id,
-                        state_name=state,
-                        output_type=db_output_type,
-                        content=content,
-                        agent=agent,
-                    )
-
-                    # Broadcast via WebSocket
+                if output_type:
+                    # Note: Database save already handled by state_machine._invoke_agent
+                    # Here we only broadcast via WebSocket
                     _broadcast_from_thread(
                         main_loop,
                         manager.broadcast(
@@ -434,7 +430,10 @@ class WorkflowService:
         if not self.running:
             return {"error": "No workflow running"}
 
-        # Note: actual abort logic would need to be added to runner
+        # Signal the state machine to abort (unblocks pause/approval waits)
+        if self._state_machine:
+            self._state_machine.abort()
+
         self.running = False
         await manager.broadcast(
             {
@@ -561,6 +560,22 @@ class WorkflowService:
                                 logging.info(f"Updated post {post_number} status to 'ready'")
             except Exception as e:
                 logging.warning(f"Failed to update post status: {e}")
+
+        # Deduct credit for completed workflow
+        if self.current_workspace_id and result.get("final_state") == "complete":
+            try:
+                from api.services.usage_service import UsageService
+                usage_svc = UsageService()
+                idempotency_key = f"workflow-run:{self.current_run_id}"
+                usage_svc.reserve_credit(
+                    workspace_id=self.current_workspace_id,
+                    resource_type="post",
+                    idempotency_key=idempotency_key,
+                    amount=1,
+                )
+                usage_svc.confirm_usage(idempotency_key)
+            except Exception as e:
+                logging.warning(f"Credit deduction failed for run {self.current_run_id}: {e}")
 
         await manager.broadcast(
             {

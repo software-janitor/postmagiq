@@ -1,73 +1,75 @@
 # ============================================================================
-# GROQ PRODUCTION WORKFLOW CONFIGURATION
+# OLLAMA LOCAL WORKFLOW CONFIGURATION
 # ============================================================================
-# Groq-only configuration for production launch.
-# All agents use Groq models (llama-70b, llama-8b, mixtral).
+# Local testing configuration using Ollama models.
+# All agents use local Ollama models (no API costs).
 
 # Orchestrator settings
 orchestrator:
-  agent: groq-llama-70b
+  agent: ollama-llama-8b
   session:
     enabled: true
 
 # ============================================================================
-# WORKFLOW TIERS (Groq-Only)
+# WORKFLOW TIERS (Ollama Local)
 # ============================================================================
-# Standard and Premium tiers use Groq agents only for launch.
+# Local testing uses smaller, faster models.
 
 tiers:
   standard:
-    draft_agents: [groq-llama-70b, groq-llama-8b, groq-mixtral]
-    audit_agents: [groq-llama-70b, groq-llama-8b]
+    draft_agents: [ollama-llama-8b, ollama-mistral, ollama-llama-3b]
+    audit_agents: [ollama-llama-8b, ollama-mistral]
   premium:
-    # Same as standard until premium providers re-enabled
-    draft_agents: [groq-llama-70b, groq-llama-8b, groq-mixtral]
-    audit_agents: [groq-llama-70b, groq-llama-8b]
+    # Same as standard for local testing
+    draft_agents: [ollama-llama-8b, ollama-mistral, ollama-llama-3b]
+    audit_agents: [ollama-llama-8b, ollama-mistral]
 
-# Credit weights per model tier (for usage billing)
+# Credit weights (all free for local)
 credit_weights:
-  base_cost: 2
+  base_cost: 0
   standard:
-    - groq-llama-70b
-    - groq-llama-8b
-    - groq-mixtral
+    - ollama-llama-8b
+    - ollama-mistral
+    - ollama-llama-3b
   premium:
-    - groq-llama-70b
-    - groq-llama-8b
-    - groq-mixtral
+    - ollama-llama-8b
+    - ollama-mistral
+    - ollama-llama-3b
 
 # ============================================================================
 # AGENT DEFINITIONS
 # ============================================================================
 
 agents:
-  # Groq models (enabled for launch)
-  # GroqAPIAgent selected via groq-* name prefix in API mode
-  groq-llama-70b:
+  # Ollama models (local inference)
+  ollama-llama-8b:
+    type: ollama
     enabled: true
-    model: llama-70b
+    model: llama3.1:8b
     context_window: 128000
     cost_per_1k:
-      input: 0.00059
-      output: 0.00079
+      input: 0.0
+      output: 0.0
 
-  groq-llama-8b:
+  ollama-mistral:
+    type: ollama
     enabled: true
-    model: llama-8b
-    context_window: 128000
-    cost_per_1k:
-      input: 0.00005
-      output: 0.00008
-
-  groq-mixtral:
-    enabled: true
-    model: mixtral
+    model: mistral:7b
     context_window: 32768
     cost_per_1k:
-      input: 0.00024
-      output: 0.00024
+      input: 0.0
+      output: 0.0
 
-  # Disable all non-Groq agents
+  ollama-llama-3b:
+    type: ollama
+    enabled: true
+    model: llama3.2:3b
+    context_window: 128000
+    cost_per_1k:
+      input: 0.0
+      output: 0.0
+
+  # Disable all cloud agents
   claude:
     enabled: false
   claude-sonnet:
@@ -89,6 +91,12 @@ agents:
   gpt-5.2-medium:
     enabled: false
   gpt-5.2-high:
+    enabled: false
+  groq-llama-70b:
+    enabled: false
+  groq-llama-8b:
+    enabled: false
+  groq-mixtral:
     enabled: false
 
 # ============================================================================
@@ -126,7 +134,7 @@ states:
   story-review:
     type: single
     description: "Review raw story for completeness - ask questions if needed"
-    agent: groq-llama-70b
+    agent: ollama-llama-8b
     persona: story-reviewer
     input: "workflow/input/story_input.md"
     output: "workflow/review/review_result.json"
@@ -154,7 +162,7 @@ states:
   story-process:
     type: single
     description: "Extract 5 elements, determine shape, create processed template"
-    agent: groq-llama-70b
+    agent: ollama-llama-8b
     persona: story-processor
     input: "workflow/input/story_input.md"
     output: "workflow/processed/processed_story.md"
@@ -170,7 +178,7 @@ states:
   draft:
     type: fan-out
     description: "Generate post drafts from processed story"
-    agents: [groq-llama-70b, groq-llama-8b, groq-mixtral]
+    agents: [ollama-llama-8b, ollama-mistral, ollama-llama-3b]
     persona: writer
     input: "workflow/processed/processed_story.md"
     output: "workflow/drafts/{agent}_draft.md"
@@ -187,7 +195,7 @@ states:
   cross-audit:
     type: fan-out
     description: "Each agent audits all drafts against source material"
-    agents: [groq-llama-70b, groq-llama-8b]
+    agents: [ollama-llama-8b, ollama-mistral]
     persona: auditor
     input:
       - "workflow/processed/processed_story.md"
@@ -203,7 +211,7 @@ states:
   synthesize:
     type: orchestrator-task
     description: "Combine best elements from drafts based on audits"
-    agent: groq-llama-70b
+    agent: ollama-llama-8b
     persona: synthesizer
     input:
       - "workflow/drafts/*.md"
@@ -221,7 +229,7 @@ states:
   final-audit:
     type: fan-out
     description: "Final quality check on synthesized post against source"
-    agents: [groq-llama-70b, groq-llama-8b]
+    agents: [ollama-llama-8b, ollama-mistral]
     persona: auditor
     input:
       - "workflow/processed/processed_story.md"
@@ -232,7 +240,22 @@ states:
     transitions:
       all_success: human-approval
       partial_success: human-approval
-      all_failure: synthesize
+      all_failure: final-audit-feedback
+
+  final-audit-feedback:
+    type: human-approval
+    description: "Review audit feedback on final post"
+    input: "workflow/final/final_post.md"
+    prompt: |
+      The auditors flagged issues with the final post.
+      Review the post above and either:
+      - Type 'approve' to publish as-is
+      - Type 'abort' to cancel
+      - Provide feedback to guide the revision
+    transitions:
+      approved: complete
+      feedback: synthesize
+      abort: halt
 
   human-approval:
     type: human-approval
@@ -275,14 +298,14 @@ circuit_breaker:
     - name: transition_limit
       limit: 20
     - name: timeout
-      seconds: 1800
+      seconds: 3600  # Longer timeout for local models
     - name: cost_limit
-      limit: 5.00
+      limit: 0.00  # No cost for local
 
   safety_limits:
     max_transitions_hard: 50
-    max_runtime_hard: 3600
-    max_cost_hard: 10.00
+    max_runtime_hard: 7200  # 2 hours for local
+    max_cost_hard: 0.00
 
 # ============================================================================
 # LOGGING
@@ -310,6 +333,6 @@ logging:
 
 settings:
   working_dir: "workflow"
-  parallel_fanout: true
-  timeout_per_agent: 300
+  parallel_fanout: false  # Sequential for local (resource constraints)
+  timeout_per_agent: 600  # Longer timeout for local models
   retry_count: 2

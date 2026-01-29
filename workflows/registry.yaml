@@ -5,10 +5,22 @@
 # Used by the dynamic workflow configuration system.
 
 workflows:
-  groq-production:
+  claude:
+    name: "Claude CLI"
+    description: "Multi-provider workflow via Claude, Gemini, GPT CLIs"
+    config_file: "configs/claude.yaml"
+    environment: production
+    enabled: true
+    tier_required: premium
+    features:
+      - Claude, Gemini, GPT models
+      - Higher quality but higher cost
+      - Reserved for premium tiers
+
+  groq:
     name: "Groq Production"
     description: "Fast cloud inference via Groq API"
-    config_file: "configs/groq-production.yaml"
+    config_file: "configs/groq.yaml"
     environment: production
     enabled: true
     tier_required: null  # Available to all tiers
@@ -17,10 +29,10 @@ workflows:
       - Llama 70B, Llama 8B, Mixtral models
       - Low cost ($0.0005-0.0008/1K tokens)
 
-  ollama-local:
+  ollama:
     name: "Ollama Local"
     description: "Local testing with Ollama (no API costs)"
-    config_file: "configs/ollama-local.yaml"
+    config_file: "configs/ollama.yaml"
     environment: development
     enabled: true
     tier_required: null
@@ -29,17 +41,30 @@ workflows:
       - Llama 8B, Mistral 7B, Llama 3B models
       - Slower but private
 
-  legacy-claude:
-    name: "Legacy Multi-Provider"
-    description: "Original multi-provider workflow (Claude, Gemini, GPT)"
-    config_file: "configs/legacy-claude.yaml"
+  # Deprecated configs (kept for reference)
+  groq-production:
+    name: "Groq Production (deprecated)"
+    description: "Deprecated - use 'groq' instead"
+    config_file: "configs/deprecated/groq-production.yaml"
+    environment: production
+    enabled: false
+    deprecated: true
+
+  ollama-local:
+    name: "Ollama Local (deprecated)"
+    description: "Deprecated - use 'ollama' instead"
+    config_file: "configs/deprecated/ollama-local.yaml"
     environment: development
-    enabled: false  # Disabled for launch
-    tier_required: premium
-    features:
-      - Claude, Gemini, GPT models
-      - Higher quality but higher cost
-      - Reserved for premium tiers
+    enabled: false
+    deprecated: true
+
+  legacy-claude:
+    name: "Legacy Multi-Provider (deprecated)"
+    description: "Deprecated - use 'claude' instead"
+    config_file: "configs/deprecated/legacy-claude.yaml"
+    environment: development
+    enabled: false
+    deprecated: true
 
 # ============================================================================
 # DEPLOYMENT CONFIGURATION
@@ -50,21 +75,21 @@ deployment:
   production:
     # Only include production-grade workflows
     include_environments: [production]
-    default_workflow: groq-production
+    default_workflow: groq
 
   development:
     # Include all workflows for testing
     include_environments: [production, development]
-    default_workflow: ollama-local
+    default_workflow: ollama
 
   staging:
     # Staging mirrors production
     include_environments: [production]
-    default_workflow: groq-production
+    default_workflow: groq
 
 # ============================================================================
 # METADATA
 # ============================================================================
 
-version: "1.0"
-last_updated: "2026-01-23"
+version: "2.0"
+last_updated: "2026-01-28"

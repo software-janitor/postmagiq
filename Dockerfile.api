@@ -27,7 +27,7 @@ COPY api/ ./api/
 COPY prompts/ ./prompts/
 COPY data/image_defaults.py ./data/image_defaults.py
 COPY data/__init__.py ./data/__init__.py
-COPY workflow_config.yaml .
+COPY workflows/configs/ workflows/configs/
 
 # Create workflow directories
 RUN mkdir -p workflow/runs workflow/drafts workflow/audits workflow/final workflow/input workflow/sessions

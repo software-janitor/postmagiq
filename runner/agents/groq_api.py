@@ -12,60 +12,53 @@ from runner.models import TokenUsage
 class GroqAPIAgent(APIAgent):
     """Groq agent with chat completions and audio transcription.
 
-    Model aliases:
-        - llama-70b: llama-3.3-70b-versatile
-        - llama-8b: llama-3.1-8b-instant
-        - mixtral: mixtral-8x7b-32768
+    Production models only (https://console.groq.com/docs/models):
+        - llama-8b: llama-3.1-8b-instant (560 t/s)
+        - llama-70b: llama-3.3-70b-versatile (280 t/s)
+        - llama-guard: meta-llama/llama-guard-4-12b (1200 t/s)
+        - gpt-oss-120b: openai/gpt-oss-120b (500 t/s)
+        - gpt-oss-20b: openai/gpt-oss-20b (1000 t/s)
         - whisper: whisper-large-v3
+        - whisper-turbo: whisper-large-v3-turbo
     """
 
     MODEL_MAP = {
-        # Llama 3.x
-        "llama-70b": "llama-3.3-70b-versatile",
+        # Production models only
         "llama-8b": "llama-3.1-8b-instant",
-        "llama-70b-specdec": "llama-3.3-70b-specdec",
-        "llama-3.2-1b": "llama-3.2-1b-preview",
-        "llama-3.2-3b": "llama-3.2-3b-preview",
-        "llama-3.2-11b-vision": "llama-3.2-11b-vision-preview",
-        "llama-3.2-90b-vision": "llama-3.2-90b-vision-preview",
-        # Llama 4
-        "llama4-scout": "meta-llama/llama-4-scout-17b-16e-instruct",
-        "llama4-maverick": "meta-llama/llama-4-maverick-17b-128e-instruct",
-        # Mixtral
-        "mixtral": "mixtral-8x7b-32768",
-        # Qwen
-        "qwen-32b": "qwen/qwen3-32b",
-        # Gemma
-        "gemma2-9b": "gemma2-9b-it",
+        "llama-70b": "llama-3.3-70b-versatile",
+        "llama-guard": "meta-llama/llama-guard-4-12b",
+        "gpt-oss-120b": "openai/gpt-oss-120b",
+        "gpt-oss-20b": "openai/gpt-oss-20b",
         # Whisper (audio transcription)
         "whisper": "whisper-large-v3",
         "whisper-turbo": "whisper-large-v3-turbo",
-        "distil-whisper": "distil-whisper-large-v3-en",
     }
 
+    # Pricing per 1K tokens (from https://console.groq.com/docs/models)
     MODEL_PRICING = {
-        "llama-3.3-70b-versatile": {"input": 0.00059, "output": 0.00079},
         "llama-3.1-8b-instant": {"input": 0.00005, "output": 0.00008},
-        "llama-3.3-70b-specdec": {"input": 0.00059, "output": 0.00079},
-        "llama-3.2-1b-preview": {"input": 0.00004, "output": 0.00004},
-        "llama-3.2-3b-preview": {"input": 0.00006, "output": 0.00006},
-        "llama-3.2-11b-vision-preview": {"input": 0.00018, "output": 0.00018},
-        "llama-3.2-90b-vision-preview": {"input": 0.00090, "output": 0.00090},
-        "meta-llama/llama-4-scout-17b-16e-instruct": {"input": 0.00011, "output": 0.00034},
-        "meta-llama/llama-4-maverick-17b-128e-instruct": {"input": 0.00020, "output": 0.00060},
-        "mixtral-8x7b-32768": {"input": 0.00024, "output": 0.00024},
-        "qwen/qwen3-32b": {"input": 0.00029, "output": 0.00039},
-        "gemma2-9b-it": {"input": 0.00020, "output": 0.00020},
+        "llama-3.3-70b-versatile": {"input": 0.00059, "output": 0.00079},
+        "meta-llama/llama-guard-4-12b": {"input": 0.00020, "output": 0.00020},
+        "openai/gpt-oss-120b": {"input": 0.00015, "output": 0.00060},
+        "openai/gpt-oss-20b": {"input": 0.000075, "output": 0.00030},
     }
 
-    # Whisper pricing normalized to tokens (1 token = $0.01)
+    # Whisper pricing per hour (for reference)
+    # whisper-large-v3: $0.111/hr, whisper-large-v3-turbo: $0.04/hr
+    # Normalized to "tokens" for cost tracking (1 token = $0.01)
     WHISPER_TOKENS_PER_HOUR = {
         "whisper-large-v3": 11.1,
         "whisper-large-v3-turbo": 4.0,
-        "distil-whisper-large-v3-en": 2.0,
     }
 
     def __init__(self, config: dict):
+        # Auto-set pricing based on model before calling super().__init__
+        model_alias = config.get("model", "llama-70b")
+        model_id = self.MODEL_MAP.get(model_alias, model_alias)
+        default_pricing = {"input": 0.00015, "output": 0.00060}  # gpt-oss-120b as fallback
+        pricing = self.MODEL_PRICING.get(model_id, default_pricing)
+        config.setdefault("cost_per_1k", pricing)
+
         super().__init__(config)
         self.client = Groq(api_key=self.api_key)
         self.max_tokens = config.get("max_tokens", 4096)

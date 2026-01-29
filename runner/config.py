@@ -64,8 +64,8 @@ DEV_MODE = os.environ.get("POSTMAGIQ_DEV_MODE", "false").lower() == "true"
 # Directory containing workflow configs
 WORKFLOW_CONFIGS_DIR = PROJECT_ROOT / "workflows" / "configs"
 
-# Default config path (legacy symlink for backward compatibility)
-DEFAULT_CONFIG_PATH = PROJECT_ROOT / "workflow_config.yaml"
+# Default config path
+DEFAULT_CONFIG_PATH = WORKFLOW_CONFIGS_DIR / "claude.yaml"
 
 
 def resolve_workflow_config(config: str) -> Path:
