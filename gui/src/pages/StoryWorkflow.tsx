@@ -67,6 +67,23 @@ const STATE_LABEL_OVERRIDES: Record<string, string> = {
   'story-process': 'Story Processing',
 }
 
+// Display names for auditors
+const AUDITOR_DISPLAY_NAMES: Record<string, string> = {
+  'fabrication-auditor': 'Lie Detector',
+  'groq-fabrication-auditor': 'Lie Detector',
+  'ollama-fabrication-auditor': 'Lie Detector',
+  'claude-fabrication-auditor': 'Lie Detector',
+  'style-auditor': 'Randy',
+  'groq-style-auditor': 'Randy',
+  'ollama-style-auditor': 'Randy',
+  'claude-style-auditor': 'Randy',
+}
+
+// Helper to get auditor display name
+function getAuditorDisplayName(agent: string): string {
+  return AUDITOR_DISPLAY_NAMES[agent] || agent
+}
+
 // Helper to format state id to label
 function stateIdToLabel(id: string): string {
   if (STATE_LABEL_OVERRIDES[id]) return STATE_LABEL_OVERRIDES[id]
@@ -852,7 +869,7 @@ Include specific details: error messages, tools used, time spent, etc."
                         {auditResults.map((result, idx) => (
                           <div key={idx} className="border-b border-amber-700/30 pb-2 last:border-b-0 last:pb-0">
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs text-amber-300 font-medium uppercase">{result.agent}</span>
+                              <span className="text-xs text-amber-300 font-medium uppercase">{getAuditorDisplayName(result.agent)}</span>
                               <div className="flex items-center gap-2">
                                 {result.score != null && (
                                   <span className={clsx(
@@ -1236,7 +1253,7 @@ Include specific details: error messages, tools used, time spent, etc."
                       return (
                         <div key={agent} className="border border-slate-700 rounded p-3">
                           <div className="flex items-center justify-between mb-2">
-                            <div className="text-xs text-slate-500 uppercase">{agent}</div>
+                            <div className="text-xs text-slate-500 uppercase">{getAuditorDisplayName(agent)}</div>
                             {parsed && (
                               <div className="flex items-center gap-2">
                                 <span className={clsx(
