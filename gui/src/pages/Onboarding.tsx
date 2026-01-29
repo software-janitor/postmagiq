@@ -16,21 +16,18 @@ import {
 import { clsx } from 'clsx'
 import { useThemeClasses } from '../hooks/useThemeClasses'
 import {
-  startOnboarding,
-  submitQuickMode,
-  startDeepDiscovery,
-  sendDeepMessage,
-  generateFromDeep,
-  approvePlan,
   fetchExistingStrategy,
-  OnboardingQuestion,
+  submitQuickModeV1,
+  sendDeepMessageV1,
+  generateFromDeepV1,
+  approvePlanV1,
+  fetchContentStylesV1,
   GeneratedPlan,
   DeepModeState,
-  QuickModeAnswers,
   ExistingStrategy,
+  V1ContentStyle,
 } from '../api/onboarding'
 import { useWorkspaceStore } from '../stores/workspaceStore'
-import { fetchContentStyles, ContentStyle } from '../api/content'
 import StrategyChatPanel, { ExtractedStrategy } from '../components/StrategyChatPanel'
 
 type Mode = 'select' | 'quick' | 'deep' | 'chat'
@@ -62,13 +59,19 @@ const normalizePlan = (rawPlan: GeneratedPlan | null): GeneratedPlan => {
   }
 }
 
+// Default questions for quick mode (no longer fetched from server)
+const QUICK_QUESTIONS = [
+  { id: 'professional_role', question: 'What is your professional role?', type: 'text' as const, placeholder: 'e.g., Marketing Director, Software Engineer, Consultant' },
+  { id: 'known_for', question: 'What do you want to be known for?', type: 'text' as const, placeholder: 'e.g., AI expertise, growth marketing, leadership insights' },
+  { id: 'target_audience', question: 'Who is your target audience?', type: 'text' as const, placeholder: 'e.g., CTOs, early-stage founders, marketing professionals' },
+  { id: 'content_style', question: 'What content style do you prefer?', type: 'text' as const, placeholder: 'e.g., educational, storytelling, thought leadership' },
+  { id: 'posts_per_week', question: 'How many posts per week?', type: 'text' as const, placeholder: 'e.g., 2, 3, 5' },
+]
+
 export default function Onboarding() {
   const theme = useThemeClasses()
   const [step, setStep] = useState<Step>('existing')
   const [mode, setMode] = useState<Mode>('select')
-  const [userId, setUserId] = useState<string | null>(null)
-  const [userName, setUserName] = useState('')
-  const [userEmail, setUserEmail] = useState('')
   const [existingStrategy, setExistingStrategy] = useState<ExistingStrategy | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const workspaceId = useWorkspaceStore((s) => s.currentWorkspaceId)
@@ -93,14 +96,13 @@ export default function Onboarding() {
   }, [strategyData, step])
 
   // Quick mode state
-  const [questions, setQuestions] = useState<OnboardingQuestion[]>([])
   const [currentQuestion, setCurrentQuestion] = useState(0)
   const [answers, setAnswers] = useState<Record<string, string>>({})
 
   // Deep mode state
   const [deepState, setDeepState] = useState<DeepModeState | null>(null)
   const [deepInput, setDeepInput] = useState('')
-  const [contentStyles, setContentStyles] = useState<ContentStyle[]>([])
+  const [contentStyles, setContentStyles] = useState<V1ContentStyle[]>([])
   const [selectedStyle, setSelectedStyle] = useState('mixed')
   const availableStyles =
     contentStyles.length > 0
@@ -110,41 +112,20 @@ export default function Onboarding() {
             id: 'mixed',
             name: 'Mixed',
             description: 'Combination based on topic',
-            chapter_framing: 'Flexible framing',
           },
         ]
 
   // Generated plan
   const [plan, setPlan] = useState<GeneratedPlan | null>(null)
 
-  // Mutations
-  const startMutation = useMutation({
-    mutationFn: () => startOnboarding(userName, userEmail || undefined),
-    onSuccess: (data) => {
-      setUserId(data.user_id)
-      setQuestions(data.questions)
-      setErrorMessage(null)
-    },
-    onError: (error) => {
-      setErrorMessage(`Failed to start onboarding: ${getErrorMessage(error)}`)
-    },
-  })
-
-  const deepStartMutation = useMutation({
-    mutationFn: startDeepDiscovery,
-    onSuccess: (data) => {
-      setDeepState(data.state)
-      setStep('setup')
-      setErrorMessage(null)
-    },
-    onError: (error) => {
-      setErrorMessage(`Failed to start deep discovery: ${getErrorMessage(error)}`)
-    },
-  })
-
+  // Mutations using v1 workspace-scoped endpoints
   const deepMessageMutation = useMutation({
     mutationFn: (payload: { message: string; forceReady?: boolean }) =>
-      sendDeepMessage(userId!, payload.message, deepState!, payload.forceReady),
+      sendDeepMessageV1(workspaceId!, {
+        message: payload.message,
+        state: deepState,
+        force_ready: payload.forceReady,
+      }),
     onSuccess: (data) => {
       setDeepState(data.state)
       setErrorMessage(null)
@@ -155,7 +136,14 @@ export default function Onboarding() {
   })
 
   const quickSubmitMutation = useMutation({
-    mutationFn: (data: QuickModeAnswers) => submitQuickMode(data),
+    mutationFn: () =>
+      submitQuickModeV1(workspaceId!, {
+        professional_role: answers.professional_role || '',
+        known_for: answers.known_for || '',
+        target_audience: answers.target_audience || '',
+        content_style: answers.content_style || 'mixed',
+        posts_per_week: parseInt(answers.posts_per_week || '2'),
+      }),
     onSuccess: (data) => {
       setPlan(normalizePlan(data.plan))
       setStep('plan')
@@ -167,7 +155,11 @@ export default function Onboarding() {
   })
 
   const deepGenerateMutation = useMutation({
-    mutationFn: () => generateFromDeep(userId!, selectedStyle, deepState!),
+    mutationFn: () =>
+      generateFromDeepV1(workspaceId!, {
+        content_style: selectedStyle,
+        state: deepState!,
+      }),
     onSuccess: (data) => {
       setPlan(normalizePlan(data.plan))
       setStep('plan')
@@ -180,8 +172,7 @@ export default function Onboarding() {
 
   const approveMutation = useMutation({
     mutationFn: () =>
-      approvePlan({
-        user_id: userId!,
+      approvePlanV1(workspaceId!, {
         plan: plan!,
         positioning: answers.positioning || answers.known_for || 'Content Creator',
         target_audience: answers.target_audience || 'Professionals',
@@ -197,7 +188,6 @@ export default function Onboarding() {
           mode === 'deep'
             ? JSON.stringify(deepState?.messages)
             : undefined,
-        workspace_id: workspaceId,
       }),
     onSuccess: () => {
       setStep('complete')
@@ -209,39 +199,36 @@ export default function Onboarding() {
   })
 
   const handleModeSelect = async (selectedMode: Mode) => {
+    if (!workspaceId) {
+      setErrorMessage('No workspace selected')
+      return
+    }
     setErrorMessage(null)
     setMode(selectedMode)
+
     if (selectedMode === 'quick') {
-      try {
-        await startMutation.mutateAsync()
-      } catch {
-        return
-      }
       setStep('setup')
     } else if (selectedMode === 'chat') {
-      try {
-        await startMutation.mutateAsync()
-      } catch {
-        return
-      }
       setStep('chat')
     } else if (selectedMode === 'deep') {
+      // Load content styles for deep mode
       try {
-        await startMutation.mutateAsync()
-      } catch {
-        return
-      }
-      try {
-        const stylesResult = await fetchContentStyles()
+        const stylesResult = await fetchContentStylesV1(workspaceId)
         setContentStyles(stylesResult.styles)
       } catch (error) {
         setContentStyles([])
         setErrorMessage(`Failed to load content styles: ${getErrorMessage(error)}`)
       }
+      // Start deep mode by sending initial message
       try {
-        await deepStartMutation.mutateAsync()
-      } catch {
-        return
+        const response = await sendDeepMessageV1(workspaceId, {
+          message: "Let's start building my content strategy.",
+          state: null,
+        })
+        setDeepState(response.state)
+        setStep('setup')
+      } catch (error) {
+        setErrorMessage(`Failed to start deep discovery: ${getErrorMessage(error)}`)
       }
     }
   }
@@ -278,33 +265,22 @@ export default function Onboarding() {
   }
 
   const handleQuickAnswer = (value: string) => {
-    const questionId = questions[currentQuestion].id
+    const questionId = QUICK_QUESTIONS[currentQuestion].id
     setAnswers({ ...answers, [questionId]: value })
   }
 
   const handleQuickNext = async () => {
-    if (currentQuestion < questions.length - 1) {
+    if (currentQuestion < QUICK_QUESTIONS.length - 1) {
       setCurrentQuestion(currentQuestion + 1)
     } else {
       // Submit all answers
-      if (!userId) {
-        setErrorMessage('User is not ready yet. Please try again.')
-        return
-      }
-      await quickSubmitMutation.mutateAsync({
-        user_id: userId!,
-        professional_role: answers.professional_role || '',
-        known_for: answers.known_for || '',
-        target_audience: answers.target_audience || '',
-        content_style: answers.content_style || 'mixed',
-        posts_per_week: parseInt(answers.posts_per_week || '2'),
-      })
+      await quickSubmitMutation.mutateAsync()
     }
   }
 
   const handleDeepSend = async () => {
     if (!deepInput.trim()) return
-    if (!userId || !deepState) {
+    if (!deepState) {
       setErrorMessage('Deep discovery is not ready yet.')
       return
     }
@@ -313,7 +289,7 @@ export default function Onboarding() {
   }
 
   const handleForceReady = async () => {
-    if (!userId || !deepState) {
+    if (!deepState) {
       setErrorMessage('Deep discovery is not ready yet.')
       return
     }
@@ -324,7 +300,7 @@ export default function Onboarding() {
   }
 
   const handleGeneratePlan = async () => {
-    if (!userId || !deepState) {
+    if (!deepState) {
       setErrorMessage('Deep discovery is not ready yet.')
       return
     }
@@ -485,49 +461,21 @@ export default function Onboarding() {
               </p>
             </div>
 
-            {/* User Info */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Your Name
-                </label>
-                <input
-                  type="text"
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  placeholder="Your Name"
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-400 mb-2">
-                  Email (optional)
-                </label>
-                <input
-                  type="email"
-                  value={userEmail}
-                  onChange={(e) => setUserEmail(e.target.value)}
-                  placeholder="matt@example.com"
-                  className="w-full px-4 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                />
-              </div>
-            </div>
-
             {/* Mode Selection */}
             <div className="grid grid-cols-3 gap-4">
               <button
                 onClick={() => handleModeSelect('quick')}
-                disabled={!userName || startMutation.isPending}
+                disabled={!workspaceId}
                 className="p-6 bg-slate-900 rounded-lg border border-slate-600 hover:border-blue-500 transition-colors text-left disabled:opacity-50"
               >
                 <Zap className={clsx('w-8 h-8 mb-3', theme.iconPrimary)} />
                 <h3 className="text-white font-semibold mb-1">Quick Setup</h3>
-                <p className="text-slate-400 text-sm">5-7 questions, ~5 minutes</p>
+                <p className="text-slate-400 text-sm">5 questions, ~3 minutes</p>
               </button>
 
               <button
                 onClick={() => handleModeSelect('chat')}
-                disabled={!userName || startMutation.isPending}
+                disabled={!workspaceId}
                 className={clsx('p-6 bg-slate-900 rounded-lg border border-slate-600 transition-colors text-left disabled:opacity-50', theme.borderHover)}
               >
                 <Sparkles className={clsx('w-8 h-8 mb-3', theme.iconPrimary)} />
@@ -537,7 +485,7 @@ export default function Onboarding() {
 
               <button
                 onClick={() => handleModeSelect('deep')}
-                disabled={!userName || startMutation.isPending}
+                disabled={!workspaceId}
                 className="p-6 bg-slate-900 rounded-lg border border-slate-600 hover:border-blue-500 transition-colors text-left disabled:opacity-50"
               >
                 <MessageSquare className="w-8 h-8 text-blue-400 mb-3" />
@@ -545,58 +493,31 @@ export default function Onboarding() {
                 <p className="text-slate-400 text-sm">Guided conversation, ~15 minutes</p>
               </button>
             </div>
-
-            {startMutation.isPending && (
-              <div className="flex items-center gap-2 text-slate-400">
-                <Loader2 className="w-5 h-5 animate-spin" />
-                Starting...
-              </div>
-            )}
           </div>
         )}
 
         {/* Quick Mode Setup */}
-        {step === 'setup' && mode === 'quick' && questions.length > 0 && (
+        {step === 'setup' && mode === 'quick' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-white">
-                Question {currentQuestion + 1} of {questions.length}
+                Question {currentQuestion + 1} of {QUICK_QUESTIONS.length}
               </h2>
               <div className="text-slate-400 text-sm">
-                {Math.round(((currentQuestion + 1) / questions.length) * 100)}% complete
+                {Math.round(((currentQuestion + 1) / QUICK_QUESTIONS.length) * 100)}% complete
               </div>
             </div>
 
             <div className="space-y-4">
-              <p className="text-white text-lg">{questions[currentQuestion].question}</p>
+              <p className="text-white text-lg">{QUICK_QUESTIONS[currentQuestion].question}</p>
 
-              {questions[currentQuestion].type === 'text' ? (
-                <input
-                  type="text"
-                  value={answers[questions[currentQuestion].id] || ''}
-                  onChange={(e) => handleQuickAnswer(e.target.value)}
-                  placeholder={questions[currentQuestion].placeholder}
-                  className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
-                />
-              ) : (
-                <div className="space-y-2">
-                  {questions[currentQuestion].options?.map((option) => (
-                    <button
-                      key={option.id}
-                      onClick={() => handleQuickAnswer(option.id)}
-                      className={clsx(
-                        'w-full p-4 rounded-lg border text-left transition-colors',
-                        answers[questions[currentQuestion].id] === option.id
-                          ? 'bg-blue-600/20 border-blue-500'
-                          : 'bg-slate-900 border-slate-600 hover:border-slate-500'
-                      )}
-                    >
-                      <div className="text-white font-medium">{option.name}</div>
-                      <div className="text-slate-400 text-sm">{option.description}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
+              <input
+                type="text"
+                value={answers[QUICK_QUESTIONS[currentQuestion].id] || ''}
+                onChange={(e) => handleQuickAnswer(e.target.value)}
+                placeholder={QUICK_QUESTIONS[currentQuestion].placeholder}
+                className="w-full px-4 py-3 bg-slate-900 border border-slate-600 rounded-lg text-white focus:outline-none focus:border-blue-500"
+              />
             </div>
 
             <div className="flex justify-between">
@@ -612,7 +533,7 @@ export default function Onboarding() {
               </button>
               <button
                 onClick={handleQuickNext}
-                disabled={!answers[questions[currentQuestion].id] || quickSubmitMutation.isPending}
+                disabled={!answers[QUICK_QUESTIONS[currentQuestion].id] || quickSubmitMutation.isPending}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:opacity-50 flex items-center gap-2"
               >
                 {quickSubmitMutation.isPending ? (
@@ -620,7 +541,7 @@ export default function Onboarding() {
                     <Loader2 className="w-4 h-4 animate-spin" />
                     Generating...
                   </>
-                ) : currentQuestion < questions.length - 1 ? (
+                ) : currentQuestion < QUICK_QUESTIONS.length - 1 ? (
                   <>
                     Next <ChevronRight className="w-4 h-4" />
                   </>
@@ -819,7 +740,7 @@ export default function Onboarding() {
               </button>
               <button
                 onClick={() => approveMutation.mutate()}
-                disabled={approveMutation.isPending || !userId}
+                disabled={approveMutation.isPending || !workspaceId}
                 className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 disabled:opacity-50 flex items-center gap-2"
               >
                 {approveMutation.isPending ? (
