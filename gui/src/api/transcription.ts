@@ -69,10 +69,10 @@ export async function getUsageSummary(workspaceId: string): Promise<UsageSummary
 
 /**
  * Check if workspace has premium tier (voice/youtube transcription enabled).
- * Updated for new tier structure: starter, pro, business are premium.
+ * Premium tiers: pro, max (includes voice & youtube transcription).
  */
 export function isPremiumTier(tierSlug: string): boolean {
-  const premiumTiers = ['starter', 'pro', 'business', 'individual', 'team', 'agency']
+  const premiumTiers = ['pro', 'max']
   return premiumTiers.includes(tierSlug)
 }
 

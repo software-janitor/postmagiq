@@ -196,7 +196,7 @@ export default function StoryWorkflow() {
   const creditsUsed = usageSummary?.credits?.used || 0
   const creditsLimit = usageSummary?.credits?.limit || 10
   const creditsRemaining = usageSummary?.credits?.remaining || 0
-  const tierName = usageSummary?.tier?.name || 'Free'
+  const tierName = usageSummary?.tier?.name || 'Free Trial'
   const tierSlug = usageSummary?.tier?.slug || 'free'
 
   // Is this the free tier?
@@ -740,15 +740,15 @@ export default function StoryWorkflow() {
               </button>
             </div>
 
-            {/* Free tier upgrade banner */}
+            {/* Free trial upgrade banner */}
             {isFreeTier && (
               <div className="flex items-center gap-3 text-sm bg-gradient-to-r from-slate-800/50 to-amber-900/20 border border-amber-700/30 rounded-lg px-4 py-3">
                 <Zap className="w-5 h-5 text-amber-500 flex-shrink-0" />
                 <div className="flex-1">
-                  <span className="text-slate-300">Free tier: Basic AI, {creditsLimit} credits/month</span>
+                  <span className="text-slate-300">Free Trial: {creditsLimit} credits</span>
                   <span className="text-slate-500 mx-2">•</span>
                   <a href="/settings" className="text-amber-500 hover:text-amber-400 font-medium">
-                    Upgrade for premium quality
+                    Upgrade to Base ($3.50/mo)
                   </a>
                 </div>
               </div>
@@ -780,7 +780,7 @@ export default function StoryWorkflow() {
             {!hasVoiceTranscription && (inputMethod === 'type') && (
               <div className="flex items-center gap-2 text-sm text-slate-400 bg-slate-800/50 rounded-lg px-3 py-2">
                 <Crown className="w-4 h-4 text-amber-500" />
-                <span>Upgrade to Starter ($1/mo) to unlock Voice transcription</span>
+                <span>Upgrade to Pro ($10/mo) to unlock Voice transcription</span>
               </div>
             )}
 

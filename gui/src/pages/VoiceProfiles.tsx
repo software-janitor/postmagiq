@@ -88,9 +88,9 @@ export default function VoiceProfiles() {
   const [autoSlug, setAutoSlug] = useState(true)
 
   // Fetch voice profiles
-  const { data: profilesData, isLoading } = useQuery({
+  const { data: profiles = [], isLoading } = useQuery({
     queryKey: ['voice-profiles', workspaceId],
-    queryFn: () => apiGet<{ profiles: VoiceProfile[] }>(`/v1/w/${workspaceId}/voice-profiles`),
+    queryFn: () => apiGet<VoiceProfile[]>(`/v1/w/${workspaceId}/voice-profiles`),
     enabled: !!workspaceId,
   })
 
@@ -101,7 +101,6 @@ export default function VoiceProfiles() {
     enabled: !!workspaceId && !!selectedProfile && showPreviewModal,
   })
 
-  const profiles = profilesData?.profiles || []
   const selectedProfileData = profiles.find(p => p.id === selectedProfile)
 
   // Auto-select first profile
