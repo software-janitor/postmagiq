@@ -71,11 +71,13 @@ export default function Settings() {
   const { data: agents } = useQuery({
     queryKey: ['agents'],
     queryFn: () => apiGet<{ agents: Array<{ name: string; enabled: boolean; context_window: number; cost_per_1k: { input: number; output: number } }> }>('/config/agents'),
+    enabled: flags.show_internal_workflow,
   })
 
   const { data: personas } = useQuery({
     queryKey: ['personas'],
     queryFn: () => apiGet<{ personas: Array<{ name: string; path: string }> }>('/config/personas'),
+    enabled: flags.show_ai_personas,
   })
 
   return (
@@ -343,48 +345,50 @@ export default function Settings() {
         </div>
       </div>
 
-      {/* Agents */}
-      <div className="bg-slate-800 rounded-lg border border-slate-700">
-        <div className="p-4 border-b border-slate-700">
-          <h2 className="text-lg font-semibold text-white">Agents</h2>
-        </div>
-        <div className="p-4">
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-sm text-slate-400">
-                <th className="pb-2">Agent</th>
-                <th className="pb-2">Status</th>
-                <th className="pb-2">Context Window</th>
-                <th className="pb-2">Cost (Input)</th>
-                <th className="pb-2">Cost (Output)</th>
-              </tr>
-            </thead>
-            <tbody className="text-white">
-              {agents?.agents.map((agent) => (
-                <tr key={agent.name}>
-                  <td className="py-2 font-medium">{agent.name}</td>
-                  <td className="py-2">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      agent.enabled ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                    }`}>
-                      {agent.enabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </td>
-                  <td className="py-2 text-slate-300">
-                    {agent.context_window?.toLocaleString() || '-'}
-                  </td>
-                  <td className="py-2 text-slate-300">
-                    ${agent.cost_per_1k?.input?.toFixed(5) || '-'}/1k
-                  </td>
-                  <td className="py-2 text-slate-300">
-                    ${agent.cost_per_1k?.output?.toFixed(5) || '-'}/1k
-                  </td>
+      {/* Agents - internal only */}
+      {flags.show_internal_workflow && (
+        <div className="bg-slate-800 rounded-lg border border-slate-700">
+          <div className="p-4 border-b border-slate-700">
+            <h2 className="text-lg font-semibold text-white">Agents</h2>
+          </div>
+          <div className="p-4">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-sm text-slate-400">
+                  <th className="pb-2">Agent</th>
+                  <th className="pb-2">Status</th>
+                  <th className="pb-2">Context Window</th>
+                  <th className="pb-2">Cost (Input)</th>
+                  <th className="pb-2">Cost (Output)</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="text-white">
+                {agents?.agents.map((agent) => (
+                  <tr key={agent.name}>
+                    <td className="py-2 font-medium">{agent.name}</td>
+                    <td className="py-2">
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        agent.enabled ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {agent.enabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </td>
+                    <td className="py-2 text-slate-300">
+                      {agent.context_window?.toLocaleString() || '-'}
+                    </td>
+                    <td className="py-2 text-slate-300">
+                      ${agent.cost_per_1k?.input?.toFixed(5) || '-'}/1k
+                    </td>
+                    <td className="py-2 text-slate-300">
+                      ${agent.cost_per_1k?.output?.toFixed(5) || '-'}/1k
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Personas */}
       {flags.show_ai_personas && (
@@ -413,47 +417,49 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Circuit Breaker */}
-      <div className="bg-slate-800 rounded-lg border border-slate-700">
-        <div className="p-4 border-b border-slate-700">
-          <h2 className="text-lg font-semibold text-white">Circuit Breaker Limits</h2>
+      {/* Circuit Breaker - internal only */}
+      {flags.show_internal_workflow && (
+        <div className="bg-slate-800 rounded-lg border border-slate-700">
+          <div className="p-4 border-b border-slate-700">
+            <h2 className="text-lg font-semibold text-white">Circuit Breaker Limits</h2>
+          </div>
+          <div className="p-4 grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">State Visit Limit</label>
+              <input
+                type="number"
+                defaultValue={3}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Transition Limit</label>
+              <input
+                type="number"
+                defaultValue={20}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Timeout (seconds)</label>
+              <input
+                type="number"
+                defaultValue={1800}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Cost Limit ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                defaultValue={5.00}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
+              />
+            </div>
+          </div>
         </div>
-        <div className="p-4 grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">State Visit Limit</label>
-            <input
-              type="number"
-              defaultValue={3}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">Transition Limit</label>
-            <input
-              type="number"
-              defaultValue={20}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">Timeout (seconds)</label>
-            <input
-              type="number"
-              defaultValue={1800}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">Cost Limit ($)</label>
-            <input
-              type="number"
-              step="0.01"
-              defaultValue={5.00}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
-            />
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   )
 }
