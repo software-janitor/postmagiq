@@ -383,7 +383,11 @@ class VoiceService:
                 "title": s.title,
                 "content": s.content,
                 "word_count": s.word_count,
-                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "created_at": (
+                    s.created_at if isinstance(s.created_at, str)
+                    else s.created_at.isoformat() if s.created_at
+                    else None
+                ),
             }
             for s in samples
         ]
