@@ -10,6 +10,7 @@ import UsageBar from '../components/UsageBar'
 import BillingSection from '../components/BillingSection'
 import NotificationSettings from '../components/NotificationSettings'
 import WorkflowConfigSelector from '../components/WorkflowConfigSelector'
+import SocialConnections from '../components/SocialConnections'
 
 interface UsageSummary {
   period_start: string
@@ -289,6 +290,9 @@ export default function Settings() {
           </div>
         </div>
       )}
+
+      {/* Connected Accounts for Direct Publishing */}
+      <SocialConnections />
 
       {/* Payment Methods & Invoices */}
       <BillingSection />
