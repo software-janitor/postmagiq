@@ -2,6 +2,10 @@
 # WORKFLOW ORCHESTRATOR MAKEFILE
 # ============================================================================
 
+# CI configuration - exclude e2e tests (they cost money)
+TEST_DIRS := tests/unit tests/integration
+SRC_DIRS := runner api
+
 # Include CI reporting (provides ci-report target)
 include Makefile.ci
 
