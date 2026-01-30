@@ -9,6 +9,7 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlmodel import Session
 
 from api.auth.jwt import verify_token
+from api.auth.providers import get_provider
 from api.auth.service import AuthService
 from api.services.email_service import email_service
 from api.utils.role_flags import get_flags_for_user
@@ -68,6 +69,21 @@ class MessageResponse(BaseModel):
 def get_auth_service(session: Session = Depends(get_session_dependency)) -> AuthService:
     """Dependency to get AuthService with database session."""
     return AuthService(session)
+
+
+def require_local_auth() -> None:
+    """Dependency to require local authentication support.
+
+    Raises 400 if the configured auth provider doesn't support local auth.
+    Use this on login, register, and password reset routes.
+    """
+    provider = get_provider()
+    if not provider.supports_local_auth:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"This endpoint is not available with {provider.name} authentication. "
+            f"Please use the {provider.name} login flow instead.",
+        )
 
 
 def get_current_user(
@@ -147,6 +163,7 @@ def get_current_user(
 def register(
     request: RegisterRequest,
     req: Request,
+    _: None = Depends(require_local_auth),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
     """Register a new user.
@@ -181,6 +198,7 @@ def register(
 def login(
     request: LoginRequest,
     req: Request,
+    _: None = Depends(require_local_auth),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> TokenResponse:
     """Authenticate user and return tokens.
@@ -399,6 +417,7 @@ def update_user_role(
 @router.post("/forgot-password", response_model=MessageResponse)
 def forgot_password(
     request: ForgotPasswordRequest,
+    _: None = Depends(require_local_auth),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> MessageResponse:
     """Request a password reset email.
@@ -422,6 +441,7 @@ def forgot_password(
 @router.post("/reset-password", response_model=MessageResponse)
 def reset_password(
     request: ResetPasswordRequest,
+    _: None = Depends(require_local_auth),
     auth_service: AuthService = Depends(get_auth_service),
 ) -> MessageResponse:
     """Reset password using a reset token.

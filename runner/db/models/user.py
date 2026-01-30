@@ -51,6 +51,11 @@ class User(UUIDModel, UserBase, TimestampMixin, table=True):
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
 
+    # External auth provider fields
+    # For users authenticated via external providers (Clerk, Auth0, etc.)
+    external_id: Optional[str] = Field(default=None, index=True)
+    external_provider: Optional[str] = Field(default=None)
+
     # User-level role for feature flags
     role: UserRole = Field(default=UserRole.user)
 
