@@ -55,7 +55,7 @@ ci-report:
 		docker compose $(COMPOSE_FILES) up -d 2>&1 | tee -a $(CI_REPORT); \
 		echo "Waiting for API to start..."; \
 		sleep 15; \
-		if curl -sf http://localhost:8002/health > /dev/null; then \
+		if curl -sf http://localhost:8002/api/health > /dev/null; then \
 			BUILD_OK=1; \
 			echo "✅ BUILD: PASSED (API healthy)" >> $(CI_REPORT); \
 		else \
