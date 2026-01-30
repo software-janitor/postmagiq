@@ -98,7 +98,7 @@ def upgrade() -> None:
     # Reset tier_features with correct feature distribution
     # Free/Base: basic generation + direct publishing
     # Pro: + voice transcription, youtube transcription
-    # Max: + team workspaces, API access (enterprise)
+    # Max: + team workspaces, API access
     # ==========================================================================
 
     # Clear existing features
