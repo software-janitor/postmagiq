@@ -108,7 +108,7 @@ class VoiceService:
         # Groq configuration
         if self.llm_provider == "groq":
             self.groq_api_key = os.environ.get("GROQ_API_KEY", "")
-            self.model = os.environ.get("VOICE_MODEL", "llama-3.3-70b-versatile")
+            self.model = os.environ.get("VOICE_MODEL", "openai/gpt-oss-120b")
             if Groq and self.groq_api_key:
                 self.groq_client = Groq(api_key=self.groq_api_key)
             else:
