@@ -12,7 +12,6 @@ Simplifies pricing to 4 tiers:
 """
 
 from alembic import op
-import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "simplify_tiers"
