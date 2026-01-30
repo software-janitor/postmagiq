@@ -6,8 +6,21 @@
 TEST_DIRS := tests/unit tests/integration
 SRC_DIRS := runner api
 
-# Include CI reporting (provides ci-report target)
-include Makefile.ci
+# Override ci-report to start database first
+ci-report: ci-db-up
+	@$(MAKE) -f Makefile.ci ci-report || ($(MAKE) ci-db-down && exit 1)
+	@$(MAKE) ci-db-down
+
+ci-db-up:
+	@echo "Starting database for CI..."
+	@docker compose up -d postgres pgbouncer
+	@sleep 3
+	@docker compose exec postgres pg_isready -U orchestrator || sleep 5
+	@cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator alembic upgrade head
+
+ci-db-down:
+	@echo "Stopping CI database..."
+	@docker compose stop postgres pgbouncer
 
 .PHONY: help setup install-hooks install-deps install-gui-deps install-gh check-env \
         workflow workflow-interactive workflow-step list-configs check-config test test-unit test-int test-e2e \
@@ -16,7 +29,7 @@ include Makefile.ci
         eval-agents eval-costs eval-trend eval-post eval-summary \
         seed-db seed-db-force seed-voices seed-personas seed-sentiments sync-workflows \
         db-up db-down db-migrate db-rollback db-revision db-history db-current db-migrate-data db-init db-drop db-shell \
-        pr ci-report
+        pr ci-report ci-db-up ci-db-down
 
 # Default target
 help:
