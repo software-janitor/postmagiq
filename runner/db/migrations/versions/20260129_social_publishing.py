@@ -53,9 +53,7 @@ def upgrade() -> None:
     )
 
     # Indexes for social_connections
-    op.create_index(
-        "ix_social_connections_user_id", "social_connections", ["user_id"]
-    )
+    op.create_index("ix_social_connections_user_id", "social_connections", ["user_id"])
     op.create_index(
         "ix_social_connections_workspace_id", "social_connections", ["workspace_id"]
     )

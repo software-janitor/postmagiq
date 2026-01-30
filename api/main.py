@@ -35,6 +35,8 @@ from api.routes.v1 import (
     onboarding_router,
     finished_posts_router,
     transcription_router,
+    social_auth_router,
+    publishing_router,
 )
 from api.routes.deprecated import finished_posts as deprecated_finished_posts
 from api.middleware import (
@@ -120,6 +122,8 @@ app.include_router(voice_router, prefix="/api", tags=["voice"])
 app.include_router(onboarding_router, prefix="/api", tags=["onboarding-v1"])
 app.include_router(finished_posts_router, prefix="/api", tags=["finished-posts-v1"])
 app.include_router(transcription_router, prefix="/api", tags=["transcription"])
+app.include_router(social_auth_router, prefix="/api", tags=["social"])
+app.include_router(publishing_router, prefix="/api", tags=["publishing"])
 
 # Deprecated routes (for backwards compatibility)
 app.include_router(

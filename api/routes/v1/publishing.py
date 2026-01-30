@@ -41,7 +41,8 @@ class PublishRequest(BaseModel):
 
     post_id: UUID = Field(..., description="ID of the post to publish")
     content: Optional[str] = Field(
-        None, description="Optional content override (uses post content if not provided)"
+        None,
+        description="Optional content override (uses post content if not provided)",
     )
 
 
@@ -259,9 +260,7 @@ async def schedule_post(
 ) -> ScheduledPostRead:
     """Schedule a post for future publishing."""
     # Validate connection
-    await _get_connection(
-        session, request.connection_id, ctx.workspace_id, ctx.user_id
-    )
+    await _get_connection(session, request.connection_id, ctx.workspace_id, ctx.user_id)
 
     # Validate post
     post = session.get(Post, request.post_id)
@@ -276,7 +275,9 @@ async def schedule_post(
     if scheduled_for.tzinfo is None:
         scheduled_for = scheduled_for.replace(tzinfo=timezone.utc)
     if scheduled_for <= now:
-        raise HTTPException(status_code=400, detail="Scheduled time must be in the future")
+        raise HTTPException(
+            status_code=400, detail="Scheduled time must be in the future"
+        )
 
     # Create scheduled post
     scheduled = ScheduledPost(
@@ -347,7 +348,10 @@ async def cancel_scheduled_post(
     if scheduled.workspace_id != ctx.workspace_id:
         raise HTTPException(status_code=403, detail="Not in this workspace")
 
-    if scheduled.status not in [ScheduledPostStatus.pending, ScheduledPostStatus.failed]:
+    if scheduled.status not in [
+        ScheduledPostStatus.pending,
+        ScheduledPostStatus.failed,
+    ]:
         raise HTTPException(
             status_code=400,
             detail=f"Cannot cancel post with status: {scheduled.status}",

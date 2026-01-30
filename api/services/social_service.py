@@ -124,9 +124,7 @@ class LinkedInService:
                         "shareMediaCategory": "NONE",
                     }
                 },
-                "visibility": {
-                    "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"
-                },
+                "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"},
             }
 
             response = await client.post(
