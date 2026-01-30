@@ -31,7 +31,7 @@ def upgrade() -> None:
         UPDATE subscription_tiers SET
             name = 'Free Trial',
             slug = 'free',
-            description = 'Try Postmagiq with 10 free credits',
+            description = '10 credits to try Postmagiq',
             price_monthly = 0,
             price_yearly = 0,
             posts_per_month = 10,
@@ -48,7 +48,7 @@ def upgrade() -> None:
         UPDATE subscription_tiers SET
             name = 'Base',
             slug = 'base',
-            description = 'Premium AI models and voice learning',
+            description = '50 credits per month',
             price_monthly = 3.50,
             price_yearly = 35,
             posts_per_month = 50,
@@ -65,7 +65,7 @@ def upgrade() -> None:
         UPDATE subscription_tiers SET
             name = 'Pro',
             slug = 'pro',
-            description = 'YouTube transcription and priority support',
+            description = '200 credits + YouTube transcription',
             price_monthly = 10,
             price_yearly = 100,
             posts_per_month = 200,
@@ -82,7 +82,7 @@ def upgrade() -> None:
         UPDATE subscription_tiers SET
             name = 'Max',
             slug = 'max',
-            description = 'Team workspaces, API access, everything',
+            description = '500 credits + team workspaces',
             price_monthly = 20,
             price_yearly = 200,
             posts_per_month = 500,
