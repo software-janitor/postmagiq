@@ -8,6 +8,11 @@ from pydantic import BaseModel
 
 import requests
 
+try:
+    from groq import Groq
+except ImportError:
+    Groq = None
+
 from api.services.content_service import ContentService
 from runner.content.models import VOICE_PROMPTS
 
@@ -97,11 +102,44 @@ class VoiceService:
 
     def __init__(self, content_service: Optional[ContentService] = None):
         self.content_service = content_service or ContentService()
-        self.ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-        self.model = os.environ.get("VOICE_MODEL", "llama3.2")
+        self.llm_provider = os.environ.get("LLM_PROVIDER", "ollama")
         self.timeout = 180  # Voice analysis can take longer
 
+        # Groq configuration
+        if self.llm_provider == "groq":
+            self.groq_api_key = os.environ.get("GROQ_API_KEY", "")
+            self.model = os.environ.get("VOICE_MODEL", "llama-3.3-70b-versatile")
+            if Groq and self.groq_api_key:
+                self.groq_client = Groq(api_key=self.groq_api_key)
+            else:
+                self.groq_client = None
+        else:
+            # Ollama configuration
+            self.ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
+            self.model = os.environ.get(
+                "VOICE_MODEL", os.environ.get("OLLAMA_MODEL", "llama3.2")
+            )
+            self.groq_client = None
+
     def _call_llm(self, prompt: str) -> str:
+        """Call LLM based on configured provider."""
+        if self.llm_provider == "groq" and self.groq_client:
+            return self._call_groq(prompt)
+        return self._call_ollama(prompt)
+
+    def _call_groq(self, prompt: str) -> str:
+        """Call Groq LLM."""
+        try:
+            response = self.groq_client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=4096,
+            )
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            raise RuntimeError(f"Groq LLM request failed: {e}")
+
+    def _call_ollama(self, prompt: str) -> str:
         """Call Ollama LLM."""
         try:
             response = requests.post(
@@ -117,7 +155,7 @@ class VoiceService:
             data = response.json()
             return data.get("response", "")
         except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"LLM request failed: {e}")
+            raise RuntimeError(f"Ollama LLM request failed: {e}")
 
     def _parse_json_response(self, response: str) -> dict:
         """Extract JSON from LLM response."""
