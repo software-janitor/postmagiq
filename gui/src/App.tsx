@@ -19,6 +19,10 @@ import Approvals from './pages/Approvals'
 import WhitelabelSettings from './pages/settings/WhitelabelSettings'
 import PrivacySettings from './pages/settings/PrivacySettings'
 
+// Public pages (no auth required)
+import Privacy from './pages/Privacy'
+import Terms from './pages/Terms'
+
 // Auth pages
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
@@ -62,6 +66,10 @@ function WorkspaceLoader({ children }: { children: React.ReactNode }) {
 function App() {
   return (
     <Routes>
+      {/* Public routes (no auth required) */}
+      <Route path="/privacy" element={<Privacy />} />
+      <Route path="/terms" element={<Terms />} />
+
       {/* Auth routes (no layout) */}
       <Route path="/auth/login" element={<Login />} />
       <Route path="/auth/register" element={<Register />} />
