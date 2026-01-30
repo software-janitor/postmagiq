@@ -5,55 +5,102 @@
 # CI configuration
 TEST_DIRS := tests/unit tests/integration
 SRC_DIRS := runner api
+CI_REPORT := ci-report.txt
 
-# Full CI: lint, build containers, start services, test, stop
+# Use bash for PIPESTATUS support
+SHELL := /bin/bash
+
+# Full CI: lint, format, Docker build, tests, stop
 ci-report:
-	@echo "=============================================="
-	@echo "CI REPORT - $$(date)"
-	@echo "=============================================="
-	@FAILED=0; \
+	@echo "================================================" > $(CI_REPORT)
+	@echo "CI BUILD REPORT - $$(date)" >> $(CI_REPORT)
+	@echo "================================================" >> $(CI_REPORT)
+	@echo "" >> $(CI_REPORT)
+	@LINT_OK=0; FORMAT_OK=0; BUILD_OK=0; TEST_OK=0; \
 	\
-	echo ""; echo "[1/5] Linting..."; \
-	if ruff check $(SRC_DIRS); then echo "✅ Lint passed"; else echo "❌ Lint failed"; FAILED=1; fi; \
-	\
-	echo ""; echo "[2/5] Format check..."; \
-	if ruff format $(SRC_DIRS) --check; then echo "✅ Format passed"; else echo "❌ Format failed"; FAILED=1; fi; \
-	\
-	echo ""; echo "[3/5] Building and starting Docker containers..."; \
-	docker compose $(COMPOSE_FILES) up -d postgres pgbouncer --build && sleep 3; \
-	docker compose exec postgres pg_isready -U orchestrator || sleep 5; \
-	cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator alembic upgrade head && cd ../../..; \
-	docker compose $(COMPOSE_FILES) up -d --build; \
-	echo "Waiting for services to be healthy..."; \
-	sleep 10; \
-	if curl -sf http://localhost:8000/health > /dev/null; then \
-		echo "✅ API healthy"; \
+	echo "\033[0;34m[1/4] Running Linter...\033[0m"; \
+	echo "## LINT" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	ruff check $(SRC_DIRS) 2>&1 | tee -a $(CI_REPORT); \
+	if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+		LINT_OK=1; \
+		echo "✅ LINT: PASSED" >> $(CI_REPORT); \
 	else \
-		echo "❌ API not healthy"; FAILED=1; \
+		echo "❌ LINT: FAILED" >> $(CI_REPORT); \
 	fi; \
-	if curl -sf http://localhost:5173 > /dev/null 2>&1 || curl -sf http://localhost:3000 > /dev/null 2>&1; then \
-		echo "✅ GUI healthy"; \
+	echo "" >> $(CI_REPORT); \
+	\
+	echo "\033[0;34m[2/4] Checking Code Format...\033[0m"; \
+	echo "## FORMAT CHECK" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	ruff format $(SRC_DIRS) --check 2>&1 | tee -a $(CI_REPORT); \
+	if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+		FORMAT_OK=1; \
+		echo "✅ FORMAT: PASSED" >> $(CI_REPORT); \
 	else \
-		echo "⚠️  GUI not responding (may be expected in CI)"; \
+		echo "❌ FORMAT: FAILED" >> $(CI_REPORT); \
 	fi; \
+	echo "" >> $(CI_REPORT); \
 	\
-	echo ""; echo "[4/5] Running tests..."; \
-	if python3 -m pytest $(TEST_DIRS) -v --tb=short; then \
-		echo "✅ Tests passed"; \
+	echo "\033[0;34m[3/4] Building Docker containers...\033[0m"; \
+	echo "## DOCKER BUILD" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	docker compose $(COMPOSE_FILES) build 2>&1 | tee -a $(CI_REPORT); \
+	if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+		echo "Starting services..." | tee -a $(CI_REPORT); \
+		docker compose $(COMPOSE_FILES) up -d postgres pgbouncer 2>&1 | tee -a $(CI_REPORT); \
+		sleep 3; \
+		docker compose exec postgres pg_isready -U orchestrator || sleep 5; \
+		cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator alembic upgrade head 2>&1 | tee -a $(CI_REPORT) && cd ../../..; \
+		docker compose $(COMPOSE_FILES) up -d 2>&1 | tee -a $(CI_REPORT); \
+		sleep 10; \
+		if curl -sf http://localhost:8000/health > /dev/null; then \
+			BUILD_OK=1; \
+			echo "✅ BUILD: PASSED (API healthy)" >> $(CI_REPORT); \
+		else \
+			echo "❌ BUILD: FAILED (API not healthy)" >> $(CI_REPORT); \
+		fi; \
 	else \
-		echo "❌ Tests failed"; FAILED=1; \
+		echo "❌ BUILD: FAILED" >> $(CI_REPORT); \
 	fi; \
+	echo "" >> $(CI_REPORT); \
 	\
-	echo ""; echo "[5/5] Stopping services..."; \
-	docker compose $(COMPOSE_FILES) down; \
-	echo "✅ Services stopped"; \
-	\
-	echo ""; echo "=============================================="; \
-	if [ $$FAILED -eq 0 ]; then \
-		echo "🎉 CI PASSED"; exit 0; \
+	echo "\033[0;34m[4/4] Running Tests...\033[0m"; \
+	echo "## TESTS" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	python3 -m pytest $(TEST_DIRS) -v --tb=short 2>&1 | tee -a $(CI_REPORT); \
+	if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+		TEST_OK=1; \
+		echo "✅ TESTS: PASSED" >> $(CI_REPORT); \
 	else \
-		echo "❌ CI FAILED"; exit 1; \
-	fi
+		echo "❌ TESTS: FAILED" >> $(CI_REPORT); \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	\
+	echo "Stopping services..." ; \
+	docker compose $(COMPOSE_FILES) down 2>&1 | tee -a $(CI_REPORT); \
+	\
+	echo "================================================" >> $(CI_REPORT); \
+	echo "SUMMARY" >> $(CI_REPORT); \
+	echo "================================================" >> $(CI_REPORT); \
+	TOTAL_PASS=$$((LINT_OK + FORMAT_OK + BUILD_OK + TEST_OK)); \
+	TOTAL_FAIL=$$((4 - TOTAL_PASS)); \
+	if [ $$LINT_OK -eq 1 ]; then echo "✅ Lint:   PASSED" >> $(CI_REPORT); else echo "❌ Lint:   FAILED" >> $(CI_REPORT); fi; \
+	if [ $$FORMAT_OK -eq 1 ]; then echo "✅ Format: PASSED" >> $(CI_REPORT); else echo "❌ Format: FAILED" >> $(CI_REPORT); fi; \
+	if [ $$BUILD_OK -eq 1 ]; then echo "✅ Build:  PASSED" >> $(CI_REPORT); else echo "❌ Build:  FAILED" >> $(CI_REPORT); fi; \
+	if [ $$TEST_OK -eq 1 ]; then echo "✅ Tests:  PASSED" >> $(CI_REPORT); else echo "❌ Tests:  FAILED" >> $(CI_REPORT); fi; \
+	echo "" >> $(CI_REPORT); \
+	if [ $$TOTAL_FAIL -eq 0 ]; then \
+		echo "🎉 ALL CHECKS PASSED ($$TOTAL_PASS/4)" >> $(CI_REPORT); \
+		echo "\033[0;32m🎉 ALL CHECKS PASSED\033[0m"; \
+	else \
+		echo "⚠️  $$TOTAL_FAIL/4 CHECKS FAILED" >> $(CI_REPORT); \
+		echo "\033[0;31m⚠️  $$TOTAL_FAIL/4 CHECKS FAILED\033[0m"; \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	echo "Full report saved to: $(CI_REPORT)"; \
+	cat $(CI_REPORT) | tail -15; \
+	exit $$TOTAL_FAIL
 
 .PHONY: help setup install-hooks install-deps install-gui-deps install-gh check-env \
         workflow workflow-interactive workflow-step list-configs check-config test test-unit test-int test-e2e \
