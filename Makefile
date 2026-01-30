@@ -217,7 +217,7 @@ setup: install-hooks install-deps install-gui-deps
 # Install git hooks (prevents AI self-attribution in commits)
 install-hooks:
 	@echo "Installing git hooks..."
-	@../hooks/install.sh
+	@./hooks/install.sh
 
 # Install Python dependencies
 install-deps:

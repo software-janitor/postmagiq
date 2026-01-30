@@ -1,0 +1,31 @@
+#!/bin/bash
+# Commit-msg hook to reject AI self-attribution in commit messages
+
+COMMIT_MSG_FILE="$1"
+
+# Patterns to reject (case-insensitive)
+PATTERNS=(
+    "Co-Authored-By:.*Claude"
+    "Co-Authored-By:.*Gemini"
+    "Co-Authored-By:.*Codex"
+    "Co-Authored-By:.*GPT"
+    "Co-Authored-By:.*OpenAI"
+    "Co-Authored-By:.*Anthropic"
+    "Co-Authored-By:.*noreply@anthropic"
+    "Co-Authored-By:.*noreply@openai"
+    "Generated (with|by).*Claude"
+    "Generated (with|by).*Gemini"
+    "Generated (with|by).*Codex"
+    "Written by AI"
+    "AI-generated"
+)
+
+for pattern in "${PATTERNS[@]}"; do
+    if grep -iE "$pattern" "$COMMIT_MSG_FILE" > /dev/null 2>&1; then
+        echo "ERROR: Self-attribution found in commit message: $pattern"
+        echo "Remove AI attribution from your commit message."
+        exit 1
+    fi
+done
+
+exit 0
