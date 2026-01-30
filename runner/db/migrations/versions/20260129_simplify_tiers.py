@@ -97,8 +97,7 @@ def upgrade() -> None:
     # ==========================================================================
     # Reset tier_features with correct feature distribution
     # Free/Base: basic generation + direct publishing
-    # Pro: + voice transcription, youtube transcription
-    # Max: + team workspaces, API access
+    # Pro/Max: + voice transcription, youtube transcription
     # ==========================================================================
 
     # Clear existing features
@@ -122,32 +121,24 @@ def upgrade() -> None:
             ('free', 'youtube_transcription', false, '{}'),
             ('free', 'direct_publishing', true, '{}'),
             ('free', 'priority_support', false, '{}'),
-            ('free', 'api_access', false, '{}'),
-            ('free', 'team_workspaces', false, '{}'),
             -- Base tier: same as free, just more credits
             ('base', 'premium_workflow', true, '{"text_limit": 50000}'),
             ('base', 'voice_transcription', false, '{}'),
             ('base', 'youtube_transcription', false, '{}'),
             ('base', 'direct_publishing', true, '{}'),
             ('base', 'priority_support', false, '{}'),
-            ('base', 'api_access', false, '{}'),
-            ('base', 'team_workspaces', false, '{}'),
             -- Pro tier: + voice & youtube transcription
             ('pro', 'premium_workflow', true, '{"text_limit": 100000}'),
             ('pro', 'voice_transcription', true, '{}'),
             ('pro', 'youtube_transcription', true, '{}'),
             ('pro', 'direct_publishing', true, '{}'),
             ('pro', 'priority_support', true, '{}'),
-            ('pro', 'api_access', false, '{}'),
-            ('pro', 'team_workspaces', false, '{}'),
-            -- Max tier: + team workspaces, API access (enterprise)
+            -- Max tier: same as Pro, just more credits
             ('max', 'premium_workflow', true, '{"text_limit": 100000}'),
             ('max', 'voice_transcription', true, '{}'),
             ('max', 'youtube_transcription', true, '{}'),
             ('max', 'direct_publishing', true, '{}'),
-            ('max', 'priority_support', true, '{}'),
-            ('max', 'api_access', true, '{}'),
-            ('max', 'team_workspaces', true, '{}')
+            ('max', 'priority_support', true, '{}')
         ) AS f(tier_slug, feature_key, enabled, config)
         WHERE t.slug = f.tier_slug
     """)

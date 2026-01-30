@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CreditCard, Check, Zap, Settings2, Mic, Youtube, Crown, Code, Users, X, Send } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { CreditCard, Check, Zap, Settings2, Mic, Youtube, Crown, X, Send } from 'lucide-react'
 import { clsx } from 'clsx'
-import { apiGet, apiPost } from '../api/client'
+import { apiGet } from '../api/client'
 import { useWorkspaceStore } from '../stores/workspaceStore'
 import { useThemeClasses } from '../hooks/useThemeClasses'
 import { useEffectiveFlags } from '../stores/flagsStore'
@@ -21,8 +21,6 @@ interface UsageSummary {
     direct_publishing: boolean
     youtube_transcription: boolean
     priority_support: boolean
-    api_access: boolean
-    team_workspaces: boolean
     text_limit: number
   }
   tier: { name: string; slug: string }
@@ -52,10 +50,11 @@ interface Tier {
 export default function Settings() {
   const theme = useThemeClasses()
   const flags = useEffectiveFlags()
-  const { currentWorkspaceId, currentRole } = useWorkspaceStore()
+  const { currentWorkspaceId } = useWorkspaceStore()
   const [selectedWorkflowConfig, setSelectedWorkflowConfig] = useState<string | null>(null)
 
-  const canChangeWorkflowConfig = currentRole === 'owner' || currentRole === 'admin'
+  // All users can change workflow config (no team permissions)
+  const canChangeWorkflowConfig = true
 
   const { data: usage, isLoading: usageLoading } = useQuery({
     queryKey: ['usage', currentWorkspaceId],
@@ -186,28 +185,6 @@ export default function Settings() {
                       )}
                       Priority Support
                     </div>
-                    <div className={clsx(
-                      'flex items-center gap-2 text-sm',
-                      usage.features.api_access ? 'text-green-400' : 'text-zinc-500'
-                    )}>
-                      {usage.features.api_access ? (
-                        <Code className="w-4 h-4" />
-                      ) : (
-                        <X className="w-4 h-4" />
-                      )}
-                      API Access
-                    </div>
-                    <div className={clsx(
-                      'flex items-center gap-2 text-sm',
-                      usage.features.team_workspaces ? 'text-green-400' : 'text-zinc-500'
-                    )}>
-                      {usage.features.team_workspaces ? (
-                        <Users className="w-4 h-4" />
-                      ) : (
-                        <X className="w-4 h-4" />
-                      )}
-                      Team Workspaces
-                    </div>
                   </div>
                   <div className="mt-3 text-sm text-zinc-400">
                     Text limit: {usage.features.text_limit.toLocaleString()} characters
@@ -297,19 +274,6 @@ export default function Settings() {
                         <li className="flex items-center gap-2 text-zinc-300">
                           <Zap className={clsx('w-4 h-4', theme.iconPrimary)} />
                           Priority support
-                        </li>
-                      )}
-                      {/* Max only: enterprise features */}
-                      {tier.api_access && (
-                        <li className="flex items-center gap-2 text-zinc-300">
-                          <Code className="w-4 h-4 text-green-400" />
-                          API access
-                        </li>
-                      )}
-                      {tier.slug === 'max' && (
-                        <li className="flex items-center gap-2 text-zinc-300">
-                          <Users className="w-4 h-4 text-green-400" />
-                          Team workspaces
                         </li>
                       )}
                     </ul>

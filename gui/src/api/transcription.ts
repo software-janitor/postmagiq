@@ -19,8 +19,6 @@ export interface FeaturesInfo {
   direct_publishing: boolean
   youtube_transcription: boolean
   priority_support: boolean
-  api_access: boolean
-  team_workspaces: boolean
   text_limit: number
 }
 

@@ -44,16 +44,13 @@ class TierService:
 
     # Feature to minimum tier mapping for upgrade CTAs
     # Free/Base: basic generation + direct publishing
-    # Pro: + voice transcription, youtube transcription
-    # Max: + team workspaces, API access
+    # Pro/Max: + voice transcription, youtube transcription
     FEATURE_MIN_TIER = {
         "premium_workflow": "free",
         "direct_publishing": "free",
         "voice_transcription": "pro",
         "youtube_transcription": "pro",
         "priority_support": "pro",
-        "api_access": "max",
-        "team_workspaces": "max",
     }
 
     # Default text limits per tier
@@ -273,10 +270,6 @@ class TierService:
                 "enabled", False
             ),
             "priority_support": features.get("priority_support", {}).get(
-                "enabled", False
-            ),
-            "api_access": features.get("api_access", {}).get("enabled", False),
-            "team_workspaces": features.get("team_workspaces", {}).get(
                 "enabled", False
             ),
             "text_limit": text_limit,

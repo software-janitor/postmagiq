@@ -36,8 +36,6 @@ class FeaturesInfo(BaseModel):
     direct_publishing: bool = False
     youtube_transcription: bool
     priority_support: bool
-    api_access: bool
-    team_workspaces: bool
     text_limit: int
 
 
