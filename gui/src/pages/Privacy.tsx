@@ -116,8 +116,8 @@ export default function Privacy() {
             <h2 className="text-xl font-semibold text-white mb-3">11. Contact Us</h2>
             <p>
               If you have questions about this Privacy Policy, please contact us at:{' '}
-              <a href="mailto:privacy@postmagiq.com" className="text-purple-400 hover:text-purple-300">
-                privacy@postmagiq.com
+              <a href="mailto:support@postmagiq.com" className="text-purple-400 hover:text-purple-300">
+                support@postmagiq.com
               </a>
             </p>
           </section>

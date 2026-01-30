@@ -136,8 +136,8 @@ export default function Terms() {
             <h2 className="text-xl font-semibold text-white mb-3">14. Contact</h2>
             <p>
               For questions about these Terms, contact us at:{' '}
-              <a href="mailto:legal@postmagiq.com" className="text-purple-400 hover:text-purple-300">
-                legal@postmagiq.com
+              <a href="mailto:support@postmagiq.com" className="text-purple-400 hover:text-purple-300">
+                support@postmagiq.com
               </a>
             </p>
           </section>
