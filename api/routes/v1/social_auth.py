@@ -20,6 +20,7 @@ from runner.db.models import (
     SocialConnectionRead,
     SocialPlatform,
 )
+from runner.db.crypto import encrypt_token
 from api.services.social_service import (
     linkedin_service,
     x_service,
@@ -145,10 +146,18 @@ async def linkedin_callback(
         )
         existing = session.exec(statement).first()
 
+        # Encrypt tokens before storing
+        encrypted_access = encrypt_token(session, tokens["access_token"])
+        encrypted_refresh = (
+            encrypt_token(session, tokens["refresh_token"])
+            if tokens.get("refresh_token")
+            else None
+        )
+
         if existing:
             # Update existing connection
-            existing.access_token = tokens["access_token"]
-            existing.refresh_token = tokens.get("refresh_token")
+            existing.access_token = encrypted_access
+            existing.refresh_token = encrypted_refresh
             existing.expires_at = datetime.utcnow() + timedelta(
                 seconds=tokens.get("expires_in", 5184000)
             )
@@ -162,8 +171,8 @@ async def linkedin_callback(
                 user_id=UUID(oauth_state.user_id),
                 workspace_id=UUID(oauth_state.workspace_id),
                 platform=SocialPlatform.linkedin,
-                access_token=tokens["access_token"],
-                refresh_token=tokens.get("refresh_token"),
+                access_token=encrypted_access,
+                refresh_token=encrypted_refresh,
                 expires_at=datetime.utcnow()
                 + timedelta(seconds=tokens.get("expires_in", 5184000)),
                 platform_user_id=profile["id"],
@@ -245,9 +254,13 @@ async def x_callback(
         )
         existing = session.exec(statement).first()
 
+        # Encrypt tokens before storing
+        encrypted_access = encrypt_token(session, tokens["access_token"])
+        encrypted_secret = encrypt_token(session, tokens["access_token_secret"])
+
         if existing:
-            existing.access_token = tokens["access_token"]
-            existing.token_secret = tokens["access_token_secret"]
+            existing.access_token = encrypted_access
+            existing.token_secret = encrypted_secret
             existing.platform_user_id = profile["id"]
             existing.platform_username = profile["username"]
             existing.platform_name = profile.get("name")
@@ -257,8 +270,8 @@ async def x_callback(
                 user_id=UUID(oauth_state.user_id),
                 workspace_id=UUID(oauth_state.workspace_id),
                 platform=SocialPlatform.x,
-                access_token=tokens["access_token"],
-                token_secret=tokens["access_token_secret"],
+                access_token=encrypted_access,
+                token_secret=encrypted_secret,
                 platform_user_id=profile["id"],
                 platform_username=profile["username"],
                 platform_name=profile.get("name"),
@@ -313,8 +326,11 @@ async def threads_callback(
         )
         existing = session.exec(statement).first()
 
+        # Encrypt token before storing
+        encrypted_access = encrypt_token(session, tokens["access_token"])
+
         if existing:
-            existing.access_token = tokens["access_token"]
+            existing.access_token = encrypted_access
             existing.expires_at = datetime.utcnow() + timedelta(
                 seconds=tokens.get("expires_in", 5184000)
             )
@@ -327,7 +343,7 @@ async def threads_callback(
                 user_id=UUID(oauth_state.user_id),
                 workspace_id=UUID(oauth_state.workspace_id),
                 platform=SocialPlatform.threads,
-                access_token=tokens["access_token"],
+                access_token=encrypted_access,
                 expires_at=datetime.utcnow()
                 + timedelta(seconds=tokens.get("expires_in", 5184000)),
                 platform_user_id=profile["id"],

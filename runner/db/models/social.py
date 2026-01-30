@@ -9,6 +9,7 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID
 
+from sqlalchemy import LargeBinary
 from sqlmodel import Field, SQLModel
 
 from runner.db.models.base import UUIDModel, TimestampMixin
@@ -37,6 +38,9 @@ class SocialConnection(UUIDModel, TimestampMixin, table=True):
 
     Stores encrypted access tokens and refresh tokens for each
     platform connection. One connection per user per platform.
+
+    Tokens are encrypted using PostgreSQL pgcrypto (pgp_sym_encrypt).
+    Use runner.db.crypto.encrypt_token/decrypt_token to handle encryption.
     """
 
     __tablename__ = "social_connections"
@@ -45,10 +49,10 @@ class SocialConnection(UUIDModel, TimestampMixin, table=True):
     workspace_id: UUID = Field(foreign_key="workspaces.id", nullable=False, index=True)
     platform: SocialPlatform = Field(nullable=False)
 
-    # OAuth tokens (should be encrypted at rest)
-    access_token: str = Field(nullable=False)
-    refresh_token: Optional[str] = Field(default=None)
-    token_secret: Optional[str] = Field(default=None)  # For OAuth 1.0a (X)
+    # OAuth tokens - encrypted with pgcrypto (stored as bytea)
+    access_token: bytes = Field(nullable=False, sa_type=LargeBinary)
+    refresh_token: Optional[bytes] = Field(default=None, sa_type=LargeBinary)
+    token_secret: Optional[bytes] = Field(default=None, sa_type=LargeBinary)  # OAuth 1.0a
     expires_at: Optional[datetime] = Field(default=None)
 
     # Platform-specific user info

@@ -22,6 +22,7 @@ from runner.db.models import (
     ScheduledPostRead,
     PublishResult,
 )
+from runner.db.crypto import decrypt_token
 from api.services.social_service import (
     linkedin_service,
     x_service,
@@ -95,13 +96,17 @@ async def _get_post_content(session: Session, post_id: UUID, workspace_id: UUID)
 
 
 async def _publish_to_platform(
-    connection: SocialConnection, content: str
+    session: Session, connection: SocialConnection, content: str
 ) -> PublishResult:
     """Publish content to the appropriate platform."""
     try:
+        # Decrypt tokens
+        access_token = decrypt_token(session, connection.access_token)
+        token_secret = decrypt_token(session, connection.token_secret)
+
         if connection.platform == SocialPlatform.linkedin:
             result = await linkedin_service.publish(
-                access_token=connection.access_token,
+                access_token=access_token,
                 person_id=connection.platform_user_id,
                 text=content,
             )
@@ -114,13 +119,13 @@ async def _publish_to_platform(
                     error="Content exceeds X's 280 character limit",
                 )
             result = await x_service.publish(
-                access_token=connection.access_token,
-                access_token_secret=connection.token_secret or "",
+                access_token=access_token,
+                access_token_secret=token_secret or "",
                 text=content,
             )
         elif connection.platform == SocialPlatform.threads:
             result = await threads_service.publish(
-                access_token=connection.access_token,
+                access_token=access_token,
                 user_id=connection.platform_user_id,
                 text=content,
             )
@@ -171,7 +176,7 @@ async def publish_to_linkedin(
     content = request.content or await _get_post_content(
         session, request.post_id, ctx.workspace_id
     )
-    result = await _publish_to_platform(connection, content)
+    result = await _publish_to_platform(session, connection, content)
 
     return PublishResponse(
         success=result.success,
@@ -202,7 +207,7 @@ async def publish_to_x(
     content = request.content or await _get_post_content(
         session, request.post_id, ctx.workspace_id
     )
-    result = await _publish_to_platform(connection, content)
+    result = await _publish_to_platform(session, connection, content)
 
     return PublishResponse(
         success=result.success,
@@ -233,7 +238,7 @@ async def publish_to_threads(
     content = request.content or await _get_post_content(
         session, request.post_id, ctx.workspace_id
     )
-    result = await _publish_to_platform(connection, content)
+    result = await _publish_to_platform(session, connection, content)
 
     return PublishResponse(
         success=result.success,
