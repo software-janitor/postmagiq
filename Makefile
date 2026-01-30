@@ -53,8 +53,9 @@ ci-report:
 		docker compose exec postgres pg_isready -U orchestrator || sleep 5; \
 		cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator alembic upgrade head 2>&1 | tee -a $(CI_REPORT) && cd ../../..; \
 		docker compose $(COMPOSE_FILES) up -d 2>&1 | tee -a $(CI_REPORT); \
-		sleep 10; \
-		if curl -sf http://localhost:8000/health > /dev/null; then \
+		echo "Waiting for API to start..."; \
+		sleep 15; \
+		if curl -sf http://localhost:8002/health > /dev/null; then \
 			BUILD_OK=1; \
 			echo "✅ BUILD: PASSED (API healthy)" >> $(CI_REPORT); \
 		else \
