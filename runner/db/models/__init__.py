@@ -262,6 +262,19 @@ from runner.db.models.workflow_config import (
     WorkflowConfigUpdate,
 )
 
+# Social Publishing models
+from runner.db.models.social import (
+    SocialPlatform,
+    ScheduledPostStatus,
+    SocialConnection,
+    SocialConnectionCreate,
+    SocialConnectionRead,
+    ScheduledPost,
+    ScheduledPostCreate,
+    ScheduledPostRead,
+    PublishResult,
+)
+
 # Market Intelligence models (Phase 13)
 from runner.db.models.market_intelligence import (
     EmbeddingSourceType,
@@ -523,4 +536,14 @@ __all__ = [
     "ContentModeration",
     "ContentModerationCreate",
     "ContentModerationRead",
+    # Social Publishing
+    "SocialPlatform",
+    "ScheduledPostStatus",
+    "SocialConnection",
+    "SocialConnectionCreate",
+    "SocialConnectionRead",
+    "ScheduledPost",
+    "ScheduledPostCreate",
+    "ScheduledPostRead",
+    "PublishResult",
 ]

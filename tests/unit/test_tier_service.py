@@ -122,32 +122,29 @@ class TestFeatureMinTierMapping:
         from api.services.tier_service import TierService
 
         expected_features = [
-            "basic_workflow",
             "premium_workflow",
+            "direct_publishing",
             "voice_transcription",
             "youtube_transcription",
             "priority_support",
-            "api_access",
-            "team_workspaces",
         ]
 
         for feature in expected_features:
             assert feature in TierService.FEATURE_MIN_TIER
 
-    def test_basic_workflow_is_free(self):
-        """Basic workflow is available on free tier."""
+    def test_premium_workflow_is_free(self):
+        """Premium workflow is available on free tier."""
         from api.services.tier_service import TierService
 
-        assert TierService.FEATURE_MIN_TIER["basic_workflow"] == "free"
+        assert TierService.FEATURE_MIN_TIER["premium_workflow"] == "free"
 
-    def test_premium_features_require_paid_tiers(self):
-        """Premium features require paid tiers."""
+    def test_premium_features_require_pro_tier(self):
+        """Premium features require pro tier."""
         from api.services.tier_service import TierService
 
-        assert TierService.FEATURE_MIN_TIER["premium_workflow"] == "starter"
-        assert TierService.FEATURE_MIN_TIER["voice_transcription"] == "starter"
+        assert TierService.FEATURE_MIN_TIER["voice_transcription"] == "pro"
         assert TierService.FEATURE_MIN_TIER["youtube_transcription"] == "pro"
-        assert TierService.FEATURE_MIN_TIER["api_access"] == "business"
+        assert TierService.FEATURE_MIN_TIER["priority_support"] == "pro"
 
 
 class TestDefaultTextLimits:
@@ -158,22 +155,22 @@ class TestDefaultTextLimits:
         from api.services.tier_service import TierService
 
         assert "free" in TierService.DEFAULT_TEXT_LIMITS
-        assert "starter" in TierService.DEFAULT_TEXT_LIMITS
+        assert "base" in TierService.DEFAULT_TEXT_LIMITS
         assert "pro" in TierService.DEFAULT_TEXT_LIMITS
-        assert "business" in TierService.DEFAULT_TEXT_LIMITS
+        assert "max" in TierService.DEFAULT_TEXT_LIMITS
 
     def test_free_tier_has_lower_limit(self):
-        """Free tier has lower text limit than pro/business."""
+        """Free tier has lower text limit than pro/max."""
         from api.services.tier_service import TierService
 
         assert TierService.DEFAULT_TEXT_LIMITS["free"] == 50000
         assert TierService.DEFAULT_TEXT_LIMITS["pro"] == 100000
 
-    def test_starter_matches_free_limit(self):
-        """Starter tier has same limit as free."""
+    def test_base_matches_free_limit(self):
+        """Base tier has same limit as free."""
         from api.services.tier_service import TierService
 
-        assert TierService.DEFAULT_TEXT_LIMITS["starter"] == TierService.DEFAULT_TEXT_LIMITS["free"]
+        assert TierService.DEFAULT_TEXT_LIMITS["base"] == TierService.DEFAULT_TEXT_LIMITS["free"]
 
 
 class TestWorkflowConfigSelection:
@@ -185,15 +182,9 @@ class TestWorkflowConfigSelection:
 
         service = TierService()
 
-        # Mock has_feature to return False (free tier)
-        with patch.object(service, 'has_feature', return_value=False):
-            config = service.get_workflow_config(uuid4())
-            assert config == "groq-free.yaml"
-
-        # Mock has_feature to return True (premium tier)
-        with patch.object(service, 'has_feature', return_value=True):
-            config = service.get_workflow_config(uuid4())
-            assert config == "groq-premium.yaml"
+        # All tiers use premium workflow for best quality
+        config = service.get_workflow_config(uuid4())
+        assert config == "groq-premium.yaml"
 
 
 class TestTierFeatureModel:
