@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from api.auth.dependencies import get_current_user, require_scope
 from api.auth.scopes import Scope
 from api.services.usage_service import UsageService
+from api.services.tier_service import tier_service
 from runner.db.models import User
 
 router = APIRouter(prefix="/v1/w/{workspace_id}/usage", tags=["usage"])
@@ -19,11 +20,42 @@ router = APIRouter(prefix="/v1/w/{workspace_id}/usage", tags=["usage"])
 usage_service = UsageService()
 
 
+class CreditsInfo(BaseModel):
+    """Credit usage information."""
+
+    used: int
+    limit: int
+    remaining: int
+
+
+class FeaturesInfo(BaseModel):
+    """Feature availability information."""
+
+    premium_workflow: bool
+    voice_transcription: bool
+    youtube_transcription: bool
+    priority_support: bool
+    api_access: bool
+    team_workspaces: bool
+    text_limit: int
+
+
+class TierInfo(BaseModel):
+    """Tier information."""
+
+    name: str
+    slug: str
+
+
 class UsageSummaryResponse(BaseModel):
     """Response model for usage summary."""
 
     period_start: str
     period_end: str
+    credits: CreditsInfo
+    features: FeaturesInfo
+    tier: TierInfo
+    # Legacy fields for backwards compatibility
     posts: dict
     storage: dict
     api_calls: dict
@@ -56,11 +88,30 @@ async def get_usage_summary(
 ):
     """Get usage summary for the current billing period.
 
-    Returns usage stats for posts, storage, and API calls along with
-    the current subscription tier information.
+    Returns usage stats including credits, features, and tier information.
     """
     summary = usage_service.get_usage_summary(workspace_id)
-    return UsageSummaryResponse(**summary)
+    features = tier_service.get_features_summary(workspace_id)
+
+    return UsageSummaryResponse(
+        period_start=summary["period_start"],
+        period_end=summary["period_end"],
+        credits=CreditsInfo(
+            used=summary["credits"]["used"],
+            limit=summary["credits"]["limit"],
+            remaining=summary["credits"]["remaining"],
+        ),
+        features=FeaturesInfo(**features),
+        tier=TierInfo(
+            name=summary["tier"]["name"],
+            slug=summary["tier"]["slug"],
+        ),
+        # Legacy fields
+        posts=summary["posts"],
+        storage=summary["storage"],
+        api_calls=summary["api_calls"],
+        subscription=summary["subscription"],
+    )
 
 
 @router.get("/tiers", response_model=list[TierResponse])
@@ -140,3 +191,43 @@ async def create_subscription(
         )
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+class EstimateRequest(BaseModel):
+    """Request for credit estimate."""
+
+    text_length: int
+
+
+class EstimateResponse(BaseModel):
+    """Response for credit estimate."""
+
+    text_length: int
+    estimated_credits: int
+    credits_remaining: int
+    can_proceed: bool
+
+
+@router.post("/estimate", response_model=EstimateResponse)
+async def estimate_credits(
+    workspace_id: UUID,
+    request: EstimateRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Estimate credits needed for a workflow run.
+
+    Returns the estimated credits based on text length and the
+    workspace's tier, along with whether they can afford it.
+    """
+    is_premium = tier_service.has_feature(workspace_id, "premium_workflow")
+    estimated = tier_service.estimate_credits(request.text_length, is_premium)
+
+    can_afford, used, limit = usage_service.can_afford(workspace_id, estimated)
+    remaining = max(0, limit - used) if limit > 0 else 999999
+
+    return EstimateResponse(
+        text_length=request.text_length,
+        estimated_credits=estimated,
+        credits_remaining=remaining,
+        can_proceed=can_afford,
+    )

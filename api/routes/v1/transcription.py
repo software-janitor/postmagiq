@@ -25,10 +25,21 @@ from api.services.youtube_service import (
     DurationExceededError,
     DownloadError,
 )
+from api.services.tier_service import tier_service, FeatureNotAvailable
 
 
 router = APIRouter(prefix="/v1/w/{workspace_id}/transcribe", tags=["transcription"])
 transcription_service = TranscriptionService()
+
+
+class FeatureLockedResponse(BaseModel):
+    """Response when a feature is locked."""
+
+    error: str = "feature_locked"
+    feature: str
+    current_tier: str
+    required_tier: str
+    message: str
 
 
 # =============================================================================
@@ -64,7 +75,7 @@ class TranscriptionResponse(BaseModel):
 # =============================================================================
 
 
-@router.post("/upload", response_model=TranscriptionResponse)
+@router.post("/upload", response_model=TranscriptionResponse, responses={403: {"model": FeatureLockedResponse}})
 async def transcribe_upload(
     ctx: Annotated[
         WorkspaceContext, Depends(require_workspace_scope(Scope.WORKFLOW_EXECUTE))
@@ -75,7 +86,8 @@ async def transcribe_upload(
 ):
     """Transcribe an uploaded audio file.
 
-    Requires workflow:execute scope.
+    Requires workflow:execute scope and voice_transcription feature.
+    Available on Starter tier and above.
 
     Supported formats: mp3, wav, m4a, mp4, mpeg, mpga, webm, ogg
     Maximum file size: 25MB
@@ -85,6 +97,21 @@ async def transcribe_upload(
         language: Optional language code (e.g., "en")
         prompt: Optional prompt to guide transcription
     """
+    # Check feature access
+    try:
+        tier_service.require_feature(ctx.workspace_id, "voice_transcription")
+    except FeatureNotAvailable as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "feature_locked",
+                "feature": e.feature_key,
+                "current_tier": e.tier_name,
+                "required_tier": e.required_tier,
+                "message": str(e),
+            },
+        )
+
     # Validate file size
     if audio.size and audio.size > TranscriptionService.MAX_FILE_SIZE:
         raise HTTPException(
@@ -123,7 +150,7 @@ async def transcribe_upload(
         )
 
 
-@router.post("/youtube", response_model=TranscriptionResponse)
+@router.post("/youtube", response_model=TranscriptionResponse, responses={403: {"model": FeatureLockedResponse}})
 async def transcribe_youtube(
     request: YouTubeTranscribeRequest,
     ctx: Annotated[
@@ -132,7 +159,8 @@ async def transcribe_youtube(
 ):
     """Transcribe audio from a YouTube video.
 
-    Requires workflow:execute scope.
+    Requires workflow:execute scope and youtube_transcription feature.
+    Available on Pro tier and above.
 
     Downloads audio from YouTube, transcribes it, then cleans up.
     Maximum video duration: 1 hour.
@@ -140,6 +168,21 @@ async def transcribe_youtube(
     Args:
         request: YouTube URL and optional language
     """
+    # Check feature access
+    try:
+        tier_service.require_feature(ctx.workspace_id, "youtube_transcription")
+    except FeatureNotAvailable as e:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "feature_locked",
+                "feature": e.feature_key,
+                "current_tier": e.tier_name,
+                "required_tier": e.required_tier,
+                "message": str(e),
+            },
+        )
+
     try:
         result = transcription_service.transcribe_youtube(
             url=request.url,

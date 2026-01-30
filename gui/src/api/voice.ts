@@ -1,8 +1,7 @@
 /**
  * API client for voice learning
  *
- * v1 workspace-scoped routes for multi-tenant voice features.
- * Legacy user-scoped routes are deprecated and will be removed.
+ * Workspace-scoped routes for multi-tenant voice features.
  */
 
 import { apiGet, apiPost } from './client'
@@ -18,14 +17,14 @@ export interface VoicePrompt {
 }
 
 export interface WritingSample {
-  id: number
+  id: string
   source_type: 'prompt' | 'upload'
   prompt_id: string | null
   prompt_text: string | null
   title: string | null
   content: string
   word_count: number
-  created_at: string
+  created_at: string | null
 }
 
 export interface SamplesResponse {
@@ -42,111 +41,7 @@ export interface SampleStatus {
   words_needed: number
 }
 
-export interface VoiceAnalysis {
-  profile_id: number
-  tone: string
-  sentence_patterns: {
-    average_length?: string
-    variation?: string
-    common_structures?: string[]
-  }
-  vocabulary_level: string
-  signature_phrases: string[]
-  storytelling_style: string
-  emotional_register: string
-  summary: string
-}
-
-export interface VoiceProfile {
-  id: number
-  tone: string | null
-  sentence_patterns: {
-    average_length?: string
-    variation?: string
-    common_structures?: string[]
-  }
-  vocabulary_level: string | null
-  signature_phrases: string[]
-  storytelling_style: string | null
-  emotional_register: string | null
-}
-
-// =============================================================================
-// Prompts
-// =============================================================================
-
-export async function fetchVoicePrompts(): Promise<{ prompts: VoicePrompt[] }> {
-  return apiGet<{ prompts: VoicePrompt[] }>('/voice/prompts')
-}
-
-export async function fetchVoicePrompt(promptId: string): Promise<VoicePrompt> {
-  return apiGet<VoicePrompt>(`/voice/prompts/${promptId}`)
-}
-
-// =============================================================================
-// Samples
-// =============================================================================
-
 export interface SaveSampleRequest {
-  user_id: number
-  source_type: 'prompt' | 'upload'
-  content: string
-  prompt_id?: string
-  title?: string
-}
-
-export async function saveSample(
-  request: SaveSampleRequest
-): Promise<{ id: number; word_count: number }> {
-  return apiPost<{ id: number; word_count: number }>('/voice/samples', request)
-}
-
-export async function fetchSamples(userId: number): Promise<SamplesResponse> {
-  return apiGet<SamplesResponse>(`/voice/users/${userId}/samples`)
-}
-
-export async function fetchSampleStatus(userId: number): Promise<SampleStatus> {
-  return apiGet<SampleStatus>(`/voice/users/${userId}/samples/status`)
-}
-
-// =============================================================================
-// Analysis
-// =============================================================================
-
-export async function analyzeVoice(userId: number): Promise<VoiceAnalysis> {
-  return apiPost<VoiceAnalysis>('/voice/analyze', { user_id: userId })
-}
-
-// =============================================================================
-// Profile
-// =============================================================================
-
-export async function fetchVoiceUserProfile(userId: number): Promise<VoiceProfile> {
-  return apiGet<VoiceProfile>(`/voice/users/${userId}/profile`)
-}
-
-// =============================================================================
-// v1 Workspace-Scoped API (preferred)
-// =============================================================================
-
-export interface V1WritingSample {
-  id: string
-  source_type: 'prompt' | 'upload'
-  prompt_id: string | null
-  prompt_text: string | null
-  title: string | null
-  content: string
-  word_count: number
-  created_at: string | null
-}
-
-export interface V1SamplesResponse {
-  samples: V1WritingSample[]
-  total_word_count: number
-  can_analyze: boolean
-}
-
-export interface V1SaveSampleRequest {
   source_type: 'prompt' | 'upload'
   content: string
   prompt_id?: string
@@ -154,7 +49,7 @@ export interface V1SaveSampleRequest {
   title?: string
 }
 
-export interface V1AnalysisResult {
+export interface AnalysisResult {
   profile_id: string
   analysis: {
     tone: string
@@ -167,19 +62,41 @@ export interface V1AnalysisResult {
   }
 }
 
-/**
- * Get voice prompts (not workspace-scoped).
- */
-export async function fetchVoicePromptsV1(): Promise<{ prompts: VoicePrompt[] }> {
-  return apiGet<{ prompts: VoicePrompt[] }>('/v1/w/voice/prompts')
+export interface VoiceProfile {
+  id: string
+  workspace_id: string | null
+  name: string
+  slug: string
+  description: string | null
+  is_preset: boolean
+  tone_description: string | null
+  signature_phrases: string | null
+  word_choices: string | null
+  example_excerpts: string | null
+  avoid_patterns: string | null
 }
+
+// =============================================================================
+// Prompts
+// =============================================================================
+
+/**
+ * Get voice prompts for workspace.
+ */
+export async function fetchVoicePrompts(workspaceId: string): Promise<{ prompts: VoicePrompt[] }> {
+  return apiGet<{ prompts: VoicePrompt[] }>(`/v1/w/${workspaceId}/voice/prompts`)
+}
+
+// =============================================================================
+// Samples
+// =============================================================================
 
 /**
  * Save a writing sample for a workspace.
  */
-export async function saveSampleV1(
+export async function saveSample(
   workspaceId: string,
-  request: V1SaveSampleRequest
+  request: SaveSampleRequest
 ): Promise<{ id: string; word_count: number }> {
   return apiPost<{ id: string; word_count: number }>(
     `/v1/w/${workspaceId}/voice/samples`,
@@ -190,27 +107,45 @@ export async function saveSampleV1(
 /**
  * Get all writing samples for a workspace.
  */
-export async function fetchSamplesV1(workspaceId: string): Promise<V1SamplesResponse> {
-  return apiGet<V1SamplesResponse>(`/v1/w/${workspaceId}/voice/samples`)
+export async function fetchSamples(workspaceId: string): Promise<SamplesResponse> {
+  return apiGet<SamplesResponse>(`/v1/w/${workspaceId}/voice/samples`)
 }
 
 /**
  * Get sample status for a workspace.
  */
-export async function fetchSampleStatusV1(workspaceId: string): Promise<SampleStatus> {
+export async function fetchSampleStatus(workspaceId: string): Promise<SampleStatus> {
   return apiGet<SampleStatus>(`/v1/w/${workspaceId}/voice/samples/status`)
 }
+
+// =============================================================================
+// Analysis
+// =============================================================================
 
 /**
  * Analyze voice and create profile for a workspace.
  */
-export async function analyzeVoiceV1(workspaceId: string): Promise<V1AnalysisResult> {
-  return apiPost<V1AnalysisResult>(`/v1/w/${workspaceId}/voice/analyze`, {})
+export async function analyzeVoice(workspaceId: string): Promise<AnalysisResult> {
+  return apiPost<AnalysisResult>(`/v1/w/${workspaceId}/voice/analyze`, {})
+}
+
+// =============================================================================
+// Profiles
+// =============================================================================
+
+/**
+ * Get all voice profiles for a workspace (includes library presets).
+ */
+export async function fetchVoiceProfiles(workspaceId: string): Promise<VoiceProfile[]> {
+  return apiGet<VoiceProfile[]>(`/v1/w/${workspaceId}/voice-profiles`)
 }
 
 /**
- * Get voice profile for a workspace.
+ * Get the workspace's own voice profile (not system presets).
+ * Returns null if no custom profile exists.
  */
-export async function fetchVoiceProfileV1(workspaceId: string): Promise<VoiceProfile | null> {
-  return apiGet<VoiceProfile | null>(`/v1/w/${workspaceId}/voice/profile`)
+export async function fetchWorkspaceVoiceProfile(workspaceId: string): Promise<VoiceProfile | null> {
+  const profiles = await fetchVoiceProfiles(workspaceId)
+  // Find first profile that belongs to this workspace (not a system preset)
+  return profiles.find(p => p.workspace_id === workspaceId && !p.is_preset) ?? null
 }

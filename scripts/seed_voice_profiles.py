@@ -124,6 +124,7 @@ def seed_voice_profiles():
                 print(f"  Creating preset: {profile_data['name']} (slug: {profile_data['slug']})")
                 profile = VoiceProfile(
                     id=uuid4(),
+                    user_id=None,  # System presets have no owner
                     workspace_id=None,
                     is_preset=True,
                     **profile_data,

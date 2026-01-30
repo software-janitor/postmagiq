@@ -36,6 +36,11 @@ from api.services.audit_service import (
     AuditServiceError,
     AuditNotFoundError,
 )
+from api.services.tier_service import (
+    TierService,
+    FeatureNotAvailable,
+    tier_service,
+)
 
 __all__ = [
     "UsageService",
@@ -65,4 +70,7 @@ __all__ = [
     "AuditService",
     "AuditServiceError",
     "AuditNotFoundError",
+    "TierService",
+    "FeatureNotAvailable",
+    "tier_service",
 ]

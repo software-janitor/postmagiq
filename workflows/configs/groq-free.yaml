@@ -1,49 +1,39 @@
 # ============================================================================
-# WORKFLOW ORCHESTRATOR CONFIGURATION - GROQ (Cloud API)
+# WORKFLOW ORCHESTRATOR CONFIGURATION - GROQ FREE TIER
 # ============================================================================
-# Uses Groq's fast inference API for all agents
-# Production models only: https://console.groq.com/docs/models
-# Pricing is auto-set from runner/agents/groq_api.py MODEL_PRICING
+# Uses Groq's smaller/faster models for free tier users
+# Cost-optimized: ~$0.10/run max (10 credits)
+# Models: gpt-oss-20b, llama-8b (no premium models)
 
 orchestrator:
-  agent: groq
+  agent: groq-gpt-oss-20b
   session:
     enabled: true
 
 # ============================================================================
 # WORKFLOW TIERS
 # ============================================================================
+# Free tier only has access to basic agents
 
 tiers:
   standard:
-    draft_agents: [groq-gpt-oss-120b, groq-gpt-oss-20b, groq-8b]
-    audit_agents: [groq-gpt-oss-120b, groq-gpt-oss-20b]
-  premium:
-    draft_agents: [groq-gpt-oss-120b, groq-70b, groq-gpt-oss-20b]
-    audit_agents: [groq-gpt-oss-120b, groq-70b]
+    draft_agents: [groq-gpt-oss-20b, groq-8b]
+    audit_agents: [groq-8b]
 
 credit_weights:
-  base_cost: 2
+  base_cost: 1
   standard:
-    - groq-gpt-oss-120b
     - groq-gpt-oss-20b
     - groq-8b
-  premium:
-    - groq-70b
 
 # ============================================================================
-# AGENT DEFINITIONS - Groq Production Models
+# AGENT DEFINITIONS - Free Tier Models Only
 # ============================================================================
 
 agents:
-  groq:
+  groq-gpt-oss-20b:
     type: api
-    model: llama-70b
-    context_window: 131072
-
-  groq-70b:
-    type: api
-    model: llama-70b
+    model: gpt-oss-20b
     context_window: 131072
 
   groq-8b:
@@ -51,25 +41,15 @@ agents:
     model: llama-8b
     context_window: 131072
 
-  groq-gpt-oss-120b:
-    type: api
-    model: gpt-oss-120b
-    context_window: 131072
-
-  groq-gpt-oss-20b:
+  # Split auditor agents (same models, different personas)
+  groq-fabrication-auditor:
     type: api
     model: gpt-oss-20b
     context_window: 131072
 
-  # Split auditor agents (same models, different personas)
-  groq-fabrication-auditor:
-    type: api
-    model: gpt-oss-120b
-    context_window: 131072
-
   groq-style-auditor:
     type: api
-    model: gpt-oss-120b
+    model: llama-8b
     context_window: 131072
 
 # ============================================================================
@@ -101,7 +81,7 @@ states:
   story-review:
     type: single
     description: "Review raw story for completeness - ask questions if needed"
-    agent: groq-gpt-oss-120b
+    agent: groq-gpt-oss-20b
     persona: story-reviewer
     input: "workflow/input/story_input.md"
     output: "workflow/review/review_result.json"
@@ -129,7 +109,7 @@ states:
   story-process:
     type: single
     description: "Extract 5 elements, determine shape, create processed template"
-    agent: groq-gpt-oss-120b
+    agent: groq-gpt-oss-20b
     persona: story-processor
     input: "workflow/input/story_input.md"
     output: "workflow/processed/processed_story.md"
@@ -139,13 +119,13 @@ states:
       failure: story-review
 
   # --------------------------------------------------------------------------
-  # PHASE 2: Post Drafting
+  # PHASE 2: Post Drafting (2 agents for free tier)
   # --------------------------------------------------------------------------
 
   draft:
     type: fan-out
     description: "Generate post drafts from processed story"
-    agents: [groq-70b, groq-gpt-oss-120b, groq-gpt-oss-20b]
+    agents: [groq-gpt-oss-20b, groq-8b]
     persona: writer
     input: "workflow/processed/processed_story.md"
     output: "workflow/drafts/{agent}_draft.md"
@@ -180,7 +160,7 @@ states:
   synthesize:
     type: orchestrator-task
     description: "Combine best elements from drafts based on audits"
-    agent: groq-gpt-oss-120b
+    agent: groq-gpt-oss-20b
     persona: synthesizer
     input:
       - "workflow/drafts/*.md"
@@ -251,11 +231,32 @@ states:
     description: "Workflow halted due to failure or user abort"
 
 # ============================================================================
+# CIRCUIT BREAKER (Strict limits for free tier)
+# ============================================================================
+
+circuit_breaker:
+  rules:
+    - name: state_visit_limit
+      limit: 2
+    - name: cycle_detection
+    - name: transition_limit
+      limit: 15
+    - name: timeout
+      seconds: 900  # 15 minutes
+    - name: cost_limit
+      limit: 0.10  # 10 credits max
+
+  safety_limits:
+    max_transitions_hard: 20
+    max_runtime_hard: 1800  # 30 minutes
+    max_cost_hard: 0.20  # 20 credits hard limit
+
+# ============================================================================
 # RUNTIME SETTINGS
 # ============================================================================
 
 runtime:
   working_dir: "workflow"
   parallel_fanout: true
-  timeout_per_agent: 300
-  retry_count: 2
+  timeout_per_agent: 180  # 3 minutes per agent
+  retry_count: 1  # Limited retries for free tier

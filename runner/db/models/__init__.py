@@ -98,6 +98,7 @@ from runner.db.models.subscription import (
     AccountSubscription, AccountSubscriptionRead,
     UsageTracking, UsageTrackingRead,
     CreditReservation, CreditReservationRead,
+    TierFeature, TierFeatureRead,
 )
 
 # Billing models
@@ -229,6 +230,7 @@ __all__ = [
     "AccountSubscription", "AccountSubscriptionRead",
     "UsageTracking", "UsageTrackingRead",
     "CreditReservation", "CreditReservationRead",
+    "TierFeature", "TierFeatureRead",
     # Billing
     "BillingEventType", "InvoiceStatus", "PaymentMethodType",
     "BillingEvent", "BillingEventRead",
