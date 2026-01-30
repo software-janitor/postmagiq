@@ -78,7 +78,14 @@ class VoiceProfile(UUIDModel, VoiceProfileBase, TimestampMixin, table=True):
 
     __tablename__ = "voice_profiles"
 
-    # Multi-tenancy: workspace_id is nullable for legacy/system presets
+    # Owner of the profile (nullable for system presets)
+    user_id: Optional[UUID] = Field(
+        default=None,
+        foreign_key="users.id",
+        index=True,
+    )
+
+    # Multi-tenancy: workspace_id is nullable for system presets
     workspace_id: Optional[UUID] = Field(
         default=None,
         foreign_key="workspaces.id",
