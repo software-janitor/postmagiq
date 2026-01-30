@@ -16,6 +16,7 @@ export interface CreditsInfo {
 export interface FeaturesInfo {
   premium_workflow: boolean
   voice_transcription: boolean
+  direct_publishing: boolean
   youtube_transcription: boolean
   priority_support: boolean
   api_access: boolean

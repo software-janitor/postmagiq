@@ -33,6 +33,7 @@ class FeaturesInfo(BaseModel):
 
     premium_workflow: bool
     voice_transcription: bool
+    direct_publishing: bool = False
     youtube_transcription: bool
     priority_support: bool
     api_access: bool

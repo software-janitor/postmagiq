@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CreditCard, Check, Zap, Settings2, Mic, Youtube, Crown, Code, Users, X } from 'lucide-react'
+import { CreditCard, Check, Zap, Settings2, Mic, Youtube, Crown, Code, Users, X, Send } from 'lucide-react'
 import { clsx } from 'clsx'
 import { apiGet, apiPost } from '../api/client'
 import { useWorkspaceStore } from '../stores/workspaceStore'
@@ -18,6 +18,7 @@ interface UsageSummary {
   features: {
     premium_workflow: boolean
     voice_transcription: boolean
+    direct_publishing: boolean
     youtube_transcription: boolean
     priority_support: boolean
     api_access: boolean
@@ -154,6 +155,17 @@ export default function Settings() {
                     </div>
                     <div className={clsx(
                       'flex items-center gap-2 text-sm',
+                      usage.features.direct_publishing ? 'text-green-400' : 'text-zinc-500'
+                    )}>
+                      {usage.features.direct_publishing ? (
+                        <Send className="w-4 h-4" />
+                      ) : (
+                        <X className="w-4 h-4" />
+                      )}
+                      Direct Publishing
+                    </div>
+                    <div className={clsx(
+                      'flex items-center gap-2 text-sm',
                       usage.features.youtube_transcription ? 'text-green-400' : 'text-zinc-500'
                     )}>
                       {usage.features.youtube_transcription ? (
@@ -266,13 +278,19 @@ export default function Settings() {
                           Premium AI models
                         </li>
                       )}
-                      {(tier.slug === 'starter' || tier.slug === 'pro' || tier.slug === 'business') && (
+                      {(tier.slug === 'base' || tier.slug === 'pro' || tier.slug === 'max') && (
                         <li className="flex items-center gap-2 text-zinc-300">
                           <Mic className="w-4 h-4 text-green-400" />
                           Voice transcription
                         </li>
                       )}
-                      {(tier.slug === 'pro' || tier.slug === 'business') && (
+                      {(tier.slug === 'base' || tier.slug === 'pro' || tier.slug === 'max') && (
+                        <li className="flex items-center gap-2 text-zinc-300">
+                          <Send className="w-4 h-4 text-green-400" />
+                          Direct publishing
+                        </li>
+                      )}
+                      {(tier.slug === 'pro' || tier.slug === 'max') && (
                         <li className="flex items-center gap-2 text-zinc-300">
                           <Youtube className="w-4 h-4 text-green-400" />
                           YouTube transcription
@@ -290,7 +308,7 @@ export default function Settings() {
                           API access
                         </li>
                       )}
-                      {tier.slug === 'business' && (
+                      {tier.slug === 'max' && (
                         <li className="flex items-center gap-2 text-zinc-300">
                           <Users className="w-4 h-4 text-green-400" />
                           Team workspaces
@@ -316,34 +334,36 @@ export default function Settings() {
       {/* Notification Preferences */}
       <NotificationSettings />
 
-      {/* Workflow Configuration */}
-      <div className="bg-zinc-900 rounded-lg border border-zinc-800">
-        <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
-          <Settings2 className={clsx('w-5 h-5', theme.iconPrimary)} />
-          <h2 className="text-lg font-semibold text-white">Workflow Configuration</h2>
-        </div>
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="block text-sm text-zinc-400 mb-2">
-              Default Workflow Config
-            </label>
-            <p className="text-sm text-zinc-500 mb-3">
-              Select the default workflow configuration. This determines which AI models and settings are used when running workflows.
-            </p>
-            {canChangeWorkflowConfig ? (
-              <WorkflowConfigSelector
-                value={selectedWorkflowConfig}
-                onChange={setSelectedWorkflowConfig}
-                className="w-full max-w-md"
-              />
-            ) : (
-              <div className="text-sm text-zinc-500">
-                Only owners and admins can change the workflow configuration.
-              </div>
-            )}
+      {/* Workflow Configuration - internal only */}
+      {flags.show_internal_workflow && (
+        <div className="bg-zinc-900 rounded-lg border border-zinc-800">
+          <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
+            <Settings2 className={clsx('w-5 h-5', theme.iconPrimary)} />
+            <h2 className="text-lg font-semibold text-white">Workflow Configuration</h2>
+          </div>
+          <div className="p-4 space-y-4">
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">
+                Default Workflow Config
+              </label>
+              <p className="text-sm text-zinc-500 mb-3">
+                Select the default workflow configuration. This determines which AI models and settings are used when running workflows.
+              </p>
+              {canChangeWorkflowConfig ? (
+                <WorkflowConfigSelector
+                  value={selectedWorkflowConfig}
+                  onChange={setSelectedWorkflowConfig}
+                  className="w-full max-w-md"
+                />
+              ) : (
+                <div className="text-sm text-zinc-500">
+                  Only owners and admins can change the workflow configuration.
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Agents - internal only */}
       {flags.show_internal_workflow && (

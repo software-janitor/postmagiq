@@ -45,20 +45,21 @@ class TierService:
     # Feature to minimum tier mapping for upgrade CTAs
     FEATURE_MIN_TIER = {
         "basic_workflow": "free",
-        "premium_workflow": "starter",
-        "voice_transcription": "starter",
+        "premium_workflow": "base",
+        "voice_transcription": "base",
+        "direct_publishing": "base",
         "youtube_transcription": "pro",
         "priority_support": "pro",
-        "api_access": "business",
-        "team_workspaces": "business",
+        "api_access": "max",
+        "team_workspaces": "max",
     }
 
     # Default text limits per tier
     DEFAULT_TEXT_LIMITS = {
         "free": 50000,
-        "starter": 50000,
+        "base": 50000,
         "pro": 100000,
-        "business": 100000,
+        "max": 100000,
     }
 
     def get_tier_for_workspace(self, workspace_id: UUID) -> Optional[SubscriptionTier]:
@@ -191,18 +192,15 @@ class TierService:
     def get_workflow_config(self, workspace_id: UUID) -> str:
         """Get the workflow config file to use for a workspace.
 
-        Free tier uses basic workflow (groq-free.yaml).
-        Paid tiers use premium workflow (groq-premium.yaml).
+        All tiers use premium workflow (groq-premium.yaml) for best quality.
 
         Args:
             workspace_id: Workspace UUID
 
         Returns:
-            Workflow config filename (e.g., 'groq-free.yaml')
+            Workflow config filename (always 'groq-premium.yaml')
         """
-        if self.has_feature(workspace_id, "premium_workflow"):
-            return "groq-premium.yaml"
-        return "groq-free.yaml"
+        return "groq-premium.yaml"
 
     def get_all_features(self, workspace_id: UUID) -> dict:
         """Get all features and their status for a workspace.
@@ -264,6 +262,9 @@ class TierService:
                 "enabled", False
             ),
             "voice_transcription": features.get("voice_transcription", {}).get(
+                "enabled", False
+            ),
+            "direct_publishing": features.get("direct_publishing", {}).get(
                 "enabled", False
             ),
             "youtube_transcription": features.get("youtube_transcription", {}).get(

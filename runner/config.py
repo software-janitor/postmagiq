@@ -11,10 +11,11 @@ PROJECT_ROOT = Path(__file__).parent.parent
 # =============================================================================
 
 # PostgreSQL connection URL
-# Default points to PgBouncer on port 6434 for connection pooling
+# Default points to PostgreSQL directly on port 5434
+# Use DATABASE_URL env var to point to PgBouncer (6434) in production
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://orchestrator:orchestrator_dev@localhost:6434/orchestrator",
+    "postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator",
 )
 
 # Redis connection URL for caching

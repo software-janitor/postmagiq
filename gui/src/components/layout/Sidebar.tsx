@@ -51,7 +51,7 @@ const navItems: NavItem[] = [
   { path: '/story', icon: PenTool, label: 'New Story' },
   { path: '/finished', icon: FileCheck, label: 'Finished Posts' },
   { path: '/workflow', icon: Play, label: 'Live Workflow', flag: 'show_live_workflow' },
-  { path: '/runs', icon: History, label: 'Run History' },
+  { path: '/runs', icon: History, label: 'Run History', flag: 'show_internal_workflow' },
   { path: '/editor', icon: GitBranch, label: 'State Editor', flag: 'show_state_editor' },
   { path: '/approvals', icon: CheckSquare, label: 'Approvals', scope: 'content:read' as const, flag: 'show_approvals' },
   { path: '/team', icon: UsersRound, label: 'Team', scope: 'team:read' as const, flag: 'show_teams' },
