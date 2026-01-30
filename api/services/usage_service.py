@@ -405,6 +405,14 @@ class UsageService:
         return {
             "period_start": usage.period_start.isoformat(),
             "period_end": usage.period_end.isoformat(),
+            # Credits format (posts_per_month now represents credits)
+            "credits": {
+                "used": usage.posts_created,
+                "limit": usage.posts_limit,
+                "remaining": max(0, usage.posts_limit - usage.posts_created),
+                "unlimited": usage.posts_limit == 0,
+            },
+            # Legacy posts format for backwards compatibility
             "posts": {
                 "used": usage.posts_created,
                 "limit": usage.posts_limit,
@@ -429,7 +437,56 @@ class UsageService:
                 "status": subscription.status if subscription else "none",
                 "overage_enabled": tier.overage_enabled if tier else False,
             },
+            "tier": {
+                "name": tier.name if tier else "Free",
+                "slug": tier.slug if tier else "free",
+            },
         }
+
+    def consume_credits(
+        self,
+        workspace_id: UUID,
+        credits: int,
+        idempotency_key: str,
+        resource_id: Optional[str] = None,
+    ) -> bool:
+        """Consume credits for a completed operation.
+
+        This is a convenience method that reserves and immediately confirms credits.
+        For operations that may fail, use reserve_credit + confirm_usage instead.
+
+        Args:
+            workspace_id: Workspace UUID
+            credits: Number of credits to consume
+            idempotency_key: Unique key for this operation
+            resource_id: Optional resource identifier
+
+        Returns:
+            True if credits were consumed
+
+        Raises:
+            UsageLimitExceeded: If not enough credits available
+        """
+        self.reserve_credit(
+            workspace_id=workspace_id,
+            resource_type="post",  # Credits tracked as posts
+            idempotency_key=idempotency_key,
+            amount=credits,
+            resource_id=resource_id,
+        )
+        return self.confirm_usage(idempotency_key)
+
+    def can_afford(self, workspace_id: UUID, credits: int) -> tuple[bool, int, int]:
+        """Check if workspace can afford a certain number of credits.
+
+        Args:
+            workspace_id: Workspace UUID
+            credits: Number of credits needed
+
+        Returns:
+            Tuple of (can_afford, current_used, limit)
+        """
+        return self.check_limit(workspace_id, "post", credits)
 
     def create_subscription(
         self,

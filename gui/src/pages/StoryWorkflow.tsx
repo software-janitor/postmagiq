@@ -34,7 +34,7 @@ import { useEffectiveFlags } from '../stores/flagsStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import { pauseWorkflow, resumeWorkflow, abortWorkflow, submitApproval } from '../api/workflow'
 import { Send, MessageCircle, XCircle } from 'lucide-react'
-import { transcribeAudio, transcribeYouTube, getUsageSummary, isPremiumTier } from '../api/transcription'
+import { transcribeAudio, transcribeYouTube, getUsageSummary, isPremiumTier, hasFeature, estimateCredits, type CreditEstimate } from '../api/transcription'
 
 type Step = 'select' | 'raw' | 'workflow' | 'complete'
 
@@ -179,9 +179,28 @@ export default function StoryWorkflow() {
     staleTime: 60000, // Cache for 1 minute
   })
 
+  // Feature access based on new tier features
+  const hasVoiceTranscription = usageSummary ? hasFeature(usageSummary, 'voice_transcription') : false
+  const hasYoutubeTranscription = usageSummary ? hasFeature(usageSummary, 'youtube_transcription') : false
+  const hasPremiumWorkflow = usageSummary ? hasFeature(usageSummary, 'premium_workflow') : false
+
+  // Legacy check for backwards compatibility
   const hasPremiumFeatures = usageSummary?.subscription?.tier_slug
     ? isPremiumTier(usageSummary.subscription.tier_slug)
     : false
+
+  // Text limit from tier
+  const textLimit = usageSummary?.features?.text_limit || 50000
+
+  // Credits info
+  const creditsUsed = usageSummary?.credits?.used || 0
+  const creditsLimit = usageSummary?.credits?.limit || 10
+  const creditsRemaining = usageSummary?.credits?.remaining || 0
+  const tierName = usageSummary?.tier?.name || 'Free'
+  const tierSlug = usageSummary?.tier?.slug || 'free'
+
+  // Is this the free tier?
+  const isFreeTier = tierSlug === 'free'
 
   // Build workflow states from API data or use defaults
   const WORKFLOW_STATES = workflowStatesData?.states
@@ -680,52 +699,88 @@ export default function StoryWorkflow() {
                 Type
               </button>
               <button
-                onClick={() => hasPremiumFeatures ? setInputMethod('voice') : null}
-                disabled={!hasPremiumFeatures}
+                onClick={() => hasVoiceTranscription ? setInputMethod('voice') : null}
+                disabled={!hasVoiceTranscription}
                 className={clsx(
                   'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
                   inputMethod === 'voice'
                     ? 'bg-slate-700 text-white'
-                    : hasPremiumFeatures
+                    : hasVoiceTranscription
                       ? 'text-slate-400 hover:text-white'
                       : 'text-slate-600 cursor-not-allowed'
                 )}
               >
-                {hasPremiumFeatures ? (
+                {hasVoiceTranscription ? (
                   <Mic className="w-4 h-4" />
                 ) : (
                   <Lock className="w-4 h-4" />
                 )}
                 Voice
-                {!hasPremiumFeatures && <Crown className="w-3 h-3 text-amber-500" />}
+                {!hasVoiceTranscription && <Crown className="w-3 h-3 text-amber-500" />}
               </button>
               <button
-                onClick={() => hasPremiumFeatures ? setInputMethod('youtube') : null}
-                disabled={!hasPremiumFeatures}
+                onClick={() => hasYoutubeTranscription ? setInputMethod('youtube') : null}
+                disabled={!hasYoutubeTranscription}
                 className={clsx(
                   'flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors',
                   inputMethod === 'youtube'
                     ? 'bg-slate-700 text-white'
-                    : hasPremiumFeatures
+                    : hasYoutubeTranscription
                       ? 'text-slate-400 hover:text-white'
                       : 'text-slate-600 cursor-not-allowed'
                 )}
               >
-                {hasPremiumFeatures ? (
+                {hasYoutubeTranscription ? (
                   <Youtube className="w-4 h-4" />
                 ) : (
                   <Lock className="w-4 h-4" />
                 )}
                 YouTube
-                {!hasPremiumFeatures && <Crown className="w-3 h-3 text-amber-500" />}
+                {!hasYoutubeTranscription && <Crown className="w-3 h-3 text-amber-500" />}
               </button>
             </div>
 
-            {/* Premium upgrade prompt */}
-            {!hasPremiumFeatures && (inputMethod === 'type') && (
+            {/* Free tier upgrade banner */}
+            {isFreeTier && (
+              <div className="flex items-center gap-3 text-sm bg-gradient-to-r from-slate-800/50 to-amber-900/20 border border-amber-700/30 rounded-lg px-4 py-3">
+                <Zap className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                <div className="flex-1">
+                  <span className="text-slate-300">Free tier: Basic AI, {creditsLimit} credits/month</span>
+                  <span className="text-slate-500 mx-2">•</span>
+                  <a href="/settings" className="text-amber-500 hover:text-amber-400 font-medium">
+                    Upgrade for premium quality
+                  </a>
+                </div>
+              </div>
+            )}
+
+            {/* Credits and text limit info */}
+            <div className="flex items-center justify-between text-sm text-slate-400">
+              <div className="flex items-center gap-4">
+                <span>
+                  {rawContent.length.toLocaleString()} / {textLimit.toLocaleString()} characters
+                </span>
+                {rawContent.length > textLimit && (
+                  <span className="text-red-400 flex items-center gap-1">
+                    <AlertCircle className="w-4 h-4" />
+                    Over limit
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className={clsx(
+                  creditsRemaining < 3 ? 'text-amber-400' : 'text-slate-400'
+                )}>
+                  {creditsRemaining} / {creditsLimit} credits remaining
+                </span>
+              </div>
+            </div>
+
+            {/* Feature locked prompts */}
+            {!hasVoiceTranscription && (inputMethod === 'type') && (
               <div className="flex items-center gap-2 text-sm text-slate-400 bg-slate-800/50 rounded-lg px-3 py-2">
                 <Crown className="w-4 h-4 text-amber-500" />
-                <span>Upgrade to Premium to unlock Voice and YouTube transcription</span>
+                <span>Upgrade to Starter ($1/mo) to unlock Voice transcription</span>
               </div>
             )}
 

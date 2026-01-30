@@ -7,9 +7,34 @@ import { apiGet } from './client'
 
 const API_BASE = '/api'
 
+export interface CreditsInfo {
+  used: number
+  limit: number
+  remaining: number
+}
+
+export interface FeaturesInfo {
+  premium_workflow: boolean
+  voice_transcription: boolean
+  youtube_transcription: boolean
+  priority_support: boolean
+  api_access: boolean
+  team_workspaces: boolean
+  text_limit: number
+}
+
+export interface TierInfo {
+  name: string
+  slug: string
+}
+
 export interface UsageSummary {
   period_start: string
   period_end: string
+  credits: CreditsInfo
+  features: FeaturesInfo
+  tier: TierInfo
+  // Legacy fields
   posts: {
     used: number
     limit: number
@@ -45,10 +70,56 @@ export async function getUsageSummary(workspaceId: string): Promise<UsageSummary
 
 /**
  * Check if workspace has premium tier (voice/youtube transcription enabled).
+ * Updated for new tier structure: starter, pro, business are premium.
  */
 export function isPremiumTier(tierSlug: string): boolean {
-  const premiumTiers = ['individual', 'team', 'agency']
+  const premiumTiers = ['starter', 'pro', 'business', 'individual', 'team', 'agency']
   return premiumTiers.includes(tierSlug)
+}
+
+/**
+ * Check if a specific feature is enabled based on usage summary.
+ */
+export function hasFeature(usage: UsageSummary, feature: keyof FeaturesInfo): boolean {
+  if (feature === 'text_limit') {
+    return true // text_limit is always a number, not a boolean
+  }
+  return usage.features?.[feature] ?? false
+}
+
+export interface CreditEstimate {
+  text_length: number
+  estimated_credits: number
+  credits_remaining: number
+  can_proceed: boolean
+}
+
+/**
+ * Estimate credits needed for a workflow run.
+ */
+export async function estimateCredits(
+  workspaceId: string,
+  textLength: number
+): Promise<CreditEstimate> {
+  const token = getAccessToken()
+
+  const response = await fetch(
+    `${API_BASE}/v1/w/${workspaceId}/usage/estimate`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ text_length: textLength }),
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error('Failed to estimate credits')
+  }
+
+  return response.json()
 }
 
 export interface TranscriptionResult {

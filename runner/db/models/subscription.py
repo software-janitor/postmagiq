@@ -10,6 +10,7 @@ from enum import Enum
 from typing import Optional
 from uuid import UUID
 
+from sqlalchemy import JSON
 from sqlmodel import Field, SQLModel
 
 from runner.db.models.base import UUIDModel, TimestampMixin
@@ -220,4 +221,44 @@ class CreditReservationRead(CreditReservationBase):
     id: UUID
     workspace_id: UUID
     usage_tracking_id: UUID
+    created_at: datetime
+
+
+# =============================================================================
+# Tier Features (Feature Flags)
+# =============================================================================
+
+
+class TierFeatureBase(SQLModel):
+    """Base fields for tier features."""
+
+    feature_key: str = Field(max_length=50, index=True)  # e.g., 'premium_workflow'
+    enabled: bool = Field(default=False)
+    config: dict = Field(default_factory=dict, sa_type=JSON)
+
+
+class TierFeature(UUIDModel, TierFeatureBase, TimestampMixin, table=True):
+    """Tier feature table.
+
+    Stores feature flags and configuration per subscription tier.
+    Feature keys:
+    - basic_workflow: Basic AI workflow access
+    - premium_workflow: Premium AI models
+    - voice_transcription: Audio transcription
+    - youtube_transcription: YouTube URL transcription
+    - priority_support: Priority customer support
+    - api_access: API key access
+    - team_workspaces: Multiple team workspaces
+    """
+
+    __tablename__ = "tier_features"
+
+    tier_id: UUID = Field(foreign_key="subscription_tiers.id", index=True)
+
+
+class TierFeatureRead(TierFeatureBase):
+    """Schema for reading tier feature data."""
+
+    id: UUID
+    tier_id: UUID
     created_at: datetime

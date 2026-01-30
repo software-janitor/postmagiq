@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CreditCard, Check, Zap, Settings2 } from 'lucide-react'
+import { CreditCard, Check, Zap, Settings2, Mic, Youtube, Crown, Code, Users, X } from 'lucide-react'
 import { clsx } from 'clsx'
 import { apiGet, apiPost } from '../api/client'
 import { useWorkspaceStore } from '../stores/workspaceStore'
@@ -14,6 +14,17 @@ import WorkflowConfigSelector from '../components/WorkflowConfigSelector'
 interface UsageSummary {
   period_start: string
   period_end: string
+  credits: { used: number; limit: number; remaining: number }
+  features: {
+    premium_workflow: boolean
+    voice_transcription: boolean
+    youtube_transcription: boolean
+    priority_support: boolean
+    api_access: boolean
+    team_workspaces: boolean
+    text_limit: number
+  }
+  tier: { name: string; slug: string }
   posts: { used: number; limit: number; overage: number; unlimited: boolean }
   storage: { used_bytes: number; limit_bytes: number; used_gb: number; limit_gb: number; unlimited: boolean }
   api_calls: { used: number; limit: number; unlimited: boolean }
@@ -95,13 +106,13 @@ export default function Settings() {
                 {new Date(usage.period_end).toLocaleDateString()}
               </div>
 
-              {/* Usage Bars */}
+              {/* Credits Bar - Primary usage metric */}
               <div className="space-y-4">
                 <UsageBar
-                  label="Posts Created"
-                  used={usage.posts.used}
-                  limit={usage.posts.limit}
-                  unlimited={usage.posts.unlimited}
+                  label="Credits"
+                  used={usage.credits?.used || usage.posts.used}
+                  limit={usage.credits?.limit || usage.posts.limit}
+                  unlimited={usage.credits?.limit === 0}
                 />
                 <UsageBar
                   label="Storage"
@@ -110,21 +121,93 @@ export default function Settings() {
                   unit="GB"
                   unlimited={usage.storage.unlimited}
                 />
-                <UsageBar
-                  label="API Calls"
-                  used={usage.api_calls.used}
-                  limit={usage.api_calls.limit}
-                  unlimited={usage.api_calls.unlimited}
-                />
               </div>
 
-              {/* Overage Notice */}
-              {usage.posts.overage > 0 && (
-                <div className={clsx('p-3 rounded-lg text-sm', theme.bgMuted, theme.textPrimary)}>
-                  You have {usage.posts.overage} overage posts this period.
-                  {usage.subscription.overage_enabled
-                    ? ' Additional charges may apply.'
-                    : ' Consider upgrading your plan.'}
+              {/* Features List */}
+              {usage.features && (
+                <div className="border-t border-zinc-800 pt-4 mt-4">
+                  <h3 className="text-sm font-medium text-zinc-400 mb-3">Your Features</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className={clsx(
+                      'flex items-center gap-2 text-sm',
+                      usage.features.premium_workflow ? 'text-green-400' : 'text-zinc-500'
+                    )}>
+                      {usage.features.premium_workflow ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <X className="w-4 h-4" />
+                      )}
+                      Premium AI Models
+                    </div>
+                    <div className={clsx(
+                      'flex items-center gap-2 text-sm',
+                      usage.features.voice_transcription ? 'text-green-400' : 'text-zinc-500'
+                    )}>
+                      {usage.features.voice_transcription ? (
+                        <Mic className="w-4 h-4" />
+                      ) : (
+                        <X className="w-4 h-4" />
+                      )}
+                      Voice Transcription
+                    </div>
+                    <div className={clsx(
+                      'flex items-center gap-2 text-sm',
+                      usage.features.youtube_transcription ? 'text-green-400' : 'text-zinc-500'
+                    )}>
+                      {usage.features.youtube_transcription ? (
+                        <Youtube className="w-4 h-4" />
+                      ) : (
+                        <X className="w-4 h-4" />
+                      )}
+                      YouTube Transcription
+                    </div>
+                    <div className={clsx(
+                      'flex items-center gap-2 text-sm',
+                      usage.features.priority_support ? 'text-green-400' : 'text-zinc-500'
+                    )}>
+                      {usage.features.priority_support ? (
+                        <Zap className="w-4 h-4" />
+                      ) : (
+                        <X className="w-4 h-4" />
+                      )}
+                      Priority Support
+                    </div>
+                    <div className={clsx(
+                      'flex items-center gap-2 text-sm',
+                      usage.features.api_access ? 'text-green-400' : 'text-zinc-500'
+                    )}>
+                      {usage.features.api_access ? (
+                        <Code className="w-4 h-4" />
+                      ) : (
+                        <X className="w-4 h-4" />
+                      )}
+                      API Access
+                    </div>
+                    <div className={clsx(
+                      'flex items-center gap-2 text-sm',
+                      usage.features.team_workspaces ? 'text-green-400' : 'text-zinc-500'
+                    )}>
+                      {usage.features.team_workspaces ? (
+                        <Users className="w-4 h-4" />
+                      ) : (
+                        <X className="w-4 h-4" />
+                      )}
+                      Team Workspaces
+                    </div>
+                  </div>
+                  <div className="mt-3 text-sm text-zinc-400">
+                    Text limit: {usage.features.text_limit.toLocaleString()} characters
+                  </div>
+                </div>
+              )}
+
+              {/* Low Credits Warning */}
+              {usage.credits && usage.credits.remaining < 5 && usage.credits.limit > 0 && (
+                <div className="p-3 rounded-lg text-sm bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  <div className="flex items-center gap-2">
+                    <Crown className="w-4 h-4" />
+                    You have {usage.credits.remaining} credits remaining. Consider upgrading your plan.
+                  </div>
                 </div>
               )}
             </>
@@ -171,21 +254,28 @@ export default function Settings() {
                       <li className="flex items-center gap-2 text-zinc-300">
                         <Check className="w-4 h-4 text-green-400" />
                         {tier.posts_per_month === 0
-                          ? 'Unlimited posts'
-                          : `${tier.posts_per_month} posts/month`}
+                          ? 'Unlimited credits'
+                          : `${tier.posts_per_month} credits/month`}
                       </li>
-                      <li className="flex items-center gap-2 text-zinc-300">
-                        <Check className="w-4 h-4 text-green-400" />
-                        {tier.workspaces_limit} workspace{tier.workspaces_limit > 1 ? 's' : ''}
-                      </li>
-                      <li className="flex items-center gap-2 text-zinc-300">
-                        <Check className="w-4 h-4 text-green-400" />
-                        {tier.members_per_workspace} team member{tier.members_per_workspace > 1 ? 's' : ''}
-                      </li>
-                      <li className="flex items-center gap-2 text-zinc-300">
-                        <Check className="w-4 h-4 text-green-400" />
-                        {tier.storage_gb} GB storage
-                      </li>
+                      {/* Show features based on tier slug */}
+                      {tier.slug !== 'free' && (
+                        <li className="flex items-center gap-2 text-zinc-300">
+                          <Check className="w-4 h-4 text-green-400" />
+                          Premium AI models
+                        </li>
+                      )}
+                      {(tier.slug === 'starter' || tier.slug === 'pro' || tier.slug === 'business') && (
+                        <li className="flex items-center gap-2 text-zinc-300">
+                          <Mic className="w-4 h-4 text-green-400" />
+                          Voice transcription
+                        </li>
+                      )}
+                      {(tier.slug === 'pro' || tier.slug === 'business') && (
+                        <li className="flex items-center gap-2 text-zinc-300">
+                          <Youtube className="w-4 h-4 text-green-400" />
+                          YouTube transcription
+                        </li>
+                      )}
                       {tier.priority_support && (
                         <li className="flex items-center gap-2 text-zinc-300">
                           <Zap className={clsx('w-4 h-4', theme.iconPrimary)} />
@@ -194,8 +284,14 @@ export default function Settings() {
                       )}
                       {tier.api_access && (
                         <li className="flex items-center gap-2 text-zinc-300">
-                          <Check className="w-4 h-4 text-green-400" />
+                          <Code className="w-4 h-4 text-green-400" />
                           API access
+                        </li>
+                      )}
+                      {tier.slug === 'business' && (
+                        <li className="flex items-center gap-2 text-zinc-300">
+                          <Users className="w-4 h-4 text-green-400" />
+                          Team workspaces
                         </li>
                       )}
                     </ul>
