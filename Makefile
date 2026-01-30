@@ -2,14 +2,17 @@
 # WORKFLOW ORCHESTRATOR MAKEFILE
 # ============================================================================
 
+# Include CI reporting (provides ci-report target)
+include Makefile.ci
+
 .PHONY: help setup install-hooks install-deps install-gui-deps install-gh check-env \
         workflow workflow-interactive workflow-step list-configs check-config test test-unit test-int test-e2e \
-        coverage logs log-states log-tokens log-summary clean \
+        test-isolation coverage logs log-states log-tokens log-summary clean \
         up up-gpu up-cpu down api gui gui-build dev dev-stop restart ollama-pull ollama-list \
         eval-agents eval-costs eval-trend eval-post eval-summary \
         seed-db seed-db-force seed-voices seed-personas seed-sentiments sync-workflows \
         db-up db-down db-migrate db-rollback db-revision db-history db-current db-migrate-data db-init db-drop db-shell \
-        pr
+        pr ci-report
 
 # Default target
 help:
@@ -57,9 +60,11 @@ help:
 	@echo "  make test                      Run unit tests"
 	@echo "  make test-unit                 Run unit tests (verbose)"
 	@echo "  make test-int                  Run integration tests"
+	@echo "  make test-isolation            Run data isolation tests"
 	@echo "  make test-e2e                  Run e2e tests (costs money)"
 	@echo "  make coverage                  Generate coverage report"
 	@echo "  make test-file FILE=...        Run specific test file"
+	@echo "  make ci-report                 Run full CI pipeline with report"
 	@echo ""
 	@echo "Logging:"
 	@echo "  make logs                      List all runs"
@@ -193,6 +198,9 @@ test-unit:
 
 test-int:
 	python3 -m pytest tests/integration -v --tb=short
+
+test-isolation:
+	python3 -m pytest tests/integration/test_workspace_data_isolation.py tests/integration/test_voice_profiles_isolation.py -v --tb=short
 
 test-e2e:
 	python3 -m pytest tests/e2e -v --tb=short -m e2e
