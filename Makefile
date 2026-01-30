@@ -2,25 +2,57 @@
 # WORKFLOW ORCHESTRATOR MAKEFILE
 # ============================================================================
 
-# CI configuration - exclude e2e tests (they cost money)
+# CI configuration
 TEST_DIRS := tests/unit tests/integration
 SRC_DIRS := runner api
 
-# Override ci-report to start database first
-ci-report: ci-db-up
-	@$(MAKE) -f Makefile.ci ci-report || ($(MAKE) ci-db-down && exit 1)
-	@$(MAKE) ci-db-down
-
-ci-db-up:
-	@echo "Starting database for CI..."
-	@docker compose up -d postgres pgbouncer
-	@sleep 3
-	@docker compose exec postgres pg_isready -U orchestrator || sleep 5
-	@cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator alembic upgrade head
-
-ci-db-down:
-	@echo "Stopping CI database..."
-	@docker compose stop postgres pgbouncer
+# Full CI: lint, build, start services, test, stop
+ci-report:
+	@echo "=============================================="
+	@echo "CI REPORT - $$(date)"
+	@echo "=============================================="
+	@FAILED=0; \
+	\
+	echo ""; echo "[1/6] Linting..."; \
+	if ruff check $(SRC_DIRS); then echo "✅ Lint passed"; else echo "❌ Lint failed"; FAILED=1; fi; \
+	\
+	echo ""; echo "[2/6] Format check..."; \
+	if ruff format $(SRC_DIRS) --check; then echo "✅ Format passed"; else echo "❌ Format failed"; FAILED=1; fi; \
+	\
+	echo ""; echo "[3/6] Building GUI..."; \
+	if cd gui && npm run build; then echo "✅ GUI build passed"; else echo "❌ GUI build failed"; FAILED=1; fi; \
+	cd ..; \
+	\
+	echo ""; echo "[4/6] Starting services..."; \
+	docker compose up -d postgres pgbouncer && sleep 3; \
+	docker compose exec postgres pg_isready -U orchestrator || sleep 5; \
+	cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator alembic upgrade head && cd ../../..; \
+	uvicorn api.main:app --host 0.0.0.0 --port 8000 & API_PID=$$!; \
+	sleep 3; \
+	if curl -s http://localhost:8000/health > /dev/null; then \
+		echo "✅ API started"; \
+	else \
+		echo "❌ API failed to start"; FAILED=1; \
+	fi; \
+	\
+	echo ""; echo "[5/6] Running tests..."; \
+	if python3 -m pytest $(TEST_DIRS) -v --tb=short; then \
+		echo "✅ Tests passed"; \
+	else \
+		echo "❌ Tests failed"; FAILED=1; \
+	fi; \
+	\
+	echo ""; echo "[6/6] Stopping services..."; \
+	kill $$API_PID 2>/dev/null || true; \
+	docker compose stop postgres pgbouncer; \
+	echo "✅ Services stopped"; \
+	\
+	echo ""; echo "=============================================="; \
+	if [ $$FAILED -eq 0 ]; then \
+		echo "🎉 CI PASSED"; exit 0; \
+	else \
+		echo "❌ CI FAILED"; exit 1; \
+	fi
 
 .PHONY: help setup install-hooks install-deps install-gui-deps install-gh check-env \
         workflow workflow-interactive workflow-step list-configs check-config test test-unit test-int test-e2e \
@@ -29,7 +61,7 @@ ci-db-down:
         eval-agents eval-costs eval-trend eval-post eval-summary \
         seed-db seed-db-force seed-voices seed-personas seed-sentiments sync-workflows \
         db-up db-down db-migrate db-rollback db-revision db-history db-current db-migrate-data db-init db-drop db-shell \
-        pr ci-report ci-db-up ci-db-down
+        pr ci-report
 
 # Default target
 help:
