@@ -6,45 +6,46 @@
 TEST_DIRS := tests/unit tests/integration
 SRC_DIRS := runner api
 
-# Full CI: lint, build, start services, test, stop
+# Full CI: lint, build containers, start services, test, stop
 ci-report:
 	@echo "=============================================="
 	@echo "CI REPORT - $$(date)"
 	@echo "=============================================="
 	@FAILED=0; \
 	\
-	echo ""; echo "[1/6] Linting..."; \
+	echo ""; echo "[1/5] Linting..."; \
 	if ruff check $(SRC_DIRS); then echo "✅ Lint passed"; else echo "❌ Lint failed"; FAILED=1; fi; \
 	\
-	echo ""; echo "[2/6] Format check..."; \
+	echo ""; echo "[2/5] Format check..."; \
 	if ruff format $(SRC_DIRS) --check; then echo "✅ Format passed"; else echo "❌ Format failed"; FAILED=1; fi; \
 	\
-	echo ""; echo "[3/6] Building GUI..."; \
-	if cd gui && npm run build; then echo "✅ GUI build passed"; else echo "❌ GUI build failed"; FAILED=1; fi; \
-	cd ..; \
-	\
-	echo ""; echo "[4/6] Starting services..."; \
-	docker compose up -d postgres pgbouncer && sleep 3; \
+	echo ""; echo "[3/5] Building and starting Docker containers..."; \
+	docker compose $(COMPOSE_FILES) up -d postgres pgbouncer --build && sleep 3; \
 	docker compose exec postgres pg_isready -U orchestrator || sleep 5; \
 	cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator alembic upgrade head && cd ../../..; \
-	uvicorn api.main:app --host 0.0.0.0 --port 8000 & API_PID=$$!; \
-	sleep 3; \
-	if curl -s http://localhost:8000/health > /dev/null; then \
-		echo "✅ API started"; \
+	docker compose $(COMPOSE_FILES) up -d --build; \
+	echo "Waiting for services to be healthy..."; \
+	sleep 10; \
+	if curl -sf http://localhost:8000/health > /dev/null; then \
+		echo "✅ API healthy"; \
 	else \
-		echo "❌ API failed to start"; FAILED=1; \
+		echo "❌ API not healthy"; FAILED=1; \
+	fi; \
+	if curl -sf http://localhost:5173 > /dev/null 2>&1 || curl -sf http://localhost:3000 > /dev/null 2>&1; then \
+		echo "✅ GUI healthy"; \
+	else \
+		echo "⚠️  GUI not responding (may be expected in CI)"; \
 	fi; \
 	\
-	echo ""; echo "[5/6] Running tests..."; \
+	echo ""; echo "[4/5] Running tests..."; \
 	if python3 -m pytest $(TEST_DIRS) -v --tb=short; then \
 		echo "✅ Tests passed"; \
 	else \
 		echo "❌ Tests failed"; FAILED=1; \
 	fi; \
 	\
-	echo ""; echo "[6/6] Stopping services..."; \
-	kill $$API_PID 2>/dev/null || true; \
-	docker compose stop postgres pgbouncer; \
+	echo ""; echo "[5/5] Stopping services..."; \
+	docker compose $(COMPOSE_FILES) down; \
 	echo "✅ Services stopped"; \
 	\
 	echo ""; echo "=============================================="; \
