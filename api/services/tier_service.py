@@ -43,11 +43,13 @@ class TierService:
     """
 
     # Feature to minimum tier mapping for upgrade CTAs
+    # Free/Base: basic generation + direct publishing
+    # Pro: + voice transcription, youtube transcription
+    # Max: + team workspaces, API access (enterprise)
     FEATURE_MIN_TIER = {
-        "basic_workflow": "free",
-        "premium_workflow": "base",
-        "voice_transcription": "base",
-        "direct_publishing": "base",
+        "premium_workflow": "free",
+        "direct_publishing": "free",
+        "voice_transcription": "pro",
         "youtube_transcription": "pro",
         "priority_support": "pro",
         "api_access": "max",

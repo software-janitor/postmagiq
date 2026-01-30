@@ -95,42 +95,61 @@ def upgrade() -> None:
     """)
 
     # ==========================================================================
-    # Update tier_features for new slugs
+    # Reset tier_features with correct feature distribution
+    # Free/Base: basic generation + direct publishing
+    # Pro: + voice transcription, youtube transcription
+    # Max: + team workspaces, API access (enterprise)
     # ==========================================================================
 
-    # Update feature records for Base tier (was starter)
-    op.execute("""
-        UPDATE tier_features tf
-        SET updated_at = now()
-        FROM subscription_tiers t
-        WHERE tf.tier_id = t.id AND t.slug = 'base'
-    """)
+    # Clear existing features
+    op.execute("DELETE FROM tier_features")
 
-    # Update feature records for Max tier (was business)
-    op.execute("""
-        UPDATE tier_features tf
-        SET updated_at = now()
-        FROM subscription_tiers t
-        WHERE tf.tier_id = t.id AND t.slug = 'max'
-    """)
-
-    # ==========================================================================
-    # Add direct_publishing feature to all paid tiers
-    # ==========================================================================
+    # Insert new feature configuration
     op.execute("""
         INSERT INTO tier_features (id, tier_id, feature_key, enabled, config, created_at)
         SELECT
             gen_random_uuid(),
             t.id,
-            'direct_publishing',
-            CASE WHEN t.slug IN ('base', 'pro', 'max') THEN true ELSE false END,
-            '{}',
+            f.feature_key,
+            f.enabled,
+            f.config::jsonb,
             now()
         FROM subscription_tiers t
-        WHERE t.slug IN ('free', 'base', 'pro', 'max')
-        ON CONFLICT (tier_id, feature_key) DO UPDATE SET
-            enabled = EXCLUDED.enabled,
-            updated_at = now()
+        CROSS JOIN (VALUES
+            -- Free tier: basic generation only
+            ('free', 'premium_workflow', true, '{"text_limit": 50000}'),
+            ('free', 'voice_transcription', false, '{}'),
+            ('free', 'youtube_transcription', false, '{}'),
+            ('free', 'direct_publishing', true, '{}'),
+            ('free', 'priority_support', false, '{}'),
+            ('free', 'api_access', false, '{}'),
+            ('free', 'team_workspaces', false, '{}'),
+            -- Base tier: same as free, just more credits
+            ('base', 'premium_workflow', true, '{"text_limit": 50000}'),
+            ('base', 'voice_transcription', false, '{}'),
+            ('base', 'youtube_transcription', false, '{}'),
+            ('base', 'direct_publishing', true, '{}'),
+            ('base', 'priority_support', false, '{}'),
+            ('base', 'api_access', false, '{}'),
+            ('base', 'team_workspaces', false, '{}'),
+            -- Pro tier: + voice & youtube transcription
+            ('pro', 'premium_workflow', true, '{"text_limit": 100000}'),
+            ('pro', 'voice_transcription', true, '{}'),
+            ('pro', 'youtube_transcription', true, '{}'),
+            ('pro', 'direct_publishing', true, '{}'),
+            ('pro', 'priority_support', true, '{}'),
+            ('pro', 'api_access', false, '{}'),
+            ('pro', 'team_workspaces', false, '{}'),
+            -- Max tier: + team workspaces, API access (enterprise)
+            ('max', 'premium_workflow', true, '{"text_limit": 100000}'),
+            ('max', 'voice_transcription', true, '{}'),
+            ('max', 'youtube_transcription', true, '{}'),
+            ('max', 'direct_publishing', true, '{}'),
+            ('max', 'priority_support', true, '{}'),
+            ('max', 'api_access', true, '{}'),
+            ('max', 'team_workspaces', true, '{}')
+        ) AS f(tier_slug, feature_key, enabled, config)
+        WHERE t.slug = f.tier_slug
     """)
 
 

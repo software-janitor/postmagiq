@@ -271,23 +271,20 @@ export default function Settings() {
                           ? 'Unlimited credits'
                           : `${tier.posts_per_month} credits/month`}
                       </li>
-                      {/* Show features based on tier slug */}
-                      {tier.slug !== 'free' && (
-                        <li className="flex items-center gap-2 text-zinc-300">
-                          <Check className="w-4 h-4 text-green-400" />
-                          Premium AI models
-                        </li>
-                      )}
-                      {(tier.slug === 'base' || tier.slug === 'pro' || tier.slug === 'max') && (
+                      {/* All tiers get AI generation + direct publishing */}
+                      <li className="flex items-center gap-2 text-zinc-300">
+                        <Check className="w-4 h-4 text-green-400" />
+                        AI content generation
+                      </li>
+                      <li className="flex items-center gap-2 text-zinc-300">
+                        <Send className="w-4 h-4 text-green-400" />
+                        Direct publishing
+                      </li>
+                      {/* Pro+ features: voice & youtube transcription */}
+                      {(tier.slug === 'pro' || tier.slug === 'max') && (
                         <li className="flex items-center gap-2 text-zinc-300">
                           <Mic className="w-4 h-4 text-green-400" />
                           Voice transcription
-                        </li>
-                      )}
-                      {(tier.slug === 'base' || tier.slug === 'pro' || tier.slug === 'max') && (
-                        <li className="flex items-center gap-2 text-zinc-300">
-                          <Send className="w-4 h-4 text-green-400" />
-                          Direct publishing
                         </li>
                       )}
                       {(tier.slug === 'pro' || tier.slug === 'max') && (
@@ -302,6 +299,7 @@ export default function Settings() {
                           Priority support
                         </li>
                       )}
+                      {/* Max only: enterprise features */}
                       {tier.api_access && (
                         <li className="flex items-center gap-2 text-zinc-300">
                           <Code className="w-4 h-4 text-green-400" />
