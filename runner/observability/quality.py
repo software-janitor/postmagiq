@@ -31,6 +31,7 @@ from typing import Optional
 
 class ScoreType(str, Enum):
     """Types of quality scores."""
+
     VOICE_CONSISTENCY = "voice_consistency"
     CHARACTER_CONSISTENCY = "character_consistency"
     ENGAGEMENT = "engagement"
@@ -41,6 +42,7 @@ class ScoreType(str, Enum):
 @dataclass
 class QualityScore:
     """A single quality measurement."""
+
     content_id: str
     score_type: str
     score: float  # 0.0 to 1.0
@@ -51,6 +53,7 @@ class QualityScore:
 @dataclass
 class DriftAlert:
     """Alert for quality drift."""
+
     score_type: str
     current_avg: float
     baseline_avg: float
@@ -203,8 +206,8 @@ class QualityMonitor:
                 baseline_avg=baseline,
                 drift_percentage=drift * 100,
                 timestamp=datetime.utcnow(),
-                message=f"{score_type} has {direction} by {abs(drift)*100:.1f}% "
-                        f"(baseline: {baseline:.2f}, current: {recent_avg:.2f})",
+                message=f"{score_type} has {direction} by {abs(drift) * 100:.1f}% "
+                f"(baseline: {baseline:.2f}, current: {recent_avg:.2f})",
             )
 
         return None
@@ -236,11 +239,13 @@ class QualityMonitor:
         # Calculate averages
         trend = []
         for date, values in sorted(buckets.items()):
-            trend.append({
-                "date": date,
-                "avg": statistics.mean(values),
-                "count": len(values),
-            })
+            trend.append(
+                {
+                    "date": date,
+                    "avg": statistics.mean(values),
+                    "count": len(values),
+                }
+            )
 
         return trend
 

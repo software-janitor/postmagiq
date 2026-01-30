@@ -2,14 +2,12 @@
 
 import os
 import time
-import subprocess
 import threading
 from copy import deepcopy
 from typing import Optional, Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from runner.models import (
-    AgentResult,
     TokenUsage,
     FanOutResult,
     StateResult,
@@ -53,7 +51,9 @@ class StateMachine:
         self.token_tracker: Optional[TokenTracker] = None
         self.retry_feedback: dict[str, str] = {}
         self.current_state: Optional[str] = None
-        self.last_audit_score: Optional[int] = None  # Track last audit score for circuit breaker decisions
+        self.last_audit_score: Optional[int] = (
+            None  # Track last audit score for circuit breaker decisions
+        )
         self.run_id: Optional[str] = None
 
         # Approval flow state (for API-driven approval)
@@ -152,7 +152,7 @@ class StateMachine:
 
         if self.run_dir:
             if formatted.startswith("workflow/"):
-                formatted = formatted[len("workflow/"):]
+                formatted = formatted[len("workflow/") :]
             return os.path.join(self.run_dir, formatted)
 
         return formatted
@@ -176,10 +176,12 @@ class StateMachine:
         while True:
             # Check for abort
             if self._aborted:
-                self.log_callback({
-                    "event": "aborted",
-                    "state": self.current_state,
-                })
+                self.log_callback(
+                    {
+                        "event": "aborted",
+                        "state": self.current_state,
+                    }
+                )
                 return {
                     "final_state": "halt",
                     "error": "Aborted by user",
@@ -187,34 +189,42 @@ class StateMachine:
 
             # Check for pause checkpoint
             if self._paused:
-                self.log_callback({
-                    "event": "paused",
-                    "state": self.current_state,
-                })
+                self.log_callback(
+                    {
+                        "event": "paused",
+                        "state": self.current_state,
+                    }
+                )
                 # Wait for resume (blocks until _pause_event is set)
                 self._pause_event.wait()
                 # Check if we were unblocked by abort rather than resume
                 if self._aborted:
-                    self.log_callback({
-                        "event": "aborted",
-                        "state": self.current_state,
-                    })
+                    self.log_callback(
+                        {
+                            "event": "aborted",
+                            "state": self.current_state,
+                        }
+                    )
                     return {
                         "final_state": "halt",
                         "error": "Aborted by user",
                     }
-                self.log_callback({
-                    "event": "resumed",
-                    "state": self.current_state,
-                })
+                self.log_callback(
+                    {
+                        "event": "resumed",
+                        "state": self.current_state,
+                    }
+                )
 
             safety_check = self.circuit_breaker.check_safety_limits()
             if safety_check["triggered"]:
-                self.log_callback({
-                    "event": "hard_limit",
-                    "rule": safety_check["rule"],
-                    "context": safety_check["context"],
-                })
+                self.log_callback(
+                    {
+                        "event": "hard_limit",
+                        "rule": safety_check["rule"],
+                        "context": safety_check["context"],
+                    }
+                )
                 return {
                     "final_state": "halt",
                     "error": f"Hard limit triggered: {safety_check['rule']}",
@@ -238,11 +248,13 @@ class StateMachine:
                 result = self.execute_state(self.current_state, state_config)
             except Exception as e:
                 error = str(e)
-                self.log_callback({
-                    "event": "state_error",
-                    "state": self.current_state,
-                    "error": error,
-                })
+                self.log_callback(
+                    {
+                        "event": "state_error",
+                        "state": self.current_state,
+                        "error": error,
+                    }
+                )
                 final_state = "halt"
                 break
 
@@ -252,8 +264,9 @@ class StateMachine:
                 final_state = "halt"
                 # Extract actual error from agent outputs if available
                 agent_errors = [
-                    out.error for out in result.outputs.values()
-                    if hasattr(out, 'error') and out.error
+                    out.error
+                    for out in result.outputs.values()
+                    if hasattr(out, "error") and out.error
                 ]
                 if agent_errors:
                     error = agent_errors[0]  # Use first agent error
@@ -267,24 +280,33 @@ class StateMachine:
                 ctx = breaker_check["context"]
                 AUTO_PROCEED_THRESHOLD = 8
 
-                self.log_callback({
-                    "event": "circuit_break",
-                    "rule": rule,
-                    "context": ctx,
-                    "last_audit_score": self.last_audit_score,
-                })
+                self.log_callback(
+                    {
+                        "event": "circuit_break",
+                        "rule": rule,
+                        "context": ctx,
+                        "last_audit_score": self.last_audit_score,
+                    }
+                )
 
                 # If last audit score >= 8, auto-proceed (story is good enough)
-                if self.last_audit_score is not None and self.last_audit_score >= AUTO_PROCEED_THRESHOLD:
+                if (
+                    self.last_audit_score is not None
+                    and self.last_audit_score >= AUTO_PROCEED_THRESHOLD
+                ):
                     # Look for success/proceed transition (different states use different names)
                     transitions = self._get_transitions(state_config)
-                    skip_target = transitions.get("success") or transitions.get("proceed")
+                    skip_target = transitions.get("success") or transitions.get(
+                        "proceed"
+                    )
                     if skip_target:
-                        self.log_callback({
-                            "event": "circuit_break_auto_skip",
-                            "reason": f"Score {self.last_audit_score} >= {AUTO_PROCEED_THRESHOLD}, auto-proceeding",
-                            "skip_to": skip_target,
-                        })
+                        self.log_callback(
+                            {
+                                "event": "circuit_break_auto_skip",
+                                "reason": f"Score {self.last_audit_score} >= {AUTO_PROCEED_THRESHOLD}, auto-proceeding",
+                                "skip_to": skip_target,
+                            }
+                        )
                         next_state = skip_target
                     # Continue to next iteration with new next_state
                 elif self.approval_callback:
@@ -293,7 +315,9 @@ class StateMachine:
 
                     # Build user-friendly content with audit feedback
                     content_parts = []
-                    content_parts.append(f"Quality Score: {self.last_audit_score or 'N/A'}/10\n")
+                    content_parts.append(
+                        f"Quality Score: {self.last_audit_score or 'N/A'}/10\n"
+                    )
 
                     if audit_results:
                         content_parts.append("Auditor Feedback:\n")
@@ -301,18 +325,24 @@ class StateMachine:
                             auditor = ar.get("agent", "Unknown")
                             score = ar.get("score", "N/A")
                             feedback = ar.get("feedback", "No feedback")
-                            content_parts.append(f"• {auditor}: {score}/10 - {feedback}\n")
+                            content_parts.append(
+                                f"• {auditor}: {score}/10 - {feedback}\n"
+                            )
                     else:
                         content_parts.append("No audit feedback available.\n")
 
-                    content_parts.append("\nThe post needs improvement to reach the quality threshold (8/10).")
+                    content_parts.append(
+                        "\nThe post needs improvement to reach the quality threshold (8/10)."
+                    )
 
-                    self.approval_callback({
-                        "type": "circuit_break",
-                        "content": "".join(content_parts),
-                        "prompt": "Review the feedback above and provide guidance to improve the post, or choose to publish as-is.",
-                        "audit_results": audit_results,
-                    })
+                    self.approval_callback(
+                        {
+                            "type": "circuit_break",
+                            "content": "".join(content_parts),
+                            "prompt": "Review the feedback above and provide guidance to improve the post, or choose to publish as-is.",
+                            "audit_results": audit_results,
+                        }
+                    )
 
                     # Wait for user decision
                     decision, user_feedback = self._wait_for_approval()
@@ -320,30 +350,40 @@ class StateMachine:
                     if decision == "approved":
                         # User wants to publish as-is - skip forward
                         transitions = self._get_transitions(state_config)
-                        skip_target = transitions.get("success") or transitions.get("proceed")
+                        skip_target = transitions.get("success") or transitions.get(
+                            "proceed"
+                        )
                         if skip_target:
-                            self.log_callback({
-                                "event": "circuit_break_skip",
-                                "skipped_state": next_state,
-                                "skip_to": skip_target,
-                            })
+                            self.log_callback(
+                                {
+                                    "event": "circuit_break_skip",
+                                    "skipped_state": next_state,
+                                    "skip_to": skip_target,
+                                }
+                            )
                             next_state = skip_target
                         else:
-                            self.log_callback({
-                                "event": "circuit_break_continue",
-                                "continuing_to": next_state,
-                            })
+                            self.log_callback(
+                                {
+                                    "event": "circuit_break_continue",
+                                    "continuing_to": next_state,
+                                }
+                            )
                     elif decision == "feedback":
                         # User wants to try again with guidance - loop back to synthesize
-                        self.log_callback({
-                            "event": "circuit_break_retry",
-                            "user_feedback": user_feedback,
-                        })
+                        self.log_callback(
+                            {
+                                "event": "circuit_break_retry",
+                                "user_feedback": user_feedback,
+                            }
+                        )
                         # Reset circuit breaker to allow more iterations
                         self.circuit_breaker.reset()
                         # Store user feedback for synthesizer
                         if user_feedback:
-                            self.retry_feedback["synthesize"] = f"## USER FEEDBACK — MUST INCORPORATE\n\n{user_feedback}"
+                            self.retry_feedback["synthesize"] = (
+                                f"## USER FEEDBACK — MUST INCORPORATE\n\n{user_feedback}"
+                            )
                         # Go back to synthesize
                         next_state = "synthesize"
                     else:
@@ -364,17 +404,21 @@ class StateMachine:
                         "context": ctx,
                     }
 
-            self.log_callback({
-                "event": "transition",
-                "from": self.current_state,
-                "to": next_state,
-            })
+            self.log_callback(
+                {
+                    "event": "transition",
+                    "from": self.current_state,
+                    "to": next_state,
+                }
+            )
             self.current_state = next_state
 
         return {
             "final_state": final_state,
             "error": error,
-            "token_summary": self.token_tracker.get_summary() if self.token_tracker else None,
+            "token_summary": self.token_tracker.get_summary()
+            if self.token_tracker
+            else None,
         }
 
     def execute_state(self, state_name: str, state_config: dict) -> StateResult:
@@ -395,12 +439,14 @@ class StateMachine:
                     f"Previous attempt feedback:\n{feedback}"
                 )
 
-        self.log_callback({
-            "event": "state_enter",
-            "state": state_name,
-            "type": state_type,
-            "has_feedback": feedback is not None,
-        })
+        self.log_callback(
+            {
+                "event": "state_enter",
+                "state": state_name,
+                "type": state_type,
+                "has_feedback": feedback is not None,
+            }
+        )
 
         start_time = time.time()
 
@@ -427,16 +473,20 @@ class StateMachine:
                 "tokens": tokens.total if tokens else 0,
                 "tokens_input": tokens.input_tokens if tokens else 0,
                 "tokens_output": tokens.output_tokens if tokens else 0,
-                "cost_usd": agent_result.cost_usd if hasattr(agent_result, 'cost_usd') else 0,
+                "cost_usd": agent_result.cost_usd
+                if hasattr(agent_result, "cost_usd")
+                else 0,
             }
 
-        self.log_callback({
-            "event": "state_complete",
-            "state": state_name,
-            "transition": result.transition,
-            "duration_s": result.duration_s,
-            "agent_metrics": agent_metrics,
-        })
+        self.log_callback(
+            {
+                "event": "state_complete",
+                "state": state_name,
+                "transition": result.transition,
+                "duration_s": result.duration_s,
+                "agent_metrics": agent_metrics,
+            }
+        )
 
         return result
 
@@ -496,9 +546,15 @@ class StateMachine:
             with ThreadPoolExecutor(max_workers=len(agent_names)) as executor:
                 futures = {}
                 for agent_name in agent_names:
-                    output_path = self._resolve_output_path(output_template, agent=agent_name)
+                    output_path = self._resolve_output_path(
+                        output_template, agent=agent_name
+                    )
                     future = executor.submit(
-                        self._invoke_agent, agent_name, agent_prompts[agent_name], output_path, state_name
+                        self._invoke_agent,
+                        agent_name,
+                        agent_prompts[agent_name],
+                        output_path,
+                        state_name,
                     )
                     futures[future] = agent_name
 
@@ -510,7 +566,9 @@ class StateMachine:
                             outputs[agent_name] = result
                             if result.tokens:
                                 total_tokens.input_tokens += result.tokens.input_tokens
-                                total_tokens.output_tokens += result.tokens.output_tokens
+                                total_tokens.output_tokens += (
+                                    result.tokens.output_tokens
+                                )
                         except TimeoutError:
                             outputs[agent_name] = FanOutResult(
                                 agent=agent_name,
@@ -534,8 +592,12 @@ class StateMachine:
                             )
         else:
             for agent_name in agent_names:
-                output_path = self._resolve_output_path(output_template, agent=agent_name)
-                result = self._invoke_agent(agent_name, agent_prompts[agent_name], output_path, state_name)
+                output_path = self._resolve_output_path(
+                    output_template, agent=agent_name
+                )
+                result = self._invoke_agent(
+                    agent_name, agent_prompts[agent_name], output_path, state_name
+                )
                 outputs[agent_name] = result
                 if result.tokens:
                     total_tokens.input_tokens += result.tokens.input_tokens
@@ -555,7 +617,9 @@ class StateMachine:
                         audit_results.append((name, audit))
 
             if audit_results:
-                transition, feedback = self._aggregate_audit_results(audit_results, state)
+                transition, feedback = self._aggregate_audit_results(
+                    audit_results, state
+                )
                 return StateResult(
                     state_name=state_name,
                     transition=transition,
@@ -674,7 +738,10 @@ class StateMachine:
             template_prompt = prompt_template
             if "{context}" in template_prompt:
                 import json
-                template_prompt = template_prompt.replace("{context}", json.dumps(context, indent=2))
+
+                template_prompt = template_prompt.replace(
+                    "{context}", json.dumps(context, indent=2)
+                )
             prompt_parts.append(template_prompt)
 
         # Read input files and append to prompt
@@ -683,7 +750,9 @@ class StateMachine:
             if os.path.exists(input_file):
                 with open(input_file) as f:
                     content = f.read()
-                input_content += f"\n\n## File: {os.path.basename(input_file)}\n\n{content}"
+                input_content += (
+                    f"\n\n## File: {os.path.basename(input_file)}\n\n{content}"
+                )
 
         if input_content:
             prompt_parts.append(f"## Input Files\n{input_content}")
@@ -711,20 +780,28 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
         agent = self.get_agent(agent_name)
 
         # Log session info - especially useful when resuming with feedback
-        actual_session_id = agent.session_manager.session_id if hasattr(agent, 'session_manager') else None
+        actual_session_id = (
+            agent.session_manager.session_id
+            if hasattr(agent, "session_manager")
+            else None
+        )
         if user_feedback and actual_session_id:
-            self.log_callback({
-                "event": "session_resume",
-                "state": state_name,
-                "session_id": actual_session_id,
-                "message": f"Providing feedback to session {actual_session_id}",
-            })
+            self.log_callback(
+                {
+                    "event": "session_resume",
+                    "state": state_name,
+                    "session_id": actual_session_id,
+                    "message": f"Providing feedback to session {actual_session_id}",
+                }
+            )
         elif user_feedback:
-            self.log_callback({
-                "event": "session_new",
-                "state": state_name,
-                "message": "Starting new session (no previous session found)",
-            })
+            self.log_callback(
+                {
+                    "event": "session_new",
+                    "state": state_name,
+                    "message": "Starting new session (no previous session found)",
+                }
+            )
 
         # Set dev logger for LLM visibility (if enabled)
         if self.dev_logger and self.run_id:
@@ -748,13 +825,15 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
             os.replace(tmp_path, output_path)
 
             # Emit output_written event
-            self.log_callback({
-                "type": "output_written",
-                "state": state_name,
-                "agent": agent_name,
-                "output_path": output_path,
-                "content": result.content,
-            })
+            self.log_callback(
+                {
+                    "type": "output_written",
+                    "state": state_name,
+                    "agent": agent_name,
+                    "output_path": output_path,
+                    "content": result.content,
+                }
+            )
 
         if result.cost_usd:
             self.circuit_breaker.update_cost(result.cost_usd)
@@ -821,7 +900,7 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
         # Resolve input path if run_dir is set
         if input_path and self.run_dir:
             if input_path.startswith("workflow/"):
-                input_path = input_path[len("workflow/"):]
+                input_path = input_path[len("workflow/") :]
             input_path = os.path.join(self.run_dir, input_path)
 
         # Read content for approval - try primary path first, then fallbacks
@@ -868,9 +947,9 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
             decision, feedback = self._wait_for_approval(timeout=timeout)
         else:
             # CLI mode: use interactive input
-            print(f"\n{'='*60}")
+            print(f"\n{'=' * 60}")
             print("HUMAN APPROVAL REQUIRED")
-            print(f"{'='*60}")
+            print(f"{'=' * 60}")
 
             if content:
                 display_path = actual_path or input_path
@@ -908,11 +987,13 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
                     )
                 self.retry_feedback[target] = combined
 
-        self.log_callback({
-            "event": "human_approval",
-            "decision": decision,
-            "feedback": feedback if decision == "feedback" else None,
-        })
+        self.log_callback(
+            {
+                "event": "human_approval",
+                "decision": decision,
+                "feedback": feedback if decision == "feedback" else None,
+            }
+        )
 
         return StateResult(
             state_name="human-approval",
@@ -978,23 +1059,27 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
                     os.replace(tmp_path, output_path)
                 except (OSError, PermissionError) as e:
                     # File write failed, but database has the content - log and continue
-                    self.log_callback({
-                        "type": "file_write_failed",
+                    self.log_callback(
+                        {
+                            "type": "file_write_failed",
+                            "state": state,
+                            "agent": agent_name,
+                            "output_path": output_path,
+                            "error": str(e),
+                            "note": "Content saved to database, file write optional",
+                        }
+                    )
+
+                # Emit output_written event
+                self.log_callback(
+                    {
+                        "type": "output_written",
                         "state": state,
                         "agent": agent_name,
                         "output_path": output_path,
-                        "error": str(e),
-                        "note": "Content saved to database, file write optional",
-                    })
-
-                # Emit output_written event
-                self.log_callback({
-                    "type": "output_written",
-                    "state": state,
-                    "agent": agent_name,
-                    "output_path": output_path,
-                    "content": result.content,
-                })
+                        "content": result.content,
+                    }
+                )
 
                 if self.token_tracker:
                     self.token_tracker.record(
@@ -1124,6 +1209,7 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
 
         if "*" in input_spec:
             import glob
+
             run_files = sorted(glob.glob(run_spec)) if self.run_dir else []
             if run_files:
                 return run_files
@@ -1142,7 +1228,7 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
         if not self.run_dir:
             return path
         if path.startswith("workflow/"):
-            return os.path.join(self.run_dir, path[len("workflow/"):])
+            return os.path.join(self.run_dir, path[len("workflow/") :])
         return path
 
     def _load_persona(self, persona_ref: str) -> str:
@@ -1171,15 +1257,19 @@ Please make ONLY the requested changes. Do not rewrite the entire post. Keep eve
                 return composed
 
             # Fall back to database content if composition failed
-            persona = store.get_workflow_persona_by_slug(get_system_user_id(), persona_ref)
+            persona = store.get_workflow_persona_by_slug(
+                get_system_user_id(), persona_ref
+            )
             if persona:
                 return persona.content
         except Exception as e:
-            self.log_callback({
-                "event": "persona_load_error",
-                "persona": persona_ref,
-                "error": str(e),
-            })
+            self.log_callback(
+                {
+                    "event": "persona_load_error",
+                    "persona": persona_ref,
+                    "error": str(e),
+                }
+            )
 
         return ""
 
@@ -1254,6 +1344,7 @@ Your output will be cross-checked against source material. Fabrications = automa
         # Fall back to files if database didn't have content
         if not audit_feedback_parts and self.run_dir:
             import glob
+
             audit_pattern = os.path.join(self.run_dir, file_pattern)
             audit_files = glob.glob(audit_pattern)
 
@@ -1263,7 +1354,11 @@ Your output will be cross-checked against source material. Fabrications = automa
                         content = f.read()
                     # Extract agent name from filename
                     basename = os.path.basename(audit_file)
-                    agent_name = basename.replace("_final_audit.json", "").replace("_audit.json", "").title()
+                    agent_name = (
+                        basename.replace("_final_audit.json", "")
+                        .replace("_audit.json", "")
+                        .title()
+                    )
                     audit_feedback_parts.append(
                         f"### Feedback from {agent_name}\n\n{content}"
                     )
@@ -1294,7 +1389,6 @@ Your output will be cross-checked against source material. Fabrications = automa
         Returns a list of dicts with keys: agent, score, decision, feedback.
         Tries final_audit first, falls back to cross-audit.
         """
-        import json as _json
 
         results = []
 
@@ -1318,6 +1412,7 @@ Your output will be cross-checked against source material. Fabrications = automa
             # Fall back to files
             if not results and self.run_dir:
                 import glob
+
                 pattern = os.path.join(self.run_dir, file_pattern)
                 for audit_file in sorted(glob.glob(pattern)):
                     try:
@@ -1326,7 +1421,9 @@ Your output will be cross-checked against source material. Fabrications = automa
                         parsed = self._try_parse_audit_json(content)
                         if parsed:
                             basename = os.path.basename(audit_file)
-                            agent_name = basename.replace("_final_audit.json", "").replace("_audit.json", "")
+                            agent_name = basename.replace(
+                                "_final_audit.json", ""
+                            ).replace("_audit.json", "")
                             parsed["agent"] = agent_name
                             parsed["audit_type"] = audit_type
                             results.append(parsed)
@@ -1372,8 +1469,11 @@ Your output will be cross-checked against source material. Fabrications = automa
         return None
 
     def _build_prompt(
-        self, persona: str, input_files: list[str], context: str = "",
-        input_specs: list[str] = None
+        self,
+        persona: str,
+        input_files: list[str],
+        context: str = "",
+        input_specs: list[str] = None,
     ) -> str:
         """Build full prompt from persona, database content, and files.
 
@@ -1400,7 +1500,9 @@ Your output will be cross-checked against source material. Fabrications = automa
         # so the Ollama split puts them in the user message.
         feedback_context = None
         regular_context = context
-        if context and ("## USER FEEDBACK" in context or "## Reviewer Context" in context):
+        if context and (
+            "## USER FEEDBACK" in context or "## Reviewer Context" in context
+        ):
             feedback_context = context
             regular_context = None
 
@@ -1570,6 +1672,6 @@ Your output will be cross-checked against source material. Fabrications = automa
         # Fallback: return from first { to last }
         brace_end = content.rfind("}")
         if brace_start != -1 and brace_end > brace_start:
-            return content[brace_start:brace_end + 1]
+            return content[brace_start : brace_end + 1]
 
         return None

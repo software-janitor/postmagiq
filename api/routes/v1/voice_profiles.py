@@ -10,7 +10,7 @@ from typing import Annotated, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlmodel import Session, select, or_
 
 from api.auth.scopes import Scope
@@ -23,7 +23,9 @@ from runner.db.engine import get_session_dependency
 from runner.db.models import VoiceProfile
 
 
-router = APIRouter(prefix="/v1/w/{workspace_id}/voice-profiles", tags=["voice-profiles"])
+router = APIRouter(
+    prefix="/v1/w/{workspace_id}/voice-profiles", tags=["voice-profiles"]
+)
 
 
 # =============================================================================
@@ -115,7 +117,7 @@ async def list_voice_profiles(
     statement = select(VoiceProfile).where(
         or_(
             VoiceProfile.workspace_id == ctx.workspace_id,
-            VoiceProfile.is_preset == True,
+            VoiceProfile.is_preset,
         )
     )
     profiles = session.exec(statement).all()
@@ -144,10 +146,7 @@ async def get_voice_profile(
         )
 
     # Check access: workspace match or system preset
-    if (
-        profile.workspace_id != ctx.workspace_id
-        and not profile.is_preset
-    ):
+    if profile.workspace_id != ctx.workspace_id and not profile.is_preset:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Voice profile not found",
@@ -156,10 +155,14 @@ async def get_voice_profile(
     return _to_response(profile)
 
 
-@router.post("", response_model=VoiceProfileResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=VoiceProfileResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_voice_profile(
     request: CreateVoiceProfileRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Create a new voice profile.
@@ -190,7 +193,9 @@ async def create_voice_profile(
 async def update_voice_profile(
     profile_id: UUID,
     request: UpdateVoiceProfileRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Update a voice profile.
@@ -227,7 +232,9 @@ async def update_voice_profile(
 @router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_voice_profile(
     profile_id: UUID,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Delete a voice profile.

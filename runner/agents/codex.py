@@ -1,7 +1,6 @@
 """Codex CLI agent implementation."""
 
 import json
-from typing import Optional
 
 from runner.agents.cli_base import CLIAgent
 from runner.models import TokenUsage
@@ -83,9 +82,8 @@ class CodexAgent(CLIAgent):
                     usage = msg.get("usage", {})
                     if usage:
                         # Include cached tokens in input count
-                        input_tokens = (
-                            usage.get("input_tokens", 0)
-                            + usage.get("cached_input_tokens", 0)
+                        input_tokens = usage.get("input_tokens", 0) + usage.get(
+                            "cached_input_tokens", 0
                         )
                         output_tokens = usage.get("output_tokens", 0)
 
@@ -95,15 +93,18 @@ class CodexAgent(CLIAgent):
                     if info:
                         usage = info.get("total_token_usage", {})
                         # Include cached tokens in input count
-                        input_tokens = (
-                            usage.get("input_tokens", 0)
-                            + usage.get("cached_input_tokens", 0)
+                        input_tokens = usage.get("input_tokens", 0) + usage.get(
+                            "cached_input_tokens", 0
                         )
-                        output_tokens = usage.get("output_tokens", 0) + usage.get("reasoning_output_tokens", 0)
+                        output_tokens = usage.get("output_tokens", 0) + usage.get(
+                            "reasoning_output_tokens", 0
+                        )
 
                 # Handle legacy single-object format
                 elif "response" in data or "content" in data or "text" in data:
-                    content = data.get("response", data.get("content", data.get("text", "")))
+                    content = data.get(
+                        "response", data.get("content", data.get("text", ""))
+                    )
                     if isinstance(content, list):
                         content = "\n".join(str(item) for item in content)
                     if content:

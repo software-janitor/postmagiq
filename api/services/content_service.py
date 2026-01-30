@@ -68,7 +68,9 @@ def _datetime_to_str(val) -> Optional[str]:
 def _generate_slug(name: str) -> str:
     """Generate a URL-safe slug from a name."""
     slug = name.lower().strip()
-    slug = "".join(ch if ch.isalnum() or ch.isspace() or ch == "-" else "" for ch in slug)
+    slug = "".join(
+        ch if ch.isalnum() or ch.isspace() or ch == "-" else "" for ch in slug
+    )
     slug = "-".join(slug.split())
     slug = "-".join(part for part in slug.split("-") if part)
     return slug or "voice-profile"
@@ -119,13 +121,13 @@ class ContentService:
                 return None
 
             goal_repo = GoalRepository(session)
-            voice_repo = VoiceProfileRepository(session)
+            VoiceProfileRepository(session)
             post_repo = PostRepository(session)
 
             goals = goal_repo.list_by_user(uid)
             posts = post_repo.list_by_user(uid)
             voice_profiles = session.exec(
-                select(VoiceProfile).where(VoiceProfile.is_preset == False)
+                select(VoiceProfile).where(not VoiceProfile.is_preset)
             ).all()
 
             return UserResponse(
@@ -166,7 +168,7 @@ class ContentService:
 
             users = user_repo.list_all()
             voice_profiles = session.exec(
-                select(VoiceProfile).where(VoiceProfile.is_preset == False)
+                select(VoiceProfile).where(not VoiceProfile.is_preset)
             ).all()
             has_voice = len(voice_profiles) > 0
 
@@ -369,19 +371,29 @@ class ContentService:
             session.add(goal)
             session.commit()
 
-    def delete_strategy(self, user_id: Union[str, UUID], goal_id: Union[str, UUID]) -> dict:
+    def delete_strategy(
+        self, user_id: Union[str, UUID], goal_id: Union[str, UUID]
+    ) -> dict:
         """Delete a strategy (goal) and all related chapters and posts."""
         uid = normalize_user_id(user_id)
         gid = coerce_uuid(goal_id)
         if not uid or not gid:
-            return {"goal_id": _uuid_to_str(gid), "chapters_deleted": 0, "posts_deleted": 0}
+            return {
+                "goal_id": _uuid_to_str(gid),
+                "chapters_deleted": 0,
+                "posts_deleted": 0,
+            }
         with get_session() as session:
-            chapters = list(session.exec(select(Chapter).where(Chapter.user_id == uid)).all())
+            chapters = list(
+                session.exec(select(Chapter).where(Chapter.user_id == uid)).all()
+            )
             chapter_ids = [c.id for c in chapters]
             posts = []
             if chapter_ids:
                 posts = list(
-                    session.exec(select(Post).where(Post.chapter_id.in_(chapter_ids))).all()
+                    session.exec(
+                        select(Post).where(Post.chapter_id.in_(chapter_ids))
+                    ).all()
                 )
             for post in posts:
                 session.delete(post)
@@ -428,21 +440,25 @@ class ContentService:
             for post in posts:
                 post_counts[post.chapter_id] = post_counts.get(post.chapter_id, 0) + 1
                 if post.status in ("ready", "published"):
-                    completed_counts[post.chapter_id] = completed_counts.get(post.chapter_id, 0) + 1
+                    completed_counts[post.chapter_id] = (
+                        completed_counts.get(post.chapter_id, 0) + 1
+                    )
             result = []
             for chapter in chapters:
-                result.append({
-                    "id": str(chapter.id),
-                    "chapter_number": chapter.chapter_number,
-                    "title": chapter.title,
-                    "description": chapter.description,
-                    "theme": chapter.theme,
-                    "theme_description": chapter.theme_description,
-                    "weeks_start": chapter.weeks_start,
-                    "weeks_end": chapter.weeks_end,
-                    "post_count": post_counts.get(chapter.id, 0),
-                    "completed_count": completed_counts.get(chapter.id, 0),
-                })
+                result.append(
+                    {
+                        "id": str(chapter.id),
+                        "chapter_number": chapter.chapter_number,
+                        "title": chapter.title,
+                        "description": chapter.description,
+                        "theme": chapter.theme,
+                        "theme_description": chapter.theme_description,
+                        "weeks_start": chapter.weeks_start,
+                        "weeks_end": chapter.weeks_end,
+                        "post_count": post_counts.get(chapter.id, 0),
+                        "completed_count": completed_counts.get(chapter.id, 0),
+                    }
+                )
             return result
 
     def delete_strategy_for_workspace(self, workspace_id: UUID) -> dict:
@@ -522,7 +538,9 @@ class ContentService:
             chapter_repo = ChapterRepository(session)
             post_repo = PostRepository(session)
             chapters = (
-                chapter_repo.list_by_platform(uid, pid) if pid else chapter_repo.list_by_user(uid)
+                chapter_repo.list_by_platform(uid, pid)
+                if pid
+                else chapter_repo.list_by_user(uid)
             )
             posts = post_repo.list_by_user(uid)
             post_counts = {}
@@ -530,7 +548,9 @@ class ContentService:
             for post in posts:
                 post_counts[post.chapter_id] = post_counts.get(post.chapter_id, 0) + 1
                 if post.status in ("ready", "published"):
-                    completed_counts[post.chapter_id] = completed_counts.get(post.chapter_id, 0) + 1
+                    completed_counts[post.chapter_id] = (
+                        completed_counts.get(post.chapter_id, 0) + 1
+                    )
             result = []
             for chapter in chapters:
                 result.append(
@@ -669,7 +689,10 @@ class ContentService:
             chapters = {c.id: c for c in chapter_repo.list_by_user(uid)}
             posts = session.exec(
                 select(Post)
-                .where(Post.user_id == uid, Post.status.in_(["not_started", "needs_story", "draft"]))
+                .where(
+                    Post.user_id == uid,
+                    Post.status.in_(["not_started", "needs_story", "draft"]),
+                )
                 .order_by(Post.post_number)
             ).all()
             result = []
@@ -725,7 +748,9 @@ class ContentService:
                 published_url=post.published_url,
             )
 
-    def get_post_by_number(self, user_id: Union[str, UUID], post_number: int) -> Optional[PostResponse]:
+    def get_post_by_number(
+        self, user_id: Union[str, UUID], post_number: int
+    ) -> Optional[PostResponse]:
         """Get post by user and post number."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -801,7 +826,9 @@ class ContentService:
             sample = repo.create(record)
             return str(sample.id)
 
-    def get_writing_samples(self, user_id: Union[str, UUID]) -> list[WritingSampleRecord]:
+    def get_writing_samples(
+        self, user_id: Union[str, UUID]
+    ) -> list[WritingSampleRecord]:
         """Get all writing samples for a user."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -824,7 +851,9 @@ class ContentService:
                 for s in samples
             ]
 
-    def get_writing_samples_for_workspace(self, workspace_id: UUID) -> list[WritingSampleRecord]:
+    def get_writing_samples_for_workspace(
+        self, workspace_id: UUID
+    ) -> list[WritingSampleRecord]:
         """Get all writing samples for a workspace."""
         with get_session() as session:
             repo = WritingSampleRepository(session)
@@ -855,7 +884,9 @@ class ContentService:
             goal = repo.get_by_user(user_id)
             return goal.voice_profile_id if goal else None
 
-    def _voice_profile_response(self, profile: VoiceProfile, default_id: Optional[UUID]) -> VoiceProfileResponse:
+    def _voice_profile_response(
+        self, profile: VoiceProfile, default_id: Optional[UUID]
+    ) -> VoiceProfileResponse:
         """Convert a VoiceProfile to VoiceProfileResponse."""
         legacy = _decode_legacy_voice_profile(profile.description)
         return VoiceProfileResponse(
@@ -864,10 +895,13 @@ class ContentService:
             description=None if legacy else profile.description,
             is_default=default_id == profile.id,
             tone=legacy.get("tone") or profile.tone_description,
-            sentence_patterns=legacy.get("sentence_patterns") or profile.example_excerpts,
+            sentence_patterns=legacy.get("sentence_patterns")
+            or profile.example_excerpts,
             vocabulary_level=legacy.get("vocabulary_level") or profile.word_choices,
-            signature_phrases=legacy.get("signature_phrases") or profile.signature_phrases,
-            storytelling_style=legacy.get("storytelling_style") or profile.avoid_patterns,
+            signature_phrases=legacy.get("signature_phrases")
+            or profile.signature_phrases,
+            storytelling_style=legacy.get("storytelling_style")
+            or profile.avoid_patterns,
             emotional_register=legacy.get("emotional_register"),
             created_at=_datetime_to_str(profile.created_at),
         )
@@ -889,7 +923,9 @@ class ContentService:
             raise ValueError("Invalid user_id")
         with get_session() as session:
             repo = VoiceProfileRepository(session)
-            existing = session.exec(select(VoiceProfile).where(VoiceProfile.is_preset == False)).all()
+            existing = session.exec(
+                select(VoiceProfile).where(not VoiceProfile.is_preset)
+            ).all()
             name = "Default" if not existing else f"Voice Profile {len(existing) + 1}"
             slug = _generate_slug(name)
             counter = 1
@@ -969,7 +1005,9 @@ class ContentService:
             profile = repo.create(record)
             return str(profile.id)
 
-    def get_voice_profile(self, user_id: Union[str, UUID]) -> Optional[VoiceProfileResponse]:
+    def get_voice_profile(
+        self, user_id: Union[str, UUID]
+    ) -> Optional[VoiceProfileResponse]:
         """Get user's default voice profile record."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -983,7 +1021,7 @@ class ContentService:
             if not profile:
                 profiles = session.exec(
                     select(VoiceProfile)
-                    .where(VoiceProfile.is_preset == False)
+                    .where(not VoiceProfile.is_preset)
                     .order_by(VoiceProfile.created_at.desc())
                 ).all()
                 profile = profiles[0] if profiles else None
@@ -1011,7 +1049,7 @@ class ContentService:
         with get_session() as session:
             profiles = session.exec(
                 select(VoiceProfile)
-                .where(VoiceProfile.is_preset == False)
+                .where(not VoiceProfile.is_preset)
                 .order_by(VoiceProfile.created_at.desc())
             ).all()
             return [self._voice_profile_response(p, default_id) for p in profiles]
@@ -1053,7 +1091,9 @@ class ContentService:
             session.add(profile)
             session.commit()
 
-    def set_default_voice_profile(self, user_id: Union[str, UUID], profile_id: Union[str, UUID]) -> None:
+    def set_default_voice_profile(
+        self, user_id: Union[str, UUID], profile_id: Union[str, UUID]
+    ) -> None:
         """Set a voice profile as the default by attaching to the user's goal."""
         uid = normalize_user_id(user_id)
         pid = coerce_uuid(profile_id)

@@ -92,6 +92,7 @@ class DatabaseSessionManager:
         Uses shlex.quote() to prevent shell injection.
         """
         import shlex
+
         safe_prompt = shlex.quote(prompt)
 
         if not self.session_id:
@@ -111,7 +112,9 @@ class DatabaseSessionManager:
         else:
             template = agent_config.get("resume_command_args", [])
 
-        return [arg.format(prompt=prompt, session_id=self.session_id) for arg in template]
+        return [
+            arg.format(prompt=prompt, session_id=self.session_id) for arg in template
+        ]
 
     def clear_session(self):
         """Clear session (e.g., when starting a new workflow run)."""

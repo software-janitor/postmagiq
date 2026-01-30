@@ -12,15 +12,19 @@ from uuid import UUID, uuid4
 from sqlmodel import Session, select
 
 from runner.db.models import (
-    Workspace, WorkspaceCreate,
-    WorkspaceMembership, WorkspaceMembershipCreate,
-    WorkspaceRole, InviteStatus,
+    Workspace,
+    WorkspaceCreate,
+    WorkspaceMembership,
+    WorkspaceMembershipCreate,
+    WorkspaceRole,
+    InviteStatus,
 )
 
 
 # =============================================================================
 # Workspace Repository
 # =============================================================================
+
 
 class WorkspaceRepository:
     """Repository for Workspace operations."""
@@ -96,6 +100,7 @@ class WorkspaceRepository:
 # =============================================================================
 # Workspace Membership Repository
 # =============================================================================
+
 
 class WorkspaceMembershipRepository:
     """Repository for WorkspaceMembership operations."""
@@ -240,6 +245,5 @@ class WorkspaceMembershipRepository:
         """Check if a user has any access to a workspace."""
         membership = self.get_by_workspace_and_user(workspace_id, user_id)
         return (
-            membership is not None
-            and membership.invite_status == InviteStatus.accepted
+            membership is not None and membership.invite_status == InviteStatus.accepted
         )

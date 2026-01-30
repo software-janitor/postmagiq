@@ -55,7 +55,10 @@ class GroqAPIAgent(APIAgent):
         # Auto-set pricing based on model before calling super().__init__
         model_alias = config.get("model", "llama-70b")
         model_id = self.MODEL_MAP.get(model_alias, model_alias)
-        default_pricing = {"input": 0.00015, "output": 0.00060}  # gpt-oss-120b as fallback
+        default_pricing = {
+            "input": 0.00015,
+            "output": 0.00060,
+        }  # gpt-oss-120b as fallback
         pricing = self.MODEL_PRICING.get(model_id, default_pricing)
         config.setdefault("cost_per_1k", pricing)
 
@@ -76,7 +79,9 @@ class GroqAPIAgent(APIAgent):
         try:
             api_messages = messages.copy()
             if self.system_prompt:
-                api_messages = [{"role": "system", "content": self.system_prompt}] + api_messages
+                api_messages = [
+                    {"role": "system", "content": self.system_prompt}
+                ] + api_messages
 
             response = self.client.chat.completions.create(
                 model=self.model_id,

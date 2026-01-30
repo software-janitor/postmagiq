@@ -11,6 +11,7 @@ from runner.agents import create_agent
 
 class FaceDetails(BaseModel):
     """Structured face details for human characters."""
+
     skin_tone: Optional[str] = None
     face_shape: Optional[str] = None
     eye_details: Optional[str] = None
@@ -21,6 +22,7 @@ class FaceDetails(BaseModel):
 
 class OutfitAnalysis(BaseModel):
     """Analyzed outfit components from image."""
+
     hat: Optional[str] = None
     glasses: Optional[str] = None
     jacket: Optional[str] = None
@@ -48,6 +50,7 @@ class OutfitAnalysis(BaseModel):
 
 class PhysicalTraits(BaseModel):
     """Physical traits for non-human or general body details."""
+
     body_type: Optional[str] = None
     posture: Optional[str] = None
     height_impression: Optional[str] = None
@@ -61,6 +64,7 @@ class PhysicalTraits(BaseModel):
 
 class CharacterAnalysisResult(BaseModel):
     """Result of analyzing a character image."""
+
     template_type: str = Field(description="human_male, human_female, or non_human")
     face_details: Optional[FaceDetails] = None
     physical_traits: Optional[PhysicalTraits] = None
@@ -247,7 +251,10 @@ class ImageVisionService:
         """
         existing_str = ""
         if existing_parts:
-            existing_str = f"\n\nCoordinate with these existing items:\n- " + "\n- ".join(existing_parts)
+            existing_str = (
+                "\n\nCoordinate with these existing items:\n- "
+                + "\n- ".join(existing_parts)
+            )
 
         prompt = f"""Suggest 3-5 descriptions for a {part_type} for character illustration.
 
@@ -310,11 +317,21 @@ Return ONLY a JSON array of strings:
         """
         parts_by_template = {
             "human_male": ["shirt", "vest", "jacket", "pants", "shoes", "tie", "watch"],
-            "human_female": ["blouse", "jacket", "skirt", "pants", "heels", "necklace", "earrings"],
+            "human_female": [
+                "blouse",
+                "jacket",
+                "skirt",
+                "pants",
+                "heels",
+                "necklace",
+                "earrings",
+            ],
             "non_human": ["hat", "glasses", "scarf"],
         }
 
-        all_parts = parts_by_template.get(template_type, parts_by_template["human_male"])
+        all_parts = parts_by_template.get(
+            template_type, parts_by_template["human_male"]
+        )
 
         # Determine which parts to generate
         if parts_to_vary:
@@ -328,9 +345,9 @@ Return ONLY a JSON array of strings:
             reference_section = "\n\nSTYLE REFERENCE - Generate variations that maintain consistency with these existing outfits:\n"
             for i, ref in enumerate(reference_outfits, 1):
                 reference_section += f"\nReference {i}: {ref.get('name', 'Unnamed')}"
-                if ref.get('description'):
+                if ref.get("description"):
                     reference_section += f" - {ref['description']}"
-                parts = ref.get('parts', {})
+                parts = ref.get("parts", {})
                 if parts:
                     reference_section += "\n  Parts:"
                     for part_type, desc in parts.items():

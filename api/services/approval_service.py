@@ -26,21 +26,25 @@ from runner.db.models import (
 
 class ApprovalServiceError(Exception):
     """Base exception for approval service errors."""
+
     pass
 
 
 class StageNotFoundError(ApprovalServiceError):
     """Raised when approval stage is not found."""
+
     pass
 
 
 class RequestNotFoundError(ApprovalServiceError):
     """Raised when approval request is not found."""
+
     pass
 
 
 class InvalidTransitionError(ApprovalServiceError):
     """Raised when an invalid status transition is attempted."""
+
     pass
 
 
@@ -58,12 +62,14 @@ class ApprovalService:
         include_inactive: bool = False,
     ) -> list[ApprovalStage]:
         """Get all approval stages for a workspace, ordered by stage order."""
-        stmt = select(ApprovalStage).where(
-            ApprovalStage.workspace_id == workspace_id
-        ).order_by(ApprovalStage.order)
+        stmt = (
+            select(ApprovalStage)
+            .where(ApprovalStage.workspace_id == workspace_id)
+            .order_by(ApprovalStage.order)
+        )
 
         if not include_inactive:
-            stmt = stmt.where(ApprovalStage.is_active == True)
+            stmt = stmt.where(ApprovalStage.is_active)
 
         return list(session.exec(stmt).all())
 
@@ -137,7 +143,9 @@ class ApprovalService:
         created_by_id: UUID,
     ) -> list[ApprovalStage]:
         """Create default approval stages if none exist."""
-        existing = self.get_workspace_stages(session, workspace_id, include_inactive=True)
+        existing = self.get_workspace_stages(
+            session, workspace_id, include_inactive=True
+        )
         if existing:
             return existing
 
@@ -178,8 +186,10 @@ class ApprovalService:
 
         previous_assignee_id = post.assignee_id
         action = (
-            AssignmentAction.UNASSIGNED.value if new_assignee_id is None
-            else AssignmentAction.ASSIGNED.value if previous_assignee_id is None
+            AssignmentAction.UNASSIGNED.value
+            if new_assignee_id is None
+            else AssignmentAction.ASSIGNED.value
+            if previous_assignee_id is None
             else AssignmentAction.REASSIGNED.value
         )
 
@@ -210,10 +220,14 @@ class ApprovalService:
         workspace_id: UUID,
     ) -> list[PostAssignmentHistory]:
         """Get assignment history for a post."""
-        stmt = select(PostAssignmentHistory).where(
-            PostAssignmentHistory.post_id == post_id,
-            PostAssignmentHistory.workspace_id == workspace_id,
-        ).order_by(PostAssignmentHistory.created_at.desc())
+        stmt = (
+            select(PostAssignmentHistory)
+            .where(
+                PostAssignmentHistory.post_id == post_id,
+                PostAssignmentHistory.workspace_id == workspace_id,
+            )
+            .order_by(PostAssignmentHistory.created_at.desc())
+        )
 
         return list(session.exec(stmt).all())
 
@@ -247,7 +261,9 @@ class ApprovalService:
             stages = self.get_workspace_stages(session, workspace_id)
             if not stages:
                 # Create default stages
-                stages = self.ensure_default_stages(session, workspace_id, submitted_by_id)
+                stages = self.ensure_default_stages(
+                    session, workspace_id, submitted_by_id
+                )
             stage = stages[0]  # First stage
 
         # Check for existing pending request at this stage
@@ -314,11 +330,13 @@ class ApprovalService:
         if advance_to_next_stage:
             # Check for next stage
             next_stages = session.exec(
-                select(ApprovalStage).where(
+                select(ApprovalStage)
+                .where(
                     ApprovalStage.workspace_id == workspace_id,
-                    ApprovalStage.is_active == True,
+                    ApprovalStage.is_active,
                     ApprovalStage.order > stage.order,
-                ).order_by(ApprovalStage.order)
+                )
+                .order_by(ApprovalStage.order)
             ).all()
 
             if next_stages:
@@ -459,8 +477,8 @@ class ApprovalService:
 
         if approver_id:
             stmt = stmt.where(
-                (ApprovalRequest.assigned_approver_id == approver_id) |
-                (ApprovalRequest.assigned_approver_id == None)
+                (ApprovalRequest.assigned_approver_id == approver_id)
+                | (ApprovalRequest.assigned_approver_id is None)
             )
 
         stmt = stmt.order_by(ApprovalRequest.submitted_at)
@@ -473,10 +491,14 @@ class ApprovalService:
         workspace_id: UUID,
     ) -> list[ApprovalRequest]:
         """Get all approval requests for a post."""
-        stmt = select(ApprovalRequest).where(
-            ApprovalRequest.post_id == post_id,
-            ApprovalRequest.workspace_id == workspace_id,
-        ).order_by(ApprovalRequest.submitted_at.desc())
+        stmt = (
+            select(ApprovalRequest)
+            .where(
+                ApprovalRequest.post_id == post_id,
+                ApprovalRequest.workspace_id == workspace_id,
+            )
+            .order_by(ApprovalRequest.submitted_at.desc())
+        )
 
         return list(session.exec(stmt).all())
 
@@ -526,7 +548,7 @@ class ApprovalService:
         )
 
         if not include_internal:
-            stmt = stmt.where(ApprovalComment.is_internal == False)
+            stmt = stmt.where(not ApprovalComment.is_internal)
 
         stmt = stmt.order_by(ApprovalComment.created_at)
         return list(session.exec(stmt).all())

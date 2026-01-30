@@ -1,7 +1,6 @@
 """Service for AI-powered scene generation."""
 
 import json
-from typing import Optional
 
 from runner.agents import create_agent
 
@@ -39,7 +38,9 @@ class SceneGeneratorService:
         if context == "hardware":
             context_details = "\nContext: Hardware/embedded development - include physical components, circuits, oscilloscopes, etc."
         else:
-            context_details = "\nContext: Software development - coding, debugging, deployments, etc."
+            context_details = (
+                "\nContext: Software development - coding, debugging, deployments, etc."
+            )
 
         prompt = f"""Generate {count} distinct scene descriptions for illustration.
 
@@ -115,10 +116,10 @@ Code format: {sentiment[:3].upper()}_KEYWORD (e.g., SUC_DEPLOY, FAI_DEBUG)"""
         prompt = f"""Generate {count} variations of this scene:
 
 Original:
-- Name: {original_scene.get('name', 'Scene')}
-- Description: {original_scene.get('description', '')}
-- Sentiment: {original_scene.get('sentiment', 'UNRESOLVED')}
-- Viewpoint: {original_scene.get('viewpoint', 'standard')}
+- Name: {original_scene.get("name", "Scene")}
+- Description: {original_scene.get("description", "")}
+- Sentiment: {original_scene.get("sentiment", "UNRESOLVED")}
+- Viewpoint: {original_scene.get("viewpoint", "standard")}
 {vary_str}
 
 Keep the same sentiment and core concept, but change the specified aspects.
@@ -185,23 +186,23 @@ Return ONLY valid JSON array:
 
                 # Face details
                 face_details = []
-                if char.get('skin_tone'):
+                if char.get("skin_tone"):
                     face_details.append(f"skin: {char['skin_tone']}")
-                if char.get('face_shape'):
+                if char.get("face_shape"):
                     face_details.append(f"face: {char['face_shape']}")
-                if char.get('eye_details'):
+                if char.get("eye_details"):
                     face_details.append(f"eyes: {char['eye_details']}")
-                if char.get('hair_details'):
+                if char.get("hair_details"):
                     face_details.append(f"hair: {char['hair_details']}")
                 if face_details:
                     char_parts.append(f"  Face: {', '.join(face_details)}")
 
                 # Physical traits
-                if char.get('physical_traits'):
+                if char.get("physical_traits"):
                     char_parts.append(f"  Build: {char['physical_traits']}")
 
                 # Clothing rules
-                if char.get('clothing_rules'):
+                if char.get("clothing_rules"):
                     char_parts.append(f"  Clothing rules: {char['clothing_rules']}")
 
                 parts.append("\n".join(char_parts))

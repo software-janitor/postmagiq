@@ -58,8 +58,8 @@ try:
 except ImportError:
     pass
 
-# Factory function
-from runner.agents.factory import create_agent, get_available_agents
+# Factory function (must be imported after agent classes are defined)
+from runner.agents.factory import create_agent, get_available_agents  # noqa: E402
 
 # Legacy registry for backwards compatibility
 AGENT_REGISTRY = {

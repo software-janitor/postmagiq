@@ -11,7 +11,6 @@ from api.services.onboarding_service import (
     OnboardingService,
     QuickOnboardingAnswers,
     DeepModeState,
-    DeepModeMessage,
     GeneratedPlan,
 )
 from runner.db.models import UserRole
@@ -35,12 +34,14 @@ def _verify_user_access(current_user: CurrentUser, target_user_id: UUID) -> None
 
 class StartRequest(BaseModel):
     """Start onboarding - creates user."""
+
     name: str
     email: Optional[str] = None
 
 
 class QuickModeRequest(BaseModel):
     """Quick mode answers."""
+
     user_id: UUID
     professional_role: str
     known_for: str
@@ -51,6 +52,7 @@ class QuickModeRequest(BaseModel):
 
 class DeepModeMessageRequest(BaseModel):
     """User message in deep mode conversation."""
+
     user_id: UUID
     message: str
     state: Optional[DeepModeState] = None  # Pass state for continuation
@@ -59,6 +61,7 @@ class DeepModeMessageRequest(BaseModel):
 
 class GeneratePlanRequest(BaseModel):
     """Request to generate plan from deep mode."""
+
     user_id: UUID
     content_style: str
     state: DeepModeState
@@ -66,6 +69,7 @@ class GeneratePlanRequest(BaseModel):
 
 class ApprovePlanRequest(BaseModel):
     """Approve and save generated plan."""
+
     user_id: UUID
     plan: dict  # GeneratedPlan as dict
     positioning: str
@@ -83,17 +87,20 @@ class ApprovePlanRequest(BaseModel):
 
 class StartResponse(BaseModel):
     """Response from starting onboarding."""
+
     user_id: str
     questions: list[dict]
 
 
 class QuickModeResponse(BaseModel):
     """Response from quick mode - generated plan."""
+
     plan: GeneratedPlan
 
 
 class DeepModeResponse(BaseModel):
     """Response from deep mode - assistant message + state."""
+
     assistant_message: str
     state: DeepModeState
     ready_to_generate: bool
@@ -101,6 +108,7 @@ class DeepModeResponse(BaseModel):
 
 class ApproveResponse(BaseModel):
     """Response from plan approval."""
+
     goal_id: str
     chapter_count: int
     post_count: int
@@ -263,7 +271,9 @@ def send_deep_message(
             ready_to_generate=state.ready_to_generate,
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to continue discovery: {e}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to continue discovery: {e}"
+        )
 
 
 @router.post("/deep/generate", response_model=QuickModeResponse)

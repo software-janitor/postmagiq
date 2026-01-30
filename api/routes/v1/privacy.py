@@ -3,16 +3,13 @@
 Routes for privacy preferences, data export, and account deletion.
 """
 
-import json
-import os
-import tempfile
 from datetime import datetime, timedelta
 from typing import Optional
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
-from sqlmodel import Session, select
+from sqlmodel import Session
 
 from api.auth.dependencies import get_current_user, CurrentUser
 from runner.db.engine import get_session_dependency
@@ -31,8 +28,12 @@ class PrivacySettingsResponse(BaseModel):
 
     data_retention_days: int = Field(description="Data retention period (0 = forever)")
     analytics_opt_out: bool = Field(description="Whether analytics are opted out")
-    marketing_emails_opt_out: bool = Field(description="Whether marketing emails are opted out")
-    activity_logging_enabled: bool = Field(description="Whether activity logging is enabled")
+    marketing_emails_opt_out: bool = Field(
+        description="Whether marketing emails are opted out"
+    )
+    activity_logging_enabled: bool = Field(
+        description="Whether activity logging is enabled"
+    )
 
 
 class PrivacySettingsUpdate(BaseModel):
@@ -147,7 +148,7 @@ async def export_user_data(
     user = current_user.user
 
     # Build export data
-    export_data = {
+    {
         "exported_at": datetime.utcnow().isoformat(),
         "user": {
             "id": str(user.id),

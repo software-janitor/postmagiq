@@ -8,7 +8,7 @@ Provides:
 
 import dns.resolver
 from datetime import datetime
-from typing import Optional, Tuple
+from typing import Optional
 from uuid import UUID
 
 from cryptography.hazmat.primitives import serialization
@@ -24,26 +24,31 @@ from runner.db.models import (
 
 class DomainServiceError(Exception):
     """Base exception for domain service errors."""
+
     pass
 
 
 class DomainNotFoundError(DomainServiceError):
     """Raised when a domain configuration is not found."""
+
     pass
 
 
 class DomainAlreadyVerifiedError(DomainServiceError):
     """Raised when trying to verify an already verified domain."""
+
     pass
 
 
 class DomainVerificationFailedError(DomainServiceError):
     """Raised when domain verification fails."""
+
     pass
 
 
 class DKIMGenerationError(DomainServiceError):
     """Raised when DKIM key generation fails."""
+
     pass
 
 
@@ -355,7 +360,9 @@ class DomainService:
         if not config.dkim_selector or not config.dkim_public_key:
             raise DomainNotFoundError("No DKIM keys generated")
 
-        dns_record_name = f"{config.dkim_selector}.{DKIM_TXT_PREFIX}.{config.email_domain}"
+        dns_record_name = (
+            f"{config.dkim_selector}.{DKIM_TXT_PREFIX}.{config.email_domain}"
+        )
 
         # Check for the public key in DNS
         # DKIM records contain "p=..." with the public key
@@ -370,7 +377,11 @@ class DomainService:
                     session.add(config)
                     session.commit()
                     return True
-        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers):
+        except (
+            dns.resolver.NXDOMAIN,
+            dns.resolver.NoAnswer,
+            dns.resolver.NoNameservers,
+        ):
             pass
         except Exception:
             pass
@@ -407,7 +418,9 @@ class DomainService:
 
         instructions = None
         if config.dkim_selector and config.dkim_public_key:
-            dns_record_name = f"{config.dkim_selector}.{DKIM_TXT_PREFIX}.{config.email_domain}"
+            dns_record_name = (
+                f"{config.dkim_selector}.{DKIM_TXT_PREFIX}.{config.email_domain}"
+            )
             instructions = {
                 "type": "TXT",
                 "name": dns_record_name,
@@ -474,7 +487,11 @@ class DomainService:
                 txt_value = str(rdata).strip('"')
                 if txt_value == expected_value:
                     return True
-        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer, dns.resolver.NoNameservers):
+        except (
+            dns.resolver.NXDOMAIN,
+            dns.resolver.NoAnswer,
+            dns.resolver.NoNameservers,
+        ):
             return False
         except Exception:
             return False
@@ -494,10 +511,7 @@ class DomainService:
         """
         # Remove PEM headers and footers
         lines = pem_key.strip().split("\n")
-        key_lines = [
-            line for line in lines
-            if not line.startswith("-----")
-        ]
+        key_lines = [line for line in lines if not line.startswith("-----")]
         return "".join(key_lines)
 
 
@@ -523,8 +537,8 @@ def get_workspace_by_custom_domain(
     """
     statement = select(WhitelabelConfig).where(
         WhitelabelConfig.custom_domain == domain,
-        WhitelabelConfig.domain_verified == True,
-        WhitelabelConfig.is_active == True,
+        WhitelabelConfig.domain_verified,
+        WhitelabelConfig.is_active,
     )
     config = session.exec(statement).first()
 

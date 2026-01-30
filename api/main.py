@@ -2,19 +2,40 @@
 
 import logging
 
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-
 from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 
-
 # Note: deprecated routes moved to api/routes/deprecated/ - see README.md there
-from api.routes import runs, workflow, config, ws, workflow_personas, auth, health, portal, workflow_configs
-from api.routes.v1 import workspaces_router, content_router, usage_router, billing_router, webhook_router, approvals_router, notifications_router, api_keys_router, webhooks_router, audit_router, domains_router, privacy_router, voice_profiles_router, voice_router, onboarding_router, finished_posts_router, transcription_router
+from api.routes import (
+    runs,
+    workflow,
+    config,
+    ws,
+    workflow_personas,
+    auth,
+    health,
+    portal,
+    workflow_configs,
+)
+from api.routes.v1 import (
+    workspaces_router,
+    content_router,
+    usage_router,
+    billing_router,
+    webhook_router,
+    approvals_router,
+    notifications_router,
+    api_keys_router,
+    webhooks_router,
+    audit_router,
+    domains_router,
+    privacy_router,
+    voice_profiles_router,
+    voice_router,
+    onboarding_router,
+    finished_posts_router,
+    transcription_router,
+)
 from api.routes.deprecated import finished_posts as deprecated_finished_posts
 from api.middleware import (
     UsageEnforcementMiddleware,
@@ -26,6 +47,11 @@ from api.middleware import (
     CustomDomainMiddleware,
 )
 from api.error_handlers import register_error_handlers
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
 
 
 app = FastAPI(
@@ -72,7 +98,9 @@ app.include_router(config.router, prefix="/api/config", tags=["config"])
 app.include_router(ws.router, prefix="/api/ws", tags=["websocket"])
 app.include_router(workflow_personas.router, prefix="/api", tags=["workflow-personas"])
 app.include_router(auth.router, prefix="/api", tags=["auth"])
-app.include_router(workflow_configs.router, prefix="/api/workflow-configs", tags=["workflow-configs"])
+app.include_router(
+    workflow_configs.router, prefix="/api/workflow-configs", tags=["workflow-configs"]
+)
 
 # v1 routes with workspace scoping
 app.include_router(workspaces_router, prefix="/api", tags=["workspaces"])
@@ -94,7 +122,9 @@ app.include_router(finished_posts_router, prefix="/api", tags=["finished-posts-v
 app.include_router(transcription_router, prefix="/api", tags=["transcription"])
 
 # Deprecated routes (for backwards compatibility)
-app.include_router(deprecated_finished_posts.router, prefix="/api", tags=["finished-posts-deprecated"])
+app.include_router(
+    deprecated_finished_posts.router, prefix="/api", tags=["finished-posts-deprecated"]
+)
 
 # Client portal routes (public login + authenticated review)
 app.include_router(portal.router, prefix="/api", tags=["portal"])

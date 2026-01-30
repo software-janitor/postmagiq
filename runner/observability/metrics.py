@@ -18,7 +18,6 @@ Usage:
 """
 
 import statistics
-import time
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
@@ -28,6 +27,7 @@ from typing import Optional
 @dataclass
 class MetricsSummary:
     """Summary of collected metrics."""
+
     # Latency
     latency_p50: float = 0.0
     latency_p95: float = 0.0
@@ -56,6 +56,7 @@ class MetricsSummary:
 @dataclass
 class MetricBucket:
     """A time-bucketed collection of metrics."""
+
     timestamp: datetime
     latencies: list[float] = field(default_factory=list)
     costs: list[float] = field(default_factory=list)
@@ -194,7 +195,7 @@ class MetricsCollector:
             errors = self._error_counts.get(model, 0)
             calls = self._call_counts.get(model, 0)
         else:
-            latencies = [l for ls in self._latencies.values() for l in ls]
+            latencies = [lat for ls in self._latencies.values() for lat in ls]
             costs = [c for cs in self._costs.values() for c in cs]
             input_tokens = [t for ts in self._input_tokens.values() for t in ts]
             output_tokens = [t for ts in self._output_tokens.values() for t in ts]
@@ -211,9 +212,7 @@ class MetricsCollector:
             summary.latency_p99 = self._percentile(sorted_latencies, 99)
 
         summary.total_cost = sum(costs)
-        summary.cost_by_model = {
-            m: sum(cs) for m, cs in self._costs.items()
-        }
+        summary.cost_by_model = {m: sum(cs) for m, cs in self._costs.items()}
 
         summary.total_input_tokens = sum(input_tokens)
         summary.total_output_tokens = sum(output_tokens)
@@ -261,10 +260,12 @@ class MetricsCollector:
             else:
                 value = 0
 
-            trend.append({
-                "timestamp": bucket.timestamp.isoformat(),
-                "value": value,
-            })
+            trend.append(
+                {
+                    "timestamp": bucket.timestamp.isoformat(),
+                    "value": value,
+                }
+            )
 
         return trend
 

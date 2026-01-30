@@ -5,7 +5,6 @@ for the GUI workflow selector.
 """
 
 from typing import Annotated, Optional
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -24,20 +23,24 @@ router = APIRouter()
 # Response Models
 # =============================================================================
 
+
 class WorkflowConfigListResponse(BaseModel):
     """Response for listing workflow configs."""
+
     configs: list[WorkflowConfigRead]
     default_slug: Optional[str] = None
 
 
 class WorkflowConfigResponse(BaseModel):
     """Response for a single workflow config."""
+
     config: WorkflowConfigRead
 
 
 # =============================================================================
 # Endpoints
 # =============================================================================
+
 
 @router.get("", response_model=WorkflowConfigListResponse)
 async def list_workflow_configs(

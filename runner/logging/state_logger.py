@@ -49,11 +49,13 @@ class StateLogger:
 
     def log_start(self, story: str, config_hash: Optional[str] = None):
         """Log workflow start."""
-        self.log({
-            "event": "workflow_start",
-            "story": story,
-            "config_hash": config_hash,
-        })
+        self.log(
+            {
+                "event": "workflow_start",
+                "story": story,
+                "config_hash": config_hash,
+            }
+        )
 
         # Create database record
         if self.db:
@@ -61,16 +63,20 @@ class StateLogger:
                 self.db.create_workflow_run(self.user_id, self.run_id, story)
             except Exception as e:
                 # Log but don't fail - JSONL is the fallback
-                self.log({"event": "db_error", "error": str(e), "operation": "create_run"})
+                self.log(
+                    {"event": "db_error", "error": str(e), "operation": "create_run"}
+                )
 
     def log_state_enter(self, state: str, state_type: str, has_feedback: bool = False):
         """Log entering a state."""
-        self.log({
-            "event": "state_enter",
-            "state": state,
-            "type": state_type,
-            "has_retry_feedback": has_feedback,
-        })
+        self.log(
+            {
+                "event": "state_enter",
+                "state": state,
+                "type": state_type,
+                "has_retry_feedback": has_feedback,
+            }
+        )
 
         # Update current state in database
         if self.db:
@@ -155,19 +161,23 @@ class StateLogger:
 
     def log_transition(self, from_state: str, to_state: str):
         """Log state transition."""
-        self.log({
-            "event": "transition",
-            "from_state": from_state,
-            "to_state": to_state,
-        })
+        self.log(
+            {
+                "event": "transition",
+                "from_state": from_state,
+                "to_state": to_state,
+            }
+        )
 
     def log_circuit_break(self, rule: str, context: dict):
         """Log circuit breaker trigger."""
-        self.log({
-            "event": "circuit_break",
-            "rule": rule,
-            "context": context,
-        })
+        self.log(
+            {
+                "event": "circuit_break",
+                "rule": rule,
+                "context": context,
+            }
+        )
 
         # Update database with aborted status
         if self.db:
@@ -183,11 +193,13 @@ class StateLogger:
 
     def log_error(self, state: str, error: str):
         """Log error in state."""
-        self.log({
-            "event": "error",
-            "state": state,
-            "error": error,
-        })
+        self.log(
+            {
+                "event": "error",
+                "state": state,
+                "error": error,
+            }
+        )
 
         # Update database with error status
         if self.db:
@@ -203,11 +215,13 @@ class StateLogger:
 
     def log_complete(self, final_state: str, total_duration_s: float):
         """Log workflow completion."""
-        self.log({
-            "event": "workflow_complete",
-            "final_state": final_state,
-            "duration_s": round(total_duration_s, 2),
-        })
+        self.log(
+            {
+                "event": "workflow_complete",
+                "final_state": final_state,
+                "duration_s": round(total_duration_s, 2),
+            }
+        )
 
         # Update database with completion
         if self.db:
@@ -248,7 +262,9 @@ class StateLogger:
                     agent=agent,
                 )
             except Exception as e:
-                self.log({"event": "db_error", "error": str(e), "operation": "save_output"})
+                self.log(
+                    {"event": "db_error", "error": str(e), "operation": "save_output"}
+                )
 
     def read_log(self) -> list[dict]:
         """Read all log entries from JSONL."""

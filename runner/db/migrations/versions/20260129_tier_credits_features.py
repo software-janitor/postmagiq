@@ -38,9 +38,13 @@ def upgrade() -> None:
         sa.Column("feature_key", sa.String(50), nullable=False),
         sa.Column("enabled", sa.Boolean(), nullable=False, default=False),
         sa.Column("config", postgresql.JSONB(), nullable=False, server_default="{}"),
-        sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()),
+        sa.Column(
+            "created_at", sa.DateTime(), nullable=False, server_default=sa.func.now()
+        ),
         sa.Column("updated_at", sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(["tier_id"], ["subscription_tiers.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["tier_id"], ["subscription_tiers.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("tier_id", "feature_key", name="uq_tier_feature"),
     )

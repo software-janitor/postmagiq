@@ -212,7 +212,7 @@ export default function Settings() {
               )}
             </>
           ) : (
-            <div className="text-zinc-400">No workspace selected</div>
+            <div className="text-zinc-400">No account data available</div>
           )}
         </div>
       </div>
@@ -326,7 +326,7 @@ export default function Settings() {
               Default Workflow Config
             </label>
             <p className="text-sm text-zinc-500 mb-3">
-              Select the default workflow configuration for this workspace. This determines which AI models and settings are used when running workflows.
+              Select the default workflow configuration. This determines which AI models and settings are used when running workflows.
             </p>
             {canChangeWorkflowConfig ? (
               <WorkflowConfigSelector
@@ -336,7 +336,7 @@ export default function Settings() {
               />
             ) : (
               <div className="text-sm text-zinc-500">
-                Only workspace owners and admins can change the workflow configuration.
+                Only owners and admins can change the workflow configuration.
               </div>
             )}
           </div>

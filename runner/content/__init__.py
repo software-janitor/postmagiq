@@ -1,4 +1,5 @@
 """Content strategy models package."""
+
 from runner.content.models import (
     UserRecord,
     GoalRecord,

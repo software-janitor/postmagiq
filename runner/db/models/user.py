@@ -54,6 +54,14 @@ class User(UUIDModel, UserBase, TimestampMixin, table=True):
     # User-level role for feature flags
     role: UserRole = Field(default=UserRole.user)
 
+    # Default workspace for individual tier users (hide multi-tenancy UX)
+    # When set, API routes can infer workspace without explicit workspace_id in URL
+    default_workspace_id: Optional[UUID] = Field(
+        default=None,
+        foreign_key="workspaces.id",
+        index=True,
+    )
+
 
 class UserCreate(UserBase):
     """Schema for creating a new user."""
@@ -69,6 +77,7 @@ class UserRead(UserBase):
     is_active: bool = True
     is_superuser: bool = False
     role: UserRole = UserRole.user
+    default_workspace_id: Optional[UUID] = None
 
 
 class PasswordResetToken(UUIDModel, table=True):

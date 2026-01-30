@@ -13,6 +13,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 # AnalyticsImport
 # =============================================================================
 
+
 class AnalyticsImportBase(SQLModel):
     """Base analytics import fields."""
 
@@ -50,6 +51,7 @@ class AnalyticsImportCreate(AnalyticsImportBase):
 # =============================================================================
 # PostMetric
 # =============================================================================
+
 
 class PostMetricBase(SQLModel):
     """Base post metric fields."""
@@ -104,6 +106,7 @@ class PostMetricCreate(PostMetricBase):
 # DailyMetric
 # =============================================================================
 
+
 class DailyMetricBase(SQLModel):
     """Base daily metric fields."""
 
@@ -140,6 +143,7 @@ class DailyMetricCreate(DailyMetricBase):
 # =============================================================================
 # FollowerMetric
 # =============================================================================
+
 
 class FollowerMetricBase(SQLModel):
     """Base follower metric fields."""
@@ -178,6 +182,7 @@ class FollowerMetricCreate(FollowerMetricBase):
 # AudienceDemographic
 # =============================================================================
 
+
 class AudienceDemographicBase(SQLModel):
     """Base audience demographic fields."""
 
@@ -188,7 +193,9 @@ class AudienceDemographicBase(SQLModel):
     metric_date: Optional[date] = None
 
 
-class AudienceDemographic(UUIDModel, AudienceDemographicBase, TimestampMixin, table=True):
+class AudienceDemographic(
+    UUIDModel, AudienceDemographicBase, TimestampMixin, table=True
+):
     """AudienceDemographic table - overall audience demographics."""
 
     __tablename__ = "audience_demographics"
@@ -215,6 +222,7 @@ class AudienceDemographicCreate(AudienceDemographicBase):
 # =============================================================================
 # PostDemographic
 # =============================================================================
+
 
 class PostDemographicBase(SQLModel):
     """Base post demographic fields."""

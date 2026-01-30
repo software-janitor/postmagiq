@@ -4,9 +4,7 @@ All finished posts operations are scoped to a workspace.
 Handles viewing finished content and publish status.
 """
 
-import json
 import re
-from datetime import datetime
 from typing import Annotated, Optional
 from uuid import UUID
 
@@ -20,12 +18,13 @@ from api.routes.v1.dependencies import (
     require_workspace_scope,
 )
 from api.services.content_service import ContentService
-from runner.content.workflow_store import WorkflowStore
 from runner.db.engine import get_session
 from runner.content.repository import WorkflowRunRepository, WorkflowOutputRepository
 
 
-router = APIRouter(prefix="/v1/w/{workspace_id}/finished-posts", tags=["finished-posts"])
+router = APIRouter(
+    prefix="/v1/w/{workspace_id}/finished-posts", tags=["finished-posts"]
+)
 content_service = ContentService()
 
 # Available platforms
@@ -39,6 +38,7 @@ PLATFORMS = ["linkedin", "threads", "medium", "x"]
 
 class PublishInfo(BaseModel):
     """Publishing information for a post."""
+
     platform: str
     published_at: str
     url: Optional[str] = None
@@ -46,6 +46,7 @@ class PublishInfo(BaseModel):
 
 class FinishedPost(BaseModel):
     """A finished post with content and image prompt."""
+
     post_id: str  # e.g., "c1p1"
     post_number: int
     chapter: int
@@ -58,12 +59,14 @@ class FinishedPost(BaseModel):
 
 class PublishRequest(BaseModel):
     """Request to publish/unpublish a post."""
+
     platform: str
     url: Optional[str] = None
 
 
 class FinishedPostsResponse(BaseModel):
     """List of finished posts."""
+
     posts: list[FinishedPost]
 
 
@@ -74,7 +77,7 @@ class FinishedPostsResponse(BaseModel):
 
 def _extract_title(content: str) -> str:
     """Extract title from first line of post content."""
-    lines = content.strip().split('\n')
+    lines = content.strip().split("\n")
     if lines:
         return lines[0].strip()
     return "Untitled"
@@ -84,7 +87,9 @@ def _get_workflow_run_with_final(workspace_id: UUID, story: str, user_id: UUID):
     """Get the latest workflow run that has a 'final' output for this workspace."""
     with get_session() as session:
         repo = WorkflowRunRepository(session)
-        return repo.get_latest_with_final_output(user_id, story, workspace_id=workspace_id)
+        return repo.get_latest_with_final_output(
+            user_id, story, workspace_id=workspace_id
+        )
 
 
 def _get_workflow_outputs(run_id: str):
@@ -114,6 +119,7 @@ async def list_finished_posts(
     # Get ALL posts with status 'ready' or 'published'
     with get_session() as session:
         from runner.content.repository import PostRepository, ChapterRepository
+
         post_repo = PostRepository(session)
         chapter_repo = ChapterRepository(session)
 
@@ -149,16 +155,18 @@ async def list_finished_posts(
             # Use post topic as title, fall back to first line of content
             title = post.topic if post.topic else _extract_title(final_content)
 
-            posts.append(FinishedPost(
-                post_id=post_id,
-                post_number=post.post_number,
-                chapter=chapter_num,
-                title=title,
-                content=final_content,
-                image_prompt=None,  # Can add workspace-scoped image prompts later
-                file_path=file_path,
-                publish_status=[],  # TODO: Add workspace-scoped publish status
-            ))
+            posts.append(
+                FinishedPost(
+                    post_id=post_id,
+                    post_number=post.post_number,
+                    chapter=chapter_num,
+                    title=title,
+                    content=final_content,
+                    image_prompt=None,  # Can add workspace-scoped image prompts later
+                    file_path=file_path,
+                    publish_status=[],  # TODO: Add workspace-scoped publish status
+                )
+            )
             seen_posts.add(post.post_number)
 
     # Sort by post number
@@ -184,7 +192,8 @@ async def get_finished_post(
     post_num = int(match.group(2))
 
     with get_session() as session:
-        from runner.content.repository import PostRepository, ChapterRepository
+        from runner.content.repository import PostRepository
+
         post_repo = PostRepository(session)
 
         # Find the post by number in this workspace
@@ -213,7 +222,9 @@ async def get_finished_post(
                     break
 
         if not final_content:
-            final_content = f"[Content not available]\n\nTopic: {post.topic or 'No topic'}"
+            final_content = (
+                f"[Content not available]\n\nTopic: {post.topic or 'No topic'}"
+            )
 
         title = post.topic if post.topic else _extract_title(final_content)
 
@@ -239,7 +250,9 @@ async def get_platforms(ctx: WorkspaceCtx):
 async def publish_post(
     post_id: str,
     request: PublishRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))
+    ],
 ):
     """Mark a post as published on a platform.
 
@@ -265,7 +278,9 @@ async def publish_post(
 async def unpublish_post(
     post_id: str,
     platform: str,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))
+    ],
 ):
     """Remove publish status for a post on a platform.
 

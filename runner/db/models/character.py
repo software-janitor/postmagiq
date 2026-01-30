@@ -1,6 +1,5 @@
 """Character models: CharacterTemplate, OutfitPart, Outfit, Character, etc."""
 
-from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
@@ -12,6 +11,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 # =============================================================================
 # CharacterTemplate
 # =============================================================================
+
 
 class CharacterTemplateBase(SQLModel):
     """Base character template fields."""
@@ -47,6 +47,7 @@ class CharacterTemplateCreate(CharacterTemplateBase):
 # =============================================================================
 # OutfitPart
 # =============================================================================
+
 
 class OutfitPartBase(SQLModel):
     """Base outfit part fields."""
@@ -84,6 +85,7 @@ class OutfitPartCreate(OutfitPartBase):
 # Outfit
 # =============================================================================
 
+
 class OutfitBase(SQLModel):
     """Base outfit fields."""
 
@@ -118,6 +120,7 @@ class OutfitCreate(OutfitBase):
 # OutfitItem
 # =============================================================================
 
+
 class OutfitItemBase(SQLModel):
     """Base outfit item fields (junction table)."""
 
@@ -144,6 +147,7 @@ class OutfitItemCreate(OutfitItemBase):
 # Character
 # =============================================================================
 
+
 class CharacterBase(SQLModel):
     """Base character fields."""
 
@@ -158,7 +162,9 @@ class Character(UUIDModel, CharacterBase, TimestampMixin, table=True):
     __tablename__ = "characters"
 
     user_id: UUID = Field(foreign_key="users.id", index=True)
-    template_id: Optional[UUID] = Field(default=None, foreign_key="character_templates.id")
+    template_id: Optional[UUID] = Field(
+        default=None, foreign_key="character_templates.id"
+    )
     default_outfit_id: Optional[UUID] = Field(default=None, foreign_key="outfits.id")
 
     # Multi-tenancy: workspace_id is nullable for migration compatibility
@@ -181,6 +187,7 @@ class CharacterCreate(CharacterBase):
 # =============================================================================
 # CharacterOutfit
 # =============================================================================
+
 
 class CharacterOutfitBase(SQLModel):
     """Base character outfit fields (junction table)."""
@@ -207,6 +214,7 @@ class CharacterOutfitCreate(CharacterOutfitBase):
 # =============================================================================
 # Sentiment
 # =============================================================================
+
 
 class SentimentBase(SQLModel):
     """Base sentiment fields."""
@@ -242,6 +250,7 @@ class SentimentCreate(SentimentBase):
 # SceneCharacter
 # =============================================================================
 
+
 class SceneCharacterBase(SQLModel):
     """Base scene character fields (junction table)."""
 
@@ -267,6 +276,7 @@ class SceneCharacterCreate(SceneCharacterBase):
 # =============================================================================
 # PropCategory
 # =============================================================================
+
 
 class PropCategoryBase(SQLModel):
     """Base prop category fields."""
@@ -301,6 +311,7 @@ class PropCategoryCreate(PropCategoryBase):
 # ScenePropRule
 # =============================================================================
 
+
 class ScenePropRuleBase(SQLModel):
     """Base scene prop rule fields."""
 
@@ -327,6 +338,7 @@ class ScenePropRuleCreate(ScenePropRuleBase):
 # =============================================================================
 # ContextPropRule
 # =============================================================================
+
 
 class ContextPropRuleBase(SQLModel):
     """Base context prop rule fields."""

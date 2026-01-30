@@ -7,7 +7,7 @@ Uses Groq Whisper API for transcription.
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 
 from api.auth.scopes import Scope
 from api.routes.v1.dependencies import (
@@ -20,7 +20,6 @@ from api.services.transcription_service import (
     FileValidationError,
 )
 from api.services.youtube_service import (
-    YouTubeServiceError,
     InvalidURLError,
     DurationExceededError,
     DownloadError,
@@ -75,7 +74,11 @@ class TranscriptionResponse(BaseModel):
 # =============================================================================
 
 
-@router.post("/upload", response_model=TranscriptionResponse, responses={403: {"model": FeatureLockedResponse}})
+@router.post(
+    "/upload",
+    response_model=TranscriptionResponse,
+    responses={403: {"model": FeatureLockedResponse}},
+)
 async def transcribe_upload(
     ctx: Annotated[
         WorkspaceContext, Depends(require_workspace_scope(Scope.WORKFLOW_EXECUTE))
@@ -150,7 +153,11 @@ async def transcribe_upload(
         )
 
 
-@router.post("/youtube", response_model=TranscriptionResponse, responses={403: {"model": FeatureLockedResponse}})
+@router.post(
+    "/youtube",
+    response_model=TranscriptionResponse,
+    responses={403: {"model": FeatureLockedResponse}},
+)
 async def transcribe_youtube(
     request: YouTubeTranscribeRequest,
     ctx: Annotated[

@@ -39,6 +39,7 @@ api_key_service = APIKeyService()
 
 class CreateAPIKeyRequest(BaseModel):
     """Request to create an API key."""
+
     name: str = Field(min_length=1, max_length=100)
     description: Optional[str] = None
     scopes: Optional[list[str]] = None
@@ -49,6 +50,7 @@ class CreateAPIKeyRequest(BaseModel):
 
 class UpdateAPIKeyRequest(BaseModel):
     """Request to update an API key."""
+
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     description: Optional[str] = None
     scopes: Optional[list[str]] = None
@@ -58,6 +60,7 @@ class UpdateAPIKeyRequest(BaseModel):
 
 class APIKeyResponse(BaseModel):
     """Response model for API keys (without sensitive fields)."""
+
     id: UUID
     workspace_id: UUID
     created_by_id: UUID
@@ -76,6 +79,7 @@ class APIKeyResponse(BaseModel):
 
 class APIKeyCreatedResponse(APIKeyResponse):
     """Response when creating an API key (includes the plaintext key)."""
+
     key: str  # The full key - only shown once at creation
 
 
@@ -115,7 +119,9 @@ async def list_api_keys(
     ]
 
 
-@router.post("", response_model=APIKeyCreatedResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=APIKeyCreatedResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_api_key(
     request: CreateAPIKeyRequest,
     ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.ADMIN))],
@@ -181,7 +187,9 @@ async def get_api_key(
             created_at=api_key.created_at,
         )
     except KeyNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="API key not found"
+        )
 
 
 @router.patch("/{key_id}", response_model=APIKeyResponse)
@@ -216,7 +224,9 @@ async def update_api_key(
             created_at=api_key.created_at,
         )
     except KeyNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="API key not found"
+        )
 
 
 @router.delete("/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -234,6 +244,8 @@ async def revoke_api_key(
             ctx.user_id,
         )
     except KeyNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="API key not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="API key not found"
+        )
     except APIKeyServiceError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

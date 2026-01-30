@@ -120,6 +120,7 @@ class PreviewSceneRequest(BaseModel):
 # Seed/Initialize
 # =========================================================================
 
+
 @router.post("/users/{user_id}/seed")
 def seed_defaults(user_id: str):
     """Seed default configurations for a user."""
@@ -137,6 +138,7 @@ def reset_defaults(user_id: str):
 # =========================================================================
 # Scenes
 # =========================================================================
+
 
 @router.get("/users/{user_id}/scenes")
 def list_scenes(user_id: str, sentiment: Optional[str] = None):
@@ -191,6 +193,7 @@ def delete_scene(scene_id: str):
 # Poses
 # =========================================================================
 
+
 @router.get("/users/{user_id}/poses")
 def list_poses(user_id: str, sentiment: Optional[str] = None):
     """List all poses for a user."""
@@ -232,6 +235,7 @@ def delete_pose(pose_id: str):
 # Outfits
 # =========================================================================
 
+
 @router.get("/users/{user_id}/outfits")
 def list_outfits(user_id: str):
     """List all outfits for a user."""
@@ -270,11 +274,13 @@ def delete_outfit(outfit_id: str):
 
 class BulkOutfitImportRequest(BaseModel):
     """Request for bulk outfit import."""
+
     outfits: list[CreateOutfitRequest]
 
 
 class BulkImportResponse(BaseModel):
     """Response for bulk import operations."""
+
     imported: int
     skipped: int
     errors: list[str]
@@ -297,6 +303,7 @@ def bulk_import_outfits(user_id: str, request: BulkOutfitImportRequest):
 # =========================================================================
 # Props
 # =========================================================================
+
 
 @router.get("/users/{user_id}/props")
 def list_props(user_id: str, category: Optional[str] = None):
@@ -338,6 +345,7 @@ def delete_prop(prop_id: str):
 # Characters
 # =========================================================================
 
+
 @router.get("/users/{user_id}/characters")
 def list_characters(user_id: str):
     """List all character definitions for a user."""
@@ -367,6 +375,7 @@ def update_character(character_id: str, request: UpdateCharacterRequest):
 # =========================================================================
 # Config Sets
 # =========================================================================
+
 
 @router.get("/users/{user_id}/config-sets")
 def list_config_sets(user_id: str):
@@ -431,6 +440,7 @@ def delete_config_set(config_set_id: str):
 # Scene-Character Integration
 # =========================================================================
 
+
 @router.get("/scenes/{scene_id}/characters")
 def get_scene_characters(scene_id: str):
     """Get all characters linked to a scene."""
@@ -451,7 +461,9 @@ def add_scene_character(scene_id: str, request: AddSceneCharacterRequest):
 
 
 @router.put("/scenes/{scene_id}/characters/{character_id}")
-def update_scene_character(scene_id: str, character_id: str, request: UpdateSceneCharacterRequest):
+def update_scene_character(
+    scene_id: str, character_id: str, request: UpdateSceneCharacterRequest
+):
     """Update a character's outfit or position in a scene."""
     service.update_scene_character(
         scene_id=scene_id,
@@ -472,6 +484,7 @@ def remove_scene_character(scene_id: str, character_id: str):
 # =========================================================================
 # Scene Generation (AI)
 # =========================================================================
+
 
 @router.post("/scenes/generate")
 def generate_scenes(request: GenerateScenesRequest):
@@ -515,6 +528,7 @@ def preview_scene_prompt(request: PreviewSceneRequest):
 # =========================================================================
 # Prop Categories
 # =========================================================================
+
 
 class CreatePropCategoryRequest(BaseModel):
     name: str
@@ -577,6 +591,7 @@ def delete_prop_category(category_id: str):
 # Scene Prop Rules
 # =========================================================================
 
+
 class AddScenePropRuleRequest(BaseModel):
     prop_category_id: Optional[str] = None
     prop_id: Optional[str] = None
@@ -616,6 +631,7 @@ def remove_scene_prop_rule(rule_id: str):
 # =========================================================================
 # Context Prop Rules
 # =========================================================================
+
 
 class SetContextPropRuleRequest(BaseModel):
     context: str

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Optional, Union
 from uuid import UUID
 
@@ -18,6 +17,7 @@ from runner.content.repository import (
     WorkflowStateMetricRepository,
 )
 
+
 class WorkflowStore:
     """SQLModel-backed workflow store with ContentDatabase-compatible methods."""
 
@@ -27,7 +27,9 @@ class WorkflowStore:
     # ---------------------------------------------------------------------
     # Workflow runs
     # ---------------------------------------------------------------------
-    def create_workflow_run(self, user_id, run_id: str, story: str, workspace_id: Optional[UUID] = None):
+    def create_workflow_run(
+        self, user_id, run_id: str, story: str, workspace_id: Optional[UUID] = None
+    ):
         with get_session() as session:
             repo = WorkflowRunRepository(session)
             data = {
@@ -257,7 +259,7 @@ class WorkflowStore:
             return {}, content
 
         frontmatter_raw = content[3:end].strip()
-        body = content[end + 3:].strip()
+        body = content[end + 3 :].strip()
 
         # Simple key: value parser (avoids PyYAML dependency for 2 fields)
         fm = {}
@@ -284,7 +286,9 @@ class WorkflowStore:
         """
         import os
 
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+        base_dir = os.path.dirname(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        )
         prompts_dir = os.path.join(base_dir, "prompts")
 
         # Load template first to read frontmatter
@@ -331,7 +335,9 @@ class WorkflowStore:
 
         # Include voice profile if needed
         if needs_voice:
-            voice_path = os.path.join(prompts_dir, "voice_profiles", f"{voice_profile_slug}.md")
+            voice_path = os.path.join(
+                prompts_dir, "voice_profiles", f"{voice_profile_slug}.md"
+            )
             if os.path.exists(voice_path):
                 with open(voice_path) as f:
                     parts.append(f.read().strip())

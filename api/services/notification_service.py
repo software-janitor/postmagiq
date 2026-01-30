@@ -26,16 +26,19 @@ from runner.db.models.notification import (
 
 class NotificationServiceError(Exception):
     """Base exception for notification service errors."""
+
     pass
 
 
 class NotificationNotFoundError(NotificationServiceError):
     """Raised when notification is not found."""
+
     pass
 
 
 class ChannelNotFoundError(NotificationServiceError):
     """Raised when notification channel is not found."""
+
     pass
 
 
@@ -54,7 +57,7 @@ class NotificationService:
         """Get all available notification channels."""
         stmt = select(NotificationChannel)
         if enabled_only:
-            stmt = stmt.where(NotificationChannel.is_enabled == True)
+            stmt = stmt.where(NotificationChannel.is_enabled)
         stmt = stmt.order_by(NotificationChannel.name)
         return list(session.exec(stmt).all())
 
@@ -233,8 +236,12 @@ class NotificationService:
 
         channels = self.ensure_default_channels(session)
         in_app_channel = next(
-            (c for c in channels if c.channel_type == NotificationChannelType.IN_APP.value),
-            None
+            (
+                c
+                for c in channels
+                if c.channel_type == NotificationChannelType.IN_APP.value
+            ),
+            None,
         )
 
         if not in_app_channel:
@@ -309,7 +316,9 @@ class NotificationService:
             resource_type=resource_type,
             resource_id=resource_id,
             data=json.dumps(data) if data else None,
-            delivered_via=json.dumps(delivered_channels) if delivered_channels else None,
+            delivered_via=json.dumps(delivered_channels)
+            if delivered_channels
+            else None,
             # Note: delivered_at is set later when delivery is actually confirmed
         )
         session.add(notification)
@@ -372,10 +381,10 @@ class NotificationService:
         )
 
         if unread_only:
-            stmt = stmt.where(Notification.is_read == False)
+            stmt = stmt.where(not Notification.is_read)
 
         if not include_dismissed:
-            stmt = stmt.where(Notification.is_dismissed == False)
+            stmt = stmt.where(not Notification.is_dismissed)
 
         stmt = stmt.order_by(Notification.created_at.desc()).offset(offset).limit(limit)
 
@@ -403,8 +412,8 @@ class NotificationService:
         stmt = select(func.count(Notification.id)).where(
             Notification.user_id == user_id,
             Notification.workspace_id == workspace_id,
-            Notification.is_read == False,
-            Notification.is_dismissed == False,
+            not Notification.is_read,
+            not Notification.is_dismissed,
         )
         result = session.exec(stmt).one()
         return result
@@ -457,7 +466,7 @@ class NotificationService:
         stmt = select(Notification).where(
             Notification.user_id == user_id,
             Notification.workspace_id == workspace_id,
-            Notification.is_read == False,
+            not Notification.is_read,
         )
         notifications = session.exec(stmt).all()
 
@@ -500,7 +509,7 @@ class NotificationService:
         stmt = select(Notification).where(
             Notification.user_id == user_id,
             Notification.workspace_id == workspace_id,
-            Notification.is_dismissed == False,
+            not Notification.is_dismissed,
         )
         notifications = session.exec(stmt).all()
 

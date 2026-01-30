@@ -2,7 +2,6 @@
 
 import os
 from datetime import datetime, timedelta
-from typing import Literal
 from uuid import uuid4
 
 from jose import JWTError, jwt
@@ -38,12 +37,14 @@ def create_access_token(
     """
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({
-        "exp": expire,
-        "iat": datetime.utcnow(),
-        "type": token_type,
-        "jti": str(uuid4()),
-    })
+    to_encode.update(
+        {
+            "exp": expire,
+            "iat": datetime.utcnow(),
+            "type": token_type,
+            "jti": str(uuid4()),
+        }
+    )
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
@@ -58,12 +59,14 @@ def create_refresh_token(data: dict) -> str:
     """
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({
-        "exp": expire,
-        "iat": datetime.utcnow(),
-        "type": "refresh",
-        "jti": str(uuid4()),
-    })
+    to_encode.update(
+        {
+            "exp": expire,
+            "iat": datetime.utcnow(),
+            "type": "refresh",
+            "jti": str(uuid4()),
+        }
+    )
     return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 

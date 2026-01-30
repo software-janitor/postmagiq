@@ -16,7 +16,6 @@ from sqlmodel import Session, select, func, col
 from runner.db.models.audit import (
     AuditAction,
     AuditLog,
-    AuditLogCreate,
     AuditLogRead,
 )
 from runner.logging.structured import get_logger
@@ -26,11 +25,13 @@ logger = get_logger(__name__)
 
 class AuditServiceError(Exception):
     """Base exception for audit service errors."""
+
     pass
 
 
 class AuditNotFoundError(AuditServiceError):
     """Raised when an audit log entry is not found."""
+
     pass
 
 
@@ -242,7 +243,9 @@ class AuditService:
         total = session.exec(count_stmt).one()
 
         # Apply pagination and ordering
-        stmt = stmt.order_by(col(AuditLog.created_at).desc()).offset(offset).limit(limit)
+        stmt = (
+            stmt.order_by(col(AuditLog.created_at).desc()).offset(offset).limit(limit)
+        )
 
         logs = list(session.exec(stmt).all())
 

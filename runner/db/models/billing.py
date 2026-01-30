@@ -5,7 +5,6 @@ for the multi-tenancy billing system with Stripe integration.
 """
 
 from datetime import datetime
-from decimal import Decimal
 from enum import Enum
 from typing import Optional
 from uuid import UUID
@@ -17,6 +16,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 
 class BillingEventType(str, Enum):
     """Types of billing events."""
+
     checkout_completed = "checkout.session.completed"
     invoice_paid = "invoice.paid"
     invoice_payment_failed = "invoice.payment_failed"
@@ -29,6 +29,7 @@ class BillingEventType(str, Enum):
 
 class InvoiceStatus(str, Enum):
     """Status of an invoice."""
+
     draft = "draft"
     open = "open"
     paid = "paid"
@@ -169,6 +170,7 @@ class InvoiceCreate(SQLModel):
 
 class PaymentMethodType(str, Enum):
     """Types of payment methods."""
+
     card = "card"
     bank_account = "bank_account"
     paypal = "paypal"

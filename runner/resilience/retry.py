@@ -23,9 +23,9 @@ Usage:
 import asyncio
 import logging
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from functools import wraps
-from typing import Any, Callable, Optional, Type, TypeVar
+from typing import Callable, Optional, Type, TypeVar
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,9 @@ T = TypeVar("T")
 class RetryableError(Exception):
     """Base class for errors that should trigger a retry."""
 
-    def __init__(self, message: str, retriable: bool = True, retry_after: Optional[float] = None):
+    def __init__(
+        self, message: str, retriable: bool = True, retry_after: Optional[float] = None
+    ):
         super().__init__(message)
         self.retriable = retriable
         self.retry_after = retry_after  # Hint from server (e.g., rate limit)
@@ -61,6 +63,7 @@ class RetryPolicy:
         jitter: Add random jitter to delays (default True)
         retryable_exceptions: Exception types to retry on
     """
+
     max_retries: int = 3
     backoff_base: float = 1.0
     backoff_factor: float = 2.0
@@ -70,7 +73,7 @@ class RetryPolicy:
 
     def get_delay(self, attempt: int) -> float:
         """Calculate delay for a given attempt number (0-indexed)."""
-        delay = self.backoff_base * (self.backoff_factor ** attempt)
+        delay = self.backoff_base * (self.backoff_factor**attempt)
         delay = min(delay, self.backoff_max)
 
         if self.jitter:
@@ -114,6 +117,7 @@ class RetryPolicy:
 @dataclass
 class RetryAttempt:
     """Represents a single retry attempt."""
+
     number: int
     policy: RetryPolicy
     is_last: bool
@@ -192,6 +196,7 @@ def with_retry(
             raise RuntimeError("Retry loop exited unexpectedly")
 
         return wrapper
+
     return decorator
 
 

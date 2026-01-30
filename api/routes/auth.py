@@ -11,7 +11,7 @@ from sqlmodel import Session
 from api.auth.jwt import verify_token
 from api.auth.service import AuthService
 from api.services.email_service import email_service
-from api.utils.role_flags import get_flags_for_user, RoleFlags
+from api.utils.role_flags import get_flags_for_user
 from runner.db.engine import get_session_dependency
 from runner.db.models import UserRead, UserRole
 
@@ -132,6 +132,7 @@ def get_current_user(
         is_active=user.is_active,
         is_superuser=user.is_superuser,
         role=user.role,
+        default_workspace_id=user.default_workspace_id,
     )
 
 
@@ -140,7 +141,9 @@ def get_current_user(
 # =============================================================================
 
 
-@router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED
+)
 def register(
     request: RegisterRequest,
     req: Request,
@@ -389,6 +392,7 @@ def update_user_role(
         is_active=target_user.is_active,
         is_superuser=target_user.is_superuser,
         role=target_user.role,
+        default_workspace_id=target_user.default_workspace_id,
     )
 
 

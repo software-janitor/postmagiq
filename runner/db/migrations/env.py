@@ -9,30 +9,64 @@ from sqlalchemy import engine_from_config, pool
 from sqlmodel import SQLModel
 
 # Add the project root to the path so we can import runner modules
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))))
+sys.path.insert(
+    0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+)
 
 # Import all models to ensure they're registered with SQLModel metadata
 from runner.db.models import (  # noqa: F401
     # Multi-tenancy
-    Workspace, WorkspaceMembership,
+    Workspace,
+    WorkspaceMembership,
     # Core
-    User, Platform, Goal, Chapter, Post,
+    User,
+    Platform,
+    Goal,
+    Chapter,
+    Post,
     # Session
     ActiveSession,
     # Voice
-    WritingSample, VoiceProfile,
+    WritingSample,
+    VoiceProfile,
     # Workflow
-    WorkflowRun, WorkflowOutput, WorkflowSession, WorkflowStateMetric, WorkflowPersona,
+    WorkflowRun,
+    WorkflowOutput,
+    WorkflowSession,
+    WorkflowStateMetric,
+    WorkflowPersona,
     # Image
-    ImagePrompt, ImageConfigSet, ImageScene, ImagePose, ImageOutfit, ImageProp, ImageCharacter,
+    ImagePrompt,
+    ImageConfigSet,
+    ImageScene,
+    ImagePose,
+    ImageOutfit,
+    ImageProp,
+    ImageCharacter,
     # Character
-    CharacterTemplate, OutfitPart, Outfit, OutfitItem, Character, CharacterOutfit,
-    Sentiment, SceneCharacter, PropCategory, ScenePropRule, ContextPropRule,
+    CharacterTemplate,
+    OutfitPart,
+    Outfit,
+    OutfitItem,
+    Character,
+    CharacterOutfit,
+    Sentiment,
+    SceneCharacter,
+    PropCategory,
+    ScenePropRule,
+    ContextPropRule,
     # Analytics
-    AnalyticsImport, PostMetric, DailyMetric, FollowerMetric,
-    AudienceDemographic, PostDemographic,
+    AnalyticsImport,
+    PostMetric,
+    DailyMetric,
+    FollowerMetric,
+    AudienceDemographic,
+    PostDemographic,
     # History
-    RunRecord, InvocationRecord, AuditScoreRecord, PostIterationRecord,
+    RunRecord,
+    InvocationRecord,
+    AuditScoreRecord,
+    PostIterationRecord,
 )
 
 from runner.config import DATABASE_URL

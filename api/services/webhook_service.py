@@ -21,22 +21,24 @@ from runner.db.models import (
     WebhookStatus,
     WebhookDelivery,
     DeliveryStatus,
-    WebhookEventType,
 )
 
 
 class WebhookServiceError(Exception):
     """Base exception for webhook service errors."""
+
     pass
 
 
 class WebhookNotFoundError(WebhookServiceError):
     """Raised when a webhook is not found."""
+
     pass
 
 
 class DeliveryNotFoundError(WebhookServiceError):
     """Raised when a delivery is not found."""
+
     pass
 
 
@@ -132,8 +134,15 @@ class WebhookService:
         webhook = self.get_webhook(session, webhook_id, workspace_id)
 
         allowed_fields = {
-            "name", "description", "url", "events", "status",
-            "timeout_seconds", "max_retries", "retry_delay_seconds", "headers",
+            "name",
+            "description",
+            "url",
+            "events",
+            "status",
+            "timeout_seconds",
+            "max_retries",
+            "retry_delay_seconds",
+            "headers",
         }
 
         for field, value in updates.items():
@@ -318,14 +327,18 @@ class WebhookService:
                 webhook.successful_deliveries += 1
                 webhook.last_success_at = datetime.utcnow()
             else:
-                self._handle_failure(session, delivery, webhook, f"HTTP {response.status_code}")
+                self._handle_failure(
+                    session, delivery, webhook, f"HTTP {response.status_code}"
+                )
 
         except httpx.TimeoutException:
             self._handle_failure(session, delivery, webhook, "Request timed out")
         except httpx.RequestError as e:
             self._handle_failure(session, delivery, webhook, str(e))
         except Exception as e:
-            self._handle_failure(session, delivery, webhook, f"Unexpected error: {str(e)}")
+            self._handle_failure(
+                session, delivery, webhook, f"Unexpected error: {str(e)}"
+            )
 
         # Update webhook stats
         webhook.total_deliveries += 1
@@ -413,7 +426,10 @@ class WebhookService:
         if not delivery or delivery.workspace_id != workspace_id:
             raise DeliveryNotFoundError(f"Delivery {delivery_id} not found")
 
-        if delivery.status not in (DeliveryStatus.FAILED.value, DeliveryStatus.RETRYING.value):
+        if delivery.status not in (
+            DeliveryStatus.FAILED.value,
+            DeliveryStatus.RETRYING.value,
+        ):
             raise WebhookServiceError("Can only retry failed or retrying deliveries")
 
         # Reset for retry
@@ -433,9 +449,11 @@ class WebhookService:
         session: Session,
     ) -> list[WebhookDelivery]:
         """Get deliveries that are ready to be retried."""
-        return list(session.exec(
-            select(WebhookDelivery).where(
-                WebhookDelivery.status == DeliveryStatus.RETRYING.value,
-                WebhookDelivery.next_retry_at <= datetime.utcnow(),
-            )
-        ).all())
+        return list(
+            session.exec(
+                select(WebhookDelivery).where(
+                    WebhookDelivery.status == DeliveryStatus.RETRYING.value,
+                    WebhookDelivery.next_retry_at <= datetime.utcnow(),
+                )
+            ).all()
+        )

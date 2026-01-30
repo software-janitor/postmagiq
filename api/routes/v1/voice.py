@@ -5,11 +5,9 @@ Voice prompts are shared and don't require workspace scoping.
 """
 
 from typing import Annotated, Optional
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlmodel import Session
 
 from api.auth.scopes import Scope
 from api.routes.v1.dependencies import (
@@ -18,7 +16,6 @@ from api.routes.v1.dependencies import (
     require_workspace_scope,
 )
 from api.services.voice_service import VoiceService, WritingSample
-from runner.db.engine import get_session_dependency
 
 
 router = APIRouter(prefix="/v1/w/{workspace_id}/voice", tags=["voice"])
@@ -133,7 +130,9 @@ async def get_prompt(
 @router.post("/samples", response_model=SampleResponse)
 async def save_sample(
     request: SaveSampleRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
 ):
     """Save a writing sample for the workspace.
 
@@ -166,7 +165,9 @@ async def save_sample(
     )
 
     # Use workspace_id for scoping (via user_id from context)
-    sample_id = voice_service.save_sample(ctx.user_id, sample, workspace_id=ctx.workspace_id)
+    sample_id = voice_service.save_sample(
+        ctx.user_id, sample, workspace_id=ctx.workspace_id
+    )
     word_count = len(request.content.split())
 
     return SampleResponse(id=sample_id, word_count=word_count)
@@ -213,7 +214,9 @@ async def get_sample_status(
 
 @router.post("/analyze", response_model=AnalysisResponse)
 async def analyze_voice(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
 ):
     """Analyze voice from writing samples and save profile.
 

@@ -33,10 +33,19 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # Re-add dropped columns
-    op.add_column("workflow_runs", sa.Column("updated_at", sa.DateTime(), nullable=True))
-    op.add_column("workflow_runs", sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")))
+    op.add_column(
+        "workflow_runs", sa.Column("updated_at", sa.DateTime(), nullable=True)
+    )
+    op.add_column(
+        "workflow_runs",
+        sa.Column(
+            "created_at", sa.DateTime(), nullable=False, server_default=sa.text("now()")
+        ),
+    )
     op.add_column("workflow_runs", sa.Column("post_id", sa.UUID(), nullable=True))
-    op.add_column("workflow_runs", sa.Column("total_transitions", sa.Integer(), nullable=True))
+    op.add_column(
+        "workflow_runs", sa.Column("total_transitions", sa.Integer(), nullable=True)
+    )
 
     # Drop added column
     op.drop_column("workflow_runs", "final_state")

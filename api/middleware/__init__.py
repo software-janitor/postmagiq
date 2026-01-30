@@ -2,7 +2,11 @@
 
 from api.middleware.auth import AuthMiddleware
 from api.middleware.workspace import WorkspaceMiddleware
-from api.middleware.metrics import MetricsMiddleware, get_metrics, get_metrics_content_type
+from api.middleware.metrics import (
+    MetricsMiddleware,
+    get_metrics,
+    get_metrics_content_type,
+)
 from api.middleware.custom_domain import (
     CustomDomainMiddleware,
     get_custom_domain,

@@ -42,6 +42,7 @@ approval_service = ApprovalService()
 
 class ApprovalStageResponse(BaseModel):
     """Response model for approval stages."""
+
     id: UUID
     workspace_id: UUID
     name: str
@@ -55,6 +56,7 @@ class ApprovalStageResponse(BaseModel):
 
 class CreateStageRequest(BaseModel):
     """Request to create an approval stage."""
+
     name: str = Field(min_length=1, max_length=100)
     description: Optional[str] = None
     order: int = Field(default=0, ge=0)
@@ -64,6 +66,7 @@ class CreateStageRequest(BaseModel):
 
 class UpdateStageRequest(BaseModel):
     """Request to update an approval stage."""
+
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     description: Optional[str] = None
     order: Optional[int] = Field(default=None, ge=0)
@@ -73,6 +76,7 @@ class UpdateStageRequest(BaseModel):
 
 class AssignPostRequest(BaseModel):
     """Request to assign a post to a user."""
+
     post_id: UUID
     assignee_id: Optional[UUID] = None  # None to unassign
     notes: Optional[str] = None
@@ -80,6 +84,7 @@ class AssignPostRequest(BaseModel):
 
 class AssignmentHistoryResponse(BaseModel):
     """Response model for assignment history."""
+
     id: UUID
     post_id: UUID
     action: str
@@ -92,6 +97,7 @@ class AssignmentHistoryResponse(BaseModel):
 
 class SubmitForApprovalRequest(BaseModel):
     """Request to submit a post for approval."""
+
     post_id: UUID
     stage_id: Optional[UUID] = None  # Auto-select first stage if not provided
     assigned_approver_id: Optional[UUID] = None
@@ -99,6 +105,7 @@ class SubmitForApprovalRequest(BaseModel):
 
 class ApprovalRequestResponse(BaseModel):
     """Response model for approval requests."""
+
     id: UUID
     post_id: UUID
     workspace_id: UUID
@@ -116,11 +123,13 @@ class ApprovalRequestResponse(BaseModel):
 
 class ApprovalDecisionRequest(BaseModel):
     """Request for approval decisions (approve/reject/request changes)."""
+
     notes: Optional[str] = None
 
 
 class AddCommentRequest(BaseModel):
     """Request to add a comment to an approval request."""
+
     content: str = Field(min_length=1)
     is_internal: bool = False
     line_reference: Optional[str] = None
@@ -128,6 +137,7 @@ class AddCommentRequest(BaseModel):
 
 class CommentResponse(BaseModel):
     """Response model for approval comments."""
+
     id: UUID
     approval_request_id: UUID
     author_id: UUID
@@ -144,7 +154,9 @@ class CommentResponse(BaseModel):
 
 @router.get("/stages", response_model=list[ApprovalStageResponse])
 async def list_stages(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
     include_inactive: bool = False,
 ):
@@ -168,7 +180,9 @@ async def list_stages(
     ]
 
 
-@router.post("/stages", response_model=ApprovalStageResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/stages", response_model=ApprovalStageResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_stage(
     request: CreateStageRequest,
     ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.ADMIN))],
@@ -225,7 +239,9 @@ async def update_stage(
             created_at=stage.created_at,
         )
     except StageNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stage not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Stage not found"
+        )
 
 
 @router.delete("/stages/{stage_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -238,7 +254,9 @@ async def delete_stage(
     try:
         approval_service.delete_stage(session, stage_id, ctx.workspace_id)
     except StageNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stage not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Stage not found"
+        )
 
 
 # =============================================================================
@@ -249,7 +267,9 @@ async def delete_stage(
 @router.post("/assign", response_model=AssignmentHistoryResponse)
 async def assign_post(
     request: AssignPostRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Assign or reassign a post to a user."""
@@ -276,14 +296,20 @@ async def assign_post(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.get("/posts/{post_id}/assignments", response_model=list[AssignmentHistoryResponse])
+@router.get(
+    "/posts/{post_id}/assignments", response_model=list[AssignmentHistoryResponse]
+)
 async def get_assignment_history(
     post_id: UUID,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Get assignment history for a post."""
-    history = approval_service.get_assignment_history(session, post_id, ctx.workspace_id)
+    history = approval_service.get_assignment_history(
+        session, post_id, ctx.workspace_id
+    )
     return [
         AssignmentHistoryResponse(
             id=h.id,
@@ -304,10 +330,16 @@ async def get_assignment_history(
 # =============================================================================
 
 
-@router.post("/submit", response_model=ApprovalRequestResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/submit",
+    response_model=ApprovalRequestResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def submit_for_approval(
     request: SubmitForApprovalRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Submit a post for approval."""
@@ -336,14 +368,18 @@ async def submit_for_approval(
             created_at=approval_request.created_at,
         )
     except StageNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stage not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Stage not found"
+        )
     except ApprovalServiceError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 @router.get("/pending", response_model=list[ApprovalRequestResponse])
 async def get_pending_approvals(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
     mine_only: bool = False,
 ):
@@ -352,7 +388,9 @@ async def get_pending_approvals(
     If mine_only=True, only returns requests assigned to the current user.
     """
     approver_id = ctx.user_id if mine_only else None
-    requests = approval_service.get_pending_approvals(session, ctx.workspace_id, approver_id)
+    requests = approval_service.get_pending_approvals(
+        session, ctx.workspace_id, approver_id
+    )
     return [
         ApprovalRequestResponse(
             id=r.id,
@@ -376,11 +414,15 @@ async def get_pending_approvals(
 @router.get("/posts/{post_id}/history", response_model=list[ApprovalRequestResponse])
 async def get_post_approval_history(
     post_id: UUID,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Get approval history for a post."""
-    requests = approval_service.get_post_approval_history(session, post_id, ctx.workspace_id)
+    requests = approval_service.get_post_approval_history(
+        session, post_id, ctx.workspace_id
+    )
     return [
         ApprovalRequestResponse(
             id=r.id,
@@ -405,7 +447,9 @@ async def get_post_approval_history(
 async def approve_request(
     request_id: UUID,
     body: ApprovalDecisionRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_APPROVE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_APPROVE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Approve an approval request. Requires content:approve scope."""
@@ -433,7 +477,9 @@ async def approve_request(
             created_at=approval_request.created_at,
         )
     except RequestNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Request not found"
+        )
     except InvalidTransitionError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -442,7 +488,9 @@ async def approve_request(
 async def reject_request(
     request_id: UUID,
     body: ApprovalDecisionRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_APPROVE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_APPROVE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Reject an approval request. Requires content:approve scope."""
@@ -475,16 +523,22 @@ async def reject_request(
             created_at=approval_request.created_at,
         )
     except RequestNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Request not found"
+        )
     except InvalidTransitionError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
-@router.post("/requests/{request_id}/request-changes", response_model=ApprovalRequestResponse)
+@router.post(
+    "/requests/{request_id}/request-changes", response_model=ApprovalRequestResponse
+)
 async def request_changes(
     request_id: UUID,
     body: ApprovalDecisionRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_APPROVE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_APPROVE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Request changes on an approval request. Requires content:approve scope."""
@@ -517,7 +571,9 @@ async def request_changes(
             created_at=approval_request.created_at,
         )
     except RequestNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Request not found"
+        )
     except InvalidTransitionError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -525,7 +581,9 @@ async def request_changes(
 @router.post("/requests/{request_id}/withdraw", response_model=ApprovalRequestResponse)
 async def withdraw_request(
     request_id: UUID,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Withdraw an approval request (submitter only)."""
@@ -552,7 +610,9 @@ async def withdraw_request(
             created_at=approval_request.created_at,
         )
     except RequestNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Request not found"
+        )
     except (InvalidTransitionError, ApprovalServiceError) as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -562,11 +622,17 @@ async def withdraw_request(
 # =============================================================================
 
 
-@router.post("/requests/{request_id}/comments", response_model=CommentResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/requests/{request_id}/comments",
+    response_model=CommentResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def add_comment(
     request_id: UUID,
     body: AddCommentRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Add a comment to an approval request."""
@@ -590,18 +656,24 @@ async def add_comment(
             created_at=comment.created_at,
         )
     except RequestNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Request not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Request not found"
+        )
 
 
 @router.get("/requests/{request_id}/comments", response_model=list[CommentResponse])
 async def get_comments(
     request_id: UUID,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
     include_internal: bool = True,
 ):
     """Get comments for an approval request."""
-    comments = approval_service.get_comments(session, request_id, ctx.workspace_id, include_internal)
+    comments = approval_service.get_comments(
+        session, request_id, ctx.workspace_id, include_internal
+    )
     return [
         CommentResponse(
             id=c.id,

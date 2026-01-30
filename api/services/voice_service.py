@@ -19,6 +19,7 @@ from runner.content.models import VOICE_PROMPTS
 
 class WritingSample(BaseModel):
     """A writing sample for voice analysis."""
+
     source_type: str  # "prompt" or "upload"
     prompt_id: Optional[str] = None
     prompt_text: Optional[str] = None
@@ -28,6 +29,7 @@ class WritingSample(BaseModel):
 
 class VoiceAnalysis(BaseModel):
     """Extracted voice characteristics."""
+
     tone: str
     sentence_patterns: dict
     vocabulary_level: str
@@ -125,6 +127,7 @@ class VoiceService:
             pass
 
         import re
+
         json_match = re.search(r"\{[\s\S]*\}", response)
         if json_match:
             try:
@@ -159,8 +162,9 @@ class VoiceService:
         self,
         user_id: Union[str, UUID],
         sample: WritingSample,
-    ) -> int:
-        """Save a writing sample."""
+        workspace_id: Optional[UUID] = None,
+    ) -> str:
+        """Save a writing sample, optionally with workspace scope."""
         return self.content_service.save_writing_sample(
             user_id=user_id,
             source_type=sample.source_type,
@@ -168,6 +172,7 @@ class VoiceService:
             prompt_id=sample.prompt_id,
             prompt_text=sample.prompt_text,
             title=sample.title,
+            workspace_id=workspace_id,
         )
 
     def get_samples(self, user_id: Union[str, UUID]) -> list[dict]:
@@ -205,7 +210,9 @@ class VoiceService:
 
         total_words = sum(s.word_count or 0 for s in samples)
         if total_words < 500:
-            raise ValueError(f"Need at least 500 words for analysis (have {total_words})")
+            raise ValueError(
+                f"Need at least 500 words for analysis (have {total_words})"
+            )
 
         # Format samples for prompt
         formatted_samples = []
@@ -319,7 +326,9 @@ class VoiceService:
         """Clone a voice profile with a new name."""
         return self.content_service.clone_voice_profile(profile_id, new_name)
 
-    def set_default_profile(self, user_id: Union[str, UUID], profile_id: Union[str, UUID]) -> None:
+    def set_default_profile(
+        self, user_id: Union[str, UUID], profile_id: Union[str, UUID]
+    ) -> None:
         """Set a voice profile as the default."""
         self.content_service.set_default_voice_profile(user_id, profile_id)
 
@@ -336,7 +345,9 @@ class VoiceService:
     # =========================================================================
 
     @staticmethod
-    def validate_sample_word_count(content: str, max_words: int = 500) -> tuple[bool, int]:
+    def validate_sample_word_count(
+        content: str, max_words: int = 500
+    ) -> tuple[bool, int]:
         """Validate sample word count.
 
         Returns:
@@ -345,7 +356,9 @@ class VoiceService:
         word_count = len(content.split())
         return word_count <= max_words, word_count
 
-    def can_analyze(self, user_id: Union[str, UUID], min_words: int = 500) -> tuple[bool, int]:
+    def can_analyze(
+        self, user_id: Union[str, UUID], min_words: int = 500
+    ) -> tuple[bool, int]:
         """Check if user has enough samples for analysis.
 
         Returns:
@@ -357,23 +370,6 @@ class VoiceService:
     # =========================================================================
     # Workspace-Scoped Methods (for v1 API)
     # =========================================================================
-
-    def save_sample(
-        self,
-        user_id: Union[str, UUID],
-        sample: WritingSample,
-        workspace_id: Optional[UUID] = None,
-    ) -> str:
-        """Save a writing sample, optionally with workspace scope."""
-        return self.content_service.save_writing_sample(
-            user_id=user_id,
-            source_type=sample.source_type,
-            content=sample.content,
-            prompt_id=sample.prompt_id,
-            prompt_text=sample.prompt_text,
-            title=sample.title,
-            workspace_id=workspace_id,
-        )
 
     def get_samples_for_workspace(self, workspace_id: UUID) -> list[dict]:
         """Get all writing samples for a workspace."""
@@ -406,7 +402,9 @@ class VoiceService:
 
         total_words = sum(s.word_count or 0 for s in samples)
         if total_words < 500:
-            raise ValueError(f"Need at least 500 words for analysis (have {total_words})")
+            raise ValueError(
+                f"Need at least 500 words for analysis (have {total_words})"
+            )
 
         # Format samples for prompt
         formatted_samples = []

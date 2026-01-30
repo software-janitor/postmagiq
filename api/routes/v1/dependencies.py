@@ -50,6 +50,7 @@ class WorkspaceContext:
     def has_scope(self, scope: Scope) -> bool:
         """Check if user has scope in this workspace."""
         from api.auth.scopes import has_scope
+
         return has_scope(self.membership.role, scope)
 
     def require_scope(self, scope: Scope) -> None:
@@ -154,5 +155,108 @@ def require_workspace_scope(scope: Scope):
     return scope_checker
 
 
+async def get_workspace_context_from_default(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    session: Annotated[Session, Depends(get_session_dependency)],
+) -> WorkspaceContext:
+    """Get workspace context from user's default workspace.
+
+    This dependency is used for routes that don't have workspace_id in the URL.
+    It uses the user's default_workspace_id to determine the workspace context.
+
+    This enables the "hide multi-tenancy" UX for individual tier users,
+    where they don't see workspace concepts in the URL or UI.
+
+    Usage:
+        @router.get("/goals")  # No workspace_id in path
+        async def list_goals(
+            ctx: Annotated[WorkspaceContext, Depends(get_workspace_context_from_default)]
+        ):
+            return get_goals_for_workspace(ctx.workspace_id)
+
+    Args:
+        current_user: Authenticated user from JWT
+        session: Database session
+
+    Returns:
+        WorkspaceContext with workspace, membership, and user
+
+    Raises:
+        HTTPException 404: User has no default workspace
+        HTTPException 403: User is not a member of their default workspace
+    """
+    # Check if user has a default workspace
+    if not current_user.user.default_workspace_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No default workspace configured. Please contact support.",
+        )
+
+    workspace_id = current_user.user.default_workspace_id
+
+    # Load workspace
+    workspace = session.get(Workspace, workspace_id)
+    if not workspace:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Default workspace not found",
+        )
+
+    # Load membership
+    statement = select(WorkspaceMembership).where(
+        WorkspaceMembership.workspace_id == workspace_id,
+        WorkspaceMembership.user_id == current_user.user_id,
+        WorkspaceMembership.invite_status == InviteStatus.accepted,
+    )
+    membership = session.exec(statement).first()
+
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of your default workspace",
+        )
+
+    # Update CurrentUser with membership context
+    current_user_with_membership = CurrentUser(
+        user=current_user.user,
+        membership=membership,
+    )
+
+    return WorkspaceContext(
+        workspace=workspace,
+        membership=membership,
+        current_user=current_user_with_membership,
+    )
+
+
+def require_default_workspace_scope(scope: Scope):
+    """Create a dependency that requires a specific scope using default workspace.
+
+    Usage:
+        @router.post("/goals")  # No workspace_id in path
+        async def create_goal(
+            ctx: Annotated[WorkspaceContext, Depends(require_default_workspace_scope(Scope.STRATEGY_WRITE))]
+        ):
+            ...
+
+    Args:
+        scope: Required permission scope
+
+    Returns:
+        Dependency that returns WorkspaceContext if authorized
+    """
+
+    async def scope_checker(
+        ctx: Annotated[WorkspaceContext, Depends(get_workspace_context_from_default)],
+    ) -> WorkspaceContext:
+        ctx.require_scope(scope)
+        return ctx
+
+    return scope_checker
+
+
 # Type aliases for cleaner route signatures
 WorkspaceCtx = Annotated[WorkspaceContext, Depends(get_workspace_context)]
+DefaultWorkspaceCtx = Annotated[
+    WorkspaceContext, Depends(get_workspace_context_from_default)
+]

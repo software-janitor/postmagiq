@@ -23,6 +23,7 @@ import {
 import { clsx } from 'clsx'
 import { useQuery } from '@tanstack/react-query'
 import { fetchExistingStrategy } from '../../api/onboarding'
+import { getUsageSummary } from '../../api/transcription'
 import WorkspaceSwitcher from '../WorkspaceSwitcher'
 import ThemeSwitcher from '../ThemeSwitcher'
 import { useAuthStore } from '../../stores/authStore'
@@ -104,6 +105,15 @@ export default function Sidebar() {
     enabled: !!workspaceId,
   })
 
+  // Fetch usage to check if team workspaces feature is enabled
+  const { data: usage } = useQuery({
+    queryKey: ['usage', workspaceId],
+    queryFn: () => getUsageSummary(workspaceId!),
+    enabled: !!workspaceId,
+    staleTime: 5 * 60 * 1000, // Cache for 5 minutes
+  })
+  const showTeamFeatures = usage?.features?.team_workspaces ?? false
+
   const strategyName = strategy?.goal?.signature_thesis?.split('.')[0] || 'No Strategy'
   const hasStrategy = strategy?.exists && strategy?.goal
 
@@ -122,11 +132,13 @@ export default function Sidebar() {
         <p className={`text-xs ${theme.textMuted} mt-1`}>AI Content Platform</p>
       </div>
 
-      {/* Workspace Switcher */}
-      <div className={`px-4 py-3 border-b ${theme.border}`}>
-        <div className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Workspace</div>
-        <WorkspaceSwitcher />
-      </div>
+      {/* Workspace Switcher - only shown for Business tier with team_workspaces enabled */}
+      {showTeamFeatures && (
+        <div className={`px-4 py-3 border-b ${theme.border}`}>
+          <div className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Workspace</div>
+          <WorkspaceSwitcher />
+        </div>
+      )}
 
       {/* Strategy Indicator */}
       <div className={`px-4 py-3 border-b ${theme.border}`}>

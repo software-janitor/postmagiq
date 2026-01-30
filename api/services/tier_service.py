@@ -229,7 +229,9 @@ class TierService:
             # Free tier without DB record - set basic_workflow
             features["basic_workflow"] = {
                 "enabled": True,
-                "config": {"text_limit": self.DEFAULT_TEXT_LIMITS.get(tier_slug, 50000)},
+                "config": {
+                    "text_limit": self.DEFAULT_TEXT_LIMITS.get(tier_slug, 50000)
+                },
             }
             return features
 
@@ -258,12 +260,22 @@ class TierService:
         text_limit = self.get_text_limit(workspace_id)
 
         return {
-            "premium_workflow": features.get("premium_workflow", {}).get("enabled", False),
-            "voice_transcription": features.get("voice_transcription", {}).get("enabled", False),
-            "youtube_transcription": features.get("youtube_transcription", {}).get("enabled", False),
-            "priority_support": features.get("priority_support", {}).get("enabled", False),
+            "premium_workflow": features.get("premium_workflow", {}).get(
+                "enabled", False
+            ),
+            "voice_transcription": features.get("voice_transcription", {}).get(
+                "enabled", False
+            ),
+            "youtube_transcription": features.get("youtube_transcription", {}).get(
+                "enabled", False
+            ),
+            "priority_support": features.get("priority_support", {}).get(
+                "enabled", False
+            ),
             "api_access": features.get("api_access", {}).get("enabled", False),
-            "team_workspaces": features.get("team_workspaces", {}).get("enabled", False),
+            "team_workspaces": features.get("team_workspaces", {}).get(
+                "enabled", False
+            ),
             "text_limit": text_limit,
         }
 

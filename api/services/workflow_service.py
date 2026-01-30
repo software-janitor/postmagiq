@@ -3,7 +3,6 @@
 import asyncio
 import logging
 import os
-import tempfile
 from datetime import datetime
 from typing import Optional, Any
 from threading import Thread
@@ -43,7 +42,9 @@ class WorkflowService:
         self.running = False
         self.awaiting_approval = False
         self._thread: Optional[Thread] = None
-        self._state_machine: Optional[Any] = None  # Reference to StateMachine for approval
+        self._state_machine: Optional[Any] = (
+            None  # Reference to StateMachine for approval
+        )
         self._approval_content: Optional[str] = None  # Content awaiting approval
         self._store: Optional[WorkflowStore] = None  # Created during execute()
 
@@ -107,7 +108,9 @@ class WorkflowService:
         self.current_run_id = runner._generate_run_id(story)
 
         # Create workflow run in database
-        self._store.create_workflow_run(self.current_user_id, self.current_run_id, story, workspace_id=workspace_id)
+        self._store.create_workflow_run(
+            self.current_user_id, self.current_run_id, story, workspace_id=workspace_id
+        )
 
         # Save content to database (primary) and try file (secondary)
         if content:
@@ -129,7 +132,10 @@ class WorkflowService:
                     f.write(content)
             except (OSError, PermissionError) as e:
                 import logging
-                logging.warning(f"File write failed for {story}_input.md: {e}. Content saved to database.")
+
+                logging.warning(
+                    f"File write failed for {story}_input.md: {e}. Content saved to database."
+                )
                 input_path = None  # File write failed, but database has content
 
         # Create approval callback that broadcasts to WebSocket
@@ -151,8 +157,7 @@ class WorkflowService:
                 broadcast_data["audit_results"] = approval_info["audit_results"]
 
             _broadcast_from_thread(
-                main_loop,
-                manager.broadcast(broadcast_data, self.current_run_id)
+                main_loop, manager.broadcast(broadcast_data, self.current_run_id)
             )
 
         # Broadcast start event
@@ -187,7 +192,7 @@ class WorkflowService:
                             "timestamp": datetime.utcnow().isoformat(),
                         },
                         run_id,
-                    )
+                    ),
                 )
             elif event_type == "state_exit":
                 _broadcast_from_thread(
@@ -200,7 +205,7 @@ class WorkflowService:
                             "timestamp": datetime.utcnow().isoformat(),
                         },
                         run_id,
-                    )
+                    ),
                 )
             elif event_type == "state_complete":
                 # Broadcast state completion with per-agent metrics
@@ -217,11 +222,13 @@ class WorkflowService:
                                 "timestamp": datetime.utcnow().isoformat(),
                             },
                             run_id,
-                        )
+                        ),
                     )
             elif event_type == "agent_complete":
                 # Broadcast agent completion with output preview
-                output_preview = event.get("output", "")[:500] if event.get("output") else None
+                output_preview = (
+                    event.get("output", "")[:500] if event.get("output") else None
+                )
                 _broadcast_from_thread(
                     main_loop,
                     manager.broadcast(
@@ -233,7 +240,7 @@ class WorkflowService:
                             "timestamp": datetime.utcnow().isoformat(),
                         },
                         run_id,
-                    )
+                    ),
                 )
             elif event_type == "output_written":
                 # Broadcast output events based on state
@@ -241,27 +248,20 @@ class WorkflowService:
                 content = event.get("content", "")
                 agent = event.get("agent")
                 output_type = None
-                db_output_type = None
 
                 if "review" in state:
                     output_type = "output:review"
-                    db_output_type = "review"
                 elif "process" in state:
                     output_type = "output:processed"
-                    db_output_type = "processed"
                 elif state == "draft":
                     output_type = "output:draft"
-                    db_output_type = "draft"
                 elif state == "final-audit":
                     # Distinguish final audit from cross-audit
                     output_type = "output:final-audit"
-                    db_output_type = "final_audit"
                 elif "audit" in state:
                     output_type = "output:audit"
-                    db_output_type = "audit"
                 elif "synthesize" in state or "final" in event.get("output_path", ""):
                     output_type = "output:final"
-                    db_output_type = "final"
 
                 if output_type:
                     # Note: Database save already handled by state_machine._invoke_agent
@@ -277,7 +277,7 @@ class WorkflowService:
                                 "timestamp": datetime.utcnow().isoformat(),
                             },
                             run_id,
-                        )
+                        ),
                     )
             elif event_type == "circuit_break_auto_skip":
                 # Notify user that we auto-proceeded due to high score
@@ -292,7 +292,7 @@ class WorkflowService:
                             "timestamp": datetime.utcnow().isoformat(),
                         },
                         run_id,
-                    )
+                    ),
                 )
             elif event_type == "circuit_break":
                 # Log circuit break detection
@@ -307,7 +307,7 @@ class WorkflowService:
                             "timestamp": datetime.utcnow().isoformat(),
                         },
                         run_id,
-                    )
+                    ),
                 )
             elif event_type in ("session_resume", "session_new"):
                 # Log session info for feedback
@@ -323,7 +323,7 @@ class WorkflowService:
                             "timestamp": datetime.utcnow().isoformat(),
                         },
                         run_id,
-                    )
+                    ),
                 )
             elif event_type == "llm:request":
                 # DEV_MODE: Broadcast full LLM request for dev console
@@ -345,7 +345,7 @@ class WorkflowService:
                             "timestamp": event.get("timestamp"),
                         },
                         run_id,
-                    )
+                    ),
                 )
             elif event_type == "llm:response":
                 # DEV_MODE: Broadcast full LLM response for dev console
@@ -370,7 +370,7 @@ class WorkflowService:
                             "timestamp": event.get("timestamp"),
                         },
                         run_id,
-                    )
+                    ),
                 )
 
         def run_workflow():
@@ -406,7 +406,9 @@ class WorkflowService:
 
         return {"run_id": self.current_run_id, "status": "started"}
 
-    async def execute_step(self, story: str, step: str, run_id: Optional[str] = None) -> dict:
+    async def execute_step(
+        self, story: str, step: str, run_id: Optional[str] = None
+    ) -> dict:
         """Execute a single workflow step."""
         if self.running:
             return {"error": "Workflow already running"}
@@ -445,7 +447,9 @@ class WorkflowService:
         )
         return {"status": "aborted", "run_id": self.current_run_id}
 
-    async def submit_approval(self, decision: str, feedback: Optional[str] = None) -> dict:
+    async def submit_approval(
+        self, decision: str, feedback: Optional[str] = None
+    ) -> dict:
         """Submit human approval response."""
         if not self.awaiting_approval:
             return {"error": "Not awaiting approval"}
@@ -545,6 +549,7 @@ class WorkflowService:
             try:
                 # Parse post number from story (e.g., "post_04" -> 4)
                 import re
+
                 match = re.search(r"post_(\d+)", self.current_story)
                 if match:
                     post_number = int(match.group(1))
@@ -557,7 +562,9 @@ class WorkflowService:
                                 post.status = "ready"
                                 session.add(post)
                                 session.commit()
-                                logging.info(f"Updated post {post_number} status to 'ready'")
+                                logging.info(
+                                    f"Updated post {post_number} status to 'ready'"
+                                )
             except Exception as e:
                 logging.warning(f"Failed to update post status: {e}")
 
@@ -565,6 +572,7 @@ class WorkflowService:
         if self.current_workspace_id and result.get("final_state") == "complete":
             try:
                 from api.services.usage_service import UsageService
+
                 usage_svc = UsageService()
                 idempotency_key = f"workflow-run:{self.current_run_id}"
                 usage_svc.reserve_credit(
@@ -575,7 +583,9 @@ class WorkflowService:
                 )
                 usage_svc.confirm_usage(idempotency_key)
             except Exception as e:
-                logging.warning(f"Credit deduction failed for run {self.current_run_id}: {e}")
+                logging.warning(
+                    f"Credit deduction failed for run {self.current_run_id}: {e}"
+                )
 
         await manager.broadcast(
             {

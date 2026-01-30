@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 class ComponentHealth(BaseModel):
     """Health status for a single component."""
+
     name: str
     status: str  # "healthy", "unhealthy", "degraded"
     latency_ms: Optional[float] = None
@@ -25,6 +26,7 @@ class ComponentHealth(BaseModel):
 
 class DetailedHealth(BaseModel):
     """Detailed health status with all component statuses."""
+
     status: str  # "healthy", "unhealthy", "degraded"
     timestamp: str
     version: str
@@ -104,7 +106,9 @@ class HealthService:
                 name="redis",
                 status="healthy" if redis_healthy else "unhealthy",
                 latency_ms=None,  # No actual check yet
-                message="Not implemented" if redis_healthy else "Redis connection failed",
+                message="Not implemented"
+                if redis_healthy
+                else "Redis connection failed",
             )
         )
 

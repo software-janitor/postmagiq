@@ -30,6 +30,7 @@ def _verify_user_access(current_user: CurrentUser, target_user_id: UUID) -> None
 
 class SaveSampleRequest(BaseModel):
     """Save a writing sample."""
+
     user_id: UUID
     source_type: str  # "prompt" or "upload"
     content: str
@@ -39,6 +40,7 @@ class SaveSampleRequest(BaseModel):
 
 class AnalyzeRequest(BaseModel):
     """Request voice analysis."""
+
     user_id: UUID
 
 
@@ -49,17 +51,20 @@ class AnalyzeRequest(BaseModel):
 
 class PromptsResponse(BaseModel):
     """Available voice prompts."""
+
     prompts: list[dict]
 
 
 class SampleResponse(BaseModel):
     """Saved sample info."""
+
     id: str
     word_count: int
 
 
 class SamplesResponse(BaseModel):
     """User's writing samples."""
+
     samples: list[dict]
     total_word_count: int
     can_analyze: bool
@@ -67,6 +72,7 @@ class SamplesResponse(BaseModel):
 
 class AnalysisResponse(BaseModel):
     """Voice analysis result."""
+
     profile_id: str
     tone: str
     sentence_patterns: dict
@@ -79,6 +85,7 @@ class AnalysisResponse(BaseModel):
 
 class ProfileResponse(BaseModel):
     """User's voice profile."""
+
     id: str
     name: str = "Default"
     description: Optional[str] = None
@@ -94,16 +101,19 @@ class ProfileResponse(BaseModel):
 
 class ProfilesResponse(BaseModel):
     """List of voice profiles."""
+
     profiles: list[ProfileResponse]
 
 
 class CloneProfileRequest(BaseModel):
     """Clone a profile."""
+
     new_name: str
 
 
 class UpdateProfileRequest(BaseModel):
     """Update profile metadata."""
+
     name: Optional[str] = None
     description: Optional[str] = None
 
@@ -285,9 +295,7 @@ def get_profiles(
     _verify_user_access(current_user, user_id)
 
     profiles = voice_service.get_all_profiles(user_id)
-    return ProfilesResponse(
-        profiles=[_profile_to_response(p) for p in profiles]
-    )
+    return ProfilesResponse(profiles=[_profile_to_response(p) for p in profiles])
 
 
 @router.get("/profiles/{profile_id}", response_model=ProfileResponse)

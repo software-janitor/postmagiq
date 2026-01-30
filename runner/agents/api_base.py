@@ -66,7 +66,9 @@ class APIAgent(BaseAgent):
         """
         pass
 
-    def invoke(self, prompt: str, input_files: Optional[list[str]] = None) -> AgentResult:
+    def invoke(
+        self, prompt: str, input_files: Optional[list[str]] = None
+    ) -> AgentResult:
         """One-shot invocation (no history)."""
         full_prompt = self._build_prompt(prompt, input_files)
         messages = [{"role": "user", "content": full_prompt}]
@@ -87,7 +89,9 @@ class APIAgent(BaseAgent):
             self.messages.append({"role": "assistant", "content": result.content})
         return result
 
-    def _build_prompt(self, prompt: str, input_files: Optional[list[str]] = None) -> str:
+    def _build_prompt(
+        self, prompt: str, input_files: Optional[list[str]] = None
+    ) -> str:
         """Build full prompt including file contents if provided."""
         if not input_files:
             return prompt
@@ -126,8 +130,7 @@ class APIAgent(BaseAgent):
                 last_error = str(e)
                 if attempt < self.MAX_RETRIES:
                     backoff = min(
-                        self.RETRY_BACKOFF_BASE * (2 ** attempt),
-                        self.RETRY_BACKOFF_MAX
+                        self.RETRY_BACKOFF_BASE * (2**attempt), self.RETRY_BACKOFF_MAX
                     )
                     print(
                         f"[{self.name}] Rate limited, waiting {backoff}s "
@@ -178,4 +181,5 @@ class APIAgent(BaseAgent):
 
 class RateLimitError(Exception):
     """Raised when API returns a rate limit error."""
+
     pass

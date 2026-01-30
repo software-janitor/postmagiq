@@ -20,6 +20,7 @@ watermark_service = WatermarkService()
 
 class GeneratePromptRequest(BaseModel):
     """Request to generate an image prompt."""
+
     post_id: str
     title: str
     sentiment: str  # "SUCCESS", "FAILURE", "UNRESOLVED"
@@ -38,13 +39,13 @@ def generate_prompt(
     if request.sentiment not in ["SUCCESS", "FAILURE", "UNRESOLVED"]:
         raise HTTPException(
             status_code=400,
-            detail="Invalid sentiment. Must be one of: SUCCESS, FAILURE, UNRESOLVED"
+            detail="Invalid sentiment. Must be one of: SUCCESS, FAILURE, UNRESOLVED",
         )
 
     if request.context not in ["software", "hardware"]:
         raise HTTPException(
             status_code=400,
-            detail="Invalid context. Must be one of: software, hardware"
+            detail="Invalid context. Must be one of: software, hardware",
         )
 
     return service.generate_prompt(
@@ -77,7 +78,9 @@ def get_latest_prompt(
     return prompt
 
 
-@router.get("/users/{user_id}/posts/{post_id}/latest", response_model=ImagePromptResponse)
+@router.get(
+    "/users/{user_id}/posts/{post_id}/latest", response_model=ImagePromptResponse
+)
 def get_latest_prompt_for_user(user_id: str, post_id: str):
     """Get the latest image prompt for a specific post."""
     prompt = service.get_latest_prompt(user_id, post_id)
@@ -124,6 +127,7 @@ def get_outfits(
 
 class ImageUploadResponse(BaseModel):
     """Response for image upload."""
+
     success: bool
     post_id: Optional[str] = None
     prompt_id: Optional[str] = None
@@ -280,9 +284,7 @@ def download_prompt_image(
     return Response(
         content=image_bytes,
         media_type=content_type,
-        headers={
-            "Content-Disposition": f'attachment; filename="{filename}"'
-        }
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 

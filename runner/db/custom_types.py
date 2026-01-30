@@ -56,4 +56,3 @@ class JsonOrVector(TypeDecorator):
 
             return dialect.type_descriptor(Vector(self.dimensions))
         return dialect.type_descriptor(JSON())
-
