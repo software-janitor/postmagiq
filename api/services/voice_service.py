@@ -161,7 +161,14 @@ class VoiceService:
         self.last_result = None
 
         # Use agent factory - same as workflows
-        self.model = os.environ.get("VOICE_MODEL") or os.environ.get("OLLAMA_MODEL", "llama3.2")
+        # Model defaults depend on provider
+        if os.environ.get("VOICE_MODEL"):
+            self.model = os.environ.get("VOICE_MODEL")
+        elif self.llm_provider == "groq":
+            self.model = "openai/gpt-oss-120b"  # Groq default
+        else:
+            self.model = os.environ.get("OLLAMA_MODEL", "llama3.2")
+
         self.agent = create_agent(
             self.llm_provider,
             {
