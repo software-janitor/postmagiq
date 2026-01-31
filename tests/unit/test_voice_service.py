@@ -180,3 +180,113 @@ class TestVoiceServiceModelSelection:
 
         default_model = model_defaults.get("unknown_provider", "llama3.2")
         assert default_model == "llama3.2"
+
+
+class TestVoiceProfileFormatting:
+    """Tests for voice profile data formatting functions."""
+
+    def test_format_sentence_patterns_from_json(self):
+        """Format JSON sentence patterns into readable text."""
+        from api.services.content_service import _format_sentence_patterns
+
+        json_value = '{"average_length": "medium", "variation": "varied", "common_structures": ["simple declarative", "compound sentences"]}'
+        result = _format_sentence_patterns(json_value)
+
+        assert "Medium sentence length" in result
+        assert "varied variation" in result
+        assert "Uses: simple declarative, compound sentences" in result
+
+    def test_format_sentence_patterns_plain_text_passthrough(self):
+        """Plain text sentence patterns pass through unchanged."""
+        from api.services.content_service import _format_sentence_patterns
+
+        plain_text = "Short punchy sentences. Varied rhythm."
+        result = _format_sentence_patterns(plain_text)
+
+        assert result == plain_text
+
+    def test_format_sentence_patterns_none(self):
+        """None input returns None."""
+        from api.services.content_service import _format_sentence_patterns
+
+        assert _format_sentence_patterns(None) is None
+
+    def test_format_sentence_patterns_double_encoded(self):
+        """Handle double-encoded JSON (legacy data)."""
+        from api.services.content_service import _format_sentence_patterns
+
+        # This simulates old data that was json.dumps'd twice
+        import json
+        inner = {"average_length": "short", "variation": "minimal"}
+        double_encoded = json.dumps(json.dumps(inner))
+
+        result = _format_sentence_patterns(double_encoded)
+        assert "Short sentence length" in result
+
+    def test_format_signature_phrases_from_json_array(self):
+        """Format JSON array of phrases into comma-separated text."""
+        from api.services.content_service import _format_signature_phrases
+
+        json_value = '["First phrase", "Second phrase", "Third phrase"]'
+        result = _format_signature_phrases(json_value)
+
+        assert result == "First phrase, Second phrase, Third phrase"
+
+    def test_format_signature_phrases_plain_text_passthrough(self):
+        """Plain text signature phrases pass through unchanged."""
+        from api.services.content_service import _format_signature_phrases
+
+        plain_text = "The key insight is..., What separates success from failure..."
+        result = _format_signature_phrases(plain_text)
+
+        assert result == plain_text
+
+    def test_format_signature_phrases_none(self):
+        """None input returns None."""
+        from api.services.content_service import _format_signature_phrases
+
+        assert _format_signature_phrases(None) is None
+
+    def test_format_signature_phrases_double_encoded(self):
+        """Handle double-encoded JSON array (legacy data)."""
+        from api.services.content_service import _format_signature_phrases
+
+        import json
+        inner = ["Phrase one", "Phrase two"]
+        double_encoded = json.dumps(json.dumps(inner))
+
+        result = _format_signature_phrases(double_encoded)
+        assert result == "Phrase one, Phrase two"
+
+
+class TestVoiceProfileStorage:
+    """Tests for voice profile storage without legacy wrapper."""
+
+    def test_no_legacy_wrapper_in_save(self):
+        """Verify save functions don't use legacy JSON wrapper."""
+        import inspect
+        from api.services.content_service import ContentService
+
+        # Check that save_voice_profile doesn't reference legacy
+        source = inspect.getsource(ContentService.save_voice_profile)
+        assert "legacy" not in source.lower()
+        assert "_encode_legacy" not in source
+
+    def test_no_legacy_wrapper_in_workspace_save(self):
+        """Verify workspace save doesn't use legacy JSON wrapper."""
+        import inspect
+        from api.services.content_service import ContentService
+
+        source = inspect.getsource(ContentService.save_voice_profile_for_workspace)
+        assert "legacy" not in source.lower()
+        assert "_encode_legacy" not in source
+
+    def test_response_uses_native_fields(self):
+        """Verify response builder uses native DB fields."""
+        import inspect
+        from api.services.content_service import ContentService
+
+        source = inspect.getsource(ContentService._voice_profile_response)
+        assert "_decode_legacy" not in source
+        assert "profile.tone_description" in source
+        assert "profile.signature_phrases" in source
