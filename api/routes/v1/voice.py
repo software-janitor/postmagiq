@@ -78,10 +78,9 @@ class SampleStatusResponse(BaseModel):
     words_needed: int
 
 
-class AnalysisResponse(BaseModel):
-    """Voice analysis result."""
+class AnalysisData(BaseModel):
+    """Voice analysis data."""
 
-    profile_id: str
     tone: str
     sentence_patterns: dict
     vocabulary_level: str
@@ -89,6 +88,13 @@ class AnalysisResponse(BaseModel):
     storytelling_style: str
     emotional_register: str
     summary: str
+
+
+class AnalysisResponse(BaseModel):
+    """Voice analysis result."""
+
+    profile_id: str
+    analysis: AnalysisData
 
 
 # =============================================================================
@@ -238,13 +244,15 @@ async def analyze_voice(
         analysis = result["analysis"]
         return AnalysisResponse(
             profile_id=result["profile_id"],
-            tone=analysis["tone"],
-            sentence_patterns=analysis["sentence_patterns"],
-            vocabulary_level=analysis["vocabulary_level"],
-            signature_phrases=analysis["signature_phrases"],
-            storytelling_style=analysis["storytelling_style"],
-            emotional_register=analysis["emotional_register"],
-            summary=analysis.get("summary", ""),
+            analysis=AnalysisData(
+                tone=analysis["tone"],
+                sentence_patterns=analysis["sentence_patterns"],
+                vocabulary_level=analysis["vocabulary_level"],
+                signature_phrases=analysis["signature_phrases"],
+                storytelling_style=analysis["storytelling_style"],
+                emotional_register=analysis["emotional_register"],
+                summary=analysis.get("summary", ""),
+            ),
         )
     except Exception as e:
         import traceback
