@@ -211,18 +211,6 @@ class TestVoiceProfileFormatting:
 
         assert _format_sentence_patterns(None) is None
 
-    def test_format_sentence_patterns_double_encoded(self):
-        """Handle double-encoded JSON (legacy data)."""
-        from api.services.content_service import _format_sentence_patterns
-
-        # This simulates old data that was json.dumps'd twice
-        import json
-        inner = {"average_length": "short", "variation": "minimal"}
-        double_encoded = json.dumps(json.dumps(inner))
-
-        result = _format_sentence_patterns(double_encoded)
-        assert "Short sentence length" in result
-
     def test_format_signature_phrases_from_json_array(self):
         """Format JSON array of phrases into comma-separated text."""
         from api.services.content_service import _format_signature_phrases
@@ -246,18 +234,6 @@ class TestVoiceProfileFormatting:
         from api.services.content_service import _format_signature_phrases
 
         assert _format_signature_phrases(None) is None
-
-    def test_format_signature_phrases_double_encoded(self):
-        """Handle double-encoded JSON array (legacy data)."""
-        from api.services.content_service import _format_signature_phrases
-
-        import json
-        inner = ["Phrase one", "Phrase two"]
-        double_encoded = json.dumps(json.dumps(inner))
-
-        result = _format_signature_phrases(double_encoded)
-        assert result == "Phrase one, Phrase two"
-
 
 class TestVoiceProfileStorage:
     """Tests for voice profile storage without legacy wrapper."""

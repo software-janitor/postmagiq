@@ -82,14 +82,10 @@ def _format_sentence_patterns(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
     # If it's already a plain string (preset), return as-is
-    # Check for JSON object or double-encoded JSON (starts with " or {)
-    if not value.startswith("{") and not value.startswith('"'):
+    if not value.startswith("{"):
         return value
     try:
         patterns = json.loads(value)
-        # Handle double-encoded JSON (string containing JSON)
-        if isinstance(patterns, str) and patterns.startswith("{"):
-            patterns = json.loads(patterns)
         if not isinstance(patterns, dict):
             return value
         parts = []
@@ -111,14 +107,10 @@ def _format_signature_phrases(value: Optional[str]) -> Optional[str]:
     if not value:
         return None
     # If it's already a plain string (preset), return as-is
-    # Check for JSON array or double-encoded JSON (starts with " or [)
-    if not value.startswith("[") and not value.startswith('"'):
+    if not value.startswith("["):
         return value
     try:
         phrases = json.loads(value)
-        # Handle double-encoded JSON (string containing JSON array)
-        if isinstance(phrases, str) and phrases.startswith("["):
-            phrases = json.loads(phrases)
         if isinstance(phrases, list):
             return ", ".join(str(p) for p in phrases)
         return value
