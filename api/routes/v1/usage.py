@@ -97,27 +97,7 @@ async def get_usage_summary(
 
     # Owner tier simulation: override tier info in response if view_as_tier_id is set
     if current_user.role == UserRole.owner and current_user.view_as_tier_id:
-        simulated_tier = usage_service.get_tier(current_user.view_as_tier_id)
-        if simulated_tier:
-            # Override subscription tier info with simulated tier
-            summary["subscription"] = {
-                "tier_name": f"{simulated_tier.name} (Simulated)",
-                "tier_slug": simulated_tier.slug,
-                "status": "simulated",
-                "overage_enabled": simulated_tier.overage_enabled,
-            }
-            summary["tier"] = {
-                "name": f"{simulated_tier.name} (Simulated)",
-                "slug": simulated_tier.slug,
-            }
-            # Override limits with simulated tier's limits
-            summary["posts"]["limit"] = simulated_tier.posts_per_month
-            summary["posts"]["unlimited"] = simulated_tier.posts_per_month == 0
-            summary["storage"]["limit_bytes"] = simulated_tier.storage_gb * 1024 * 1024 * 1024
-            summary["storage"]["limit_gb"] = simulated_tier.storage_gb
-            summary["storage"]["unlimited"] = simulated_tier.storage_gb == 0
-            summary["api_calls"]["limit"] = 10000 if simulated_tier.api_access else 0
-            summary["api_calls"]["unlimited"] = simulated_tier.api_access
+        summary = usage_service.apply_tier_simulation(summary, current_user.view_as_tier_id)
 
     return UsageSummaryResponse(
         period_start=summary["period_start"],

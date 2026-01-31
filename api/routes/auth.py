@@ -170,9 +170,8 @@ def register(
     """Register a new user.
 
     Creates a new user account and returns access tokens.
-    Rate limits free account creation to 2 per IP address.
     """
-    # Get client info for registration rate limiting and session
+    # Get client info for session tracking
     user_agent = req.headers.get("user-agent")
     ip_address = req.client.host if req.client else None
 
@@ -181,16 +180,10 @@ def register(
             email=request.email,
             password=request.password,
             full_name=request.full_name,
-            ip_address=ip_address,
         )
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e),
-        )
-    except PermissionError as e:
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=str(e),
         )
 
@@ -384,19 +377,13 @@ def set_view_as_tier(
             detail="Only owners can use the view-as-tier feature",
         )
 
-    # Get the user from DB (not the UserRead which is a snapshot)
-    user = auth_service.get_user_by_id(current_user.id)
-    if not user:
+    try:
+        user = auth_service.set_view_as_tier(current_user.id, request.tier_id)
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found",
+            detail=str(e),
         )
-
-    # Update view_as_tier_id
-    user.view_as_tier_id = request.tier_id
-    auth_service.session.add(user)
-    auth_service.session.commit()
-    auth_service.session.refresh(user)
 
     return UserRead(
         id=user.id,
@@ -407,6 +394,7 @@ def set_view_as_tier(
         is_superuser=user.is_superuser,
         role=user.role,
         view_as_tier_id=user.view_as_tier_id,
+        default_workspace_id=user.default_workspace_id,
     )
 
 

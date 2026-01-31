@@ -59,9 +59,6 @@ class User(UUIDModel, UserBase, TimestampMixin, table=True):
     # User-level role for feature flags
     role: UserRole = Field(default=UserRole.user)
 
-    # IP address at registration (for rate limiting free account creation)
-    registration_ip: Optional[str] = Field(default=None, index=True)
-
     # Owner can simulate other tiers for testing (nullable = use actual tier)
     view_as_tier_id: Optional[UUID] = Field(default=None, foreign_key="subscription_tiers.id")
 
