@@ -68,7 +68,7 @@ Analyze the following dimensions:
 3. **Vocabulary Level**:
    - Technical depth (jargon-heavy, accessible, mixed)
    - Register (formal, casual, conversational)
-4. **Signature Phrases**: Phrases or constructions that recur across samples
+4. **Signature Phrases**: Recurring SYNTACTIC patterns and expressions (NOT content-specific names/topics). Examples: "What I learned was...", "The key insight is...", "I always say..." - NOT product names or specific content
 5. **Storytelling Style**:
    - Opening approach (chronological, in-media-res, thesis-first)
    - Detail preference (concrete specifics, abstractions, metaphors)
@@ -88,7 +88,7 @@ Output ONLY valid JSON matching this structure:
     "common_structures": ["structure1", "structure2"]
   }},
   "vocabulary_level": "Description of vocabulary style",
-  "signature_phrases": ["phrase1", "phrase2", "phrase3"],
+  "signature_phrases": ["What I realized was...", "The thing is...", "I always tell people..."],
   "storytelling_style": "Description of storytelling approach",
   "emotional_register": "Description of emotional expression",
   "summary": "2-3 sentence summary of their unique voice"
