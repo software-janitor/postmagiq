@@ -7,12 +7,10 @@ from typing import Optional, Union
 from uuid import UUID
 from pydantic import BaseModel
 
-import requests
-
 logger = logging.getLogger(__name__)
 
 from api.services.content_service import ContentService
-from runner.agents.groq_api import GroqAPIAgent
+from runner.agents.factory import create_agent
 from runner.content.models import VOICE_PROMPTS
 
 
@@ -159,62 +157,45 @@ class VoiceService:
         self.llm_provider = os.environ.get("LLM_PROVIDER", "ollama")
         self.timeout = 180  # Voice analysis can take longer
 
-        # Groq configuration - use shared GroqAPIAgent
-        if self.llm_provider == "groq":
-            self.model = os.environ.get("VOICE_MODEL", "openai/gpt-oss-120b")
-            self.groq_agent = GroqAPIAgent({
-                "name": "voice-analyzer",
-                "model": self.model,
-                "max_tokens": 4096,
-            })
-        else:
-            # Ollama configuration
-            self.ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-            self.model = os.environ.get(
-                "VOICE_MODEL", os.environ.get("OLLAMA_MODEL", "llama3.2")
-            )
-            self.groq_agent = None
-
         # Track last result for token/cost info
         self.last_result = None
 
-    def _call_llm(self, prompt: str, system_prompt: str = None) -> str:
-        """Call LLM based on configured provider."""
-        if self.llm_provider == "groq" and self.groq_agent:
-            return self._call_groq(prompt, system_prompt)
-        return self._call_ollama(prompt)
+        # Use agent factory - same as workflows
+        self.model = os.environ.get("VOICE_MODEL") or os.environ.get("OLLAMA_MODEL", "llama3.2")
+        self.agent = create_agent(
+            self.llm_provider,
+            {
+                "name": "voice-analyzer",
+                "model": self.model,
+                "max_tokens": 4096,
+                "timeout": self.timeout,
+                "type": "api",  # Prefer API mode for direct SDK calls
+            },
+        )
 
-    def _call_groq(self, prompt: str, system_prompt: str = None) -> str:
-        """Call Groq LLM with optional system prompt and JSON mode."""
-        result = self.groq_agent.invoke_json(prompt, system_prompt=system_prompt)
+    def _call_llm(self, prompt: str, system_prompt: str = None) -> str:
+        """Call LLM using the configured agent."""
+        # Prepend system prompt if provided
+        full_prompt = prompt
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\n{prompt}"
+
+        # Use invoke_json if available (Groq), otherwise regular invoke
+        if hasattr(self.agent, 'invoke_json'):
+            result = self.agent.invoke_json(prompt, system_prompt=system_prompt)
+        else:
+            result = self.agent.invoke(full_prompt)
+
         self.last_result = result  # Store for token tracking
 
         if not result.success:
-            raise RuntimeError(f"Groq LLM request failed: {result.error}")
+            raise RuntimeError(f"LLM request failed: {result.error}")
 
         logger.warning(
-            f"GROQ response: {result.tokens.input_tokens} in / "
+            f"LLM response ({self.llm_provider}): {result.tokens.input_tokens} in / "
             f"{result.tokens.output_tokens} out, ${result.cost_usd:.4f}"
         )
         return result.content
-
-    def _call_ollama(self, prompt: str) -> str:
-        """Call Ollama LLM."""
-        try:
-            response = requests.post(
-                f"{self.ollama_host}/api/generate",
-                json={
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False,
-                },
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data.get("response", "")
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"Ollama LLM request failed: {e}")
 
     def _parse_json_response(self, response: str) -> dict:
         """Extract JSON from LLM response."""
