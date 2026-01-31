@@ -21,6 +21,10 @@ from api.routes.v1.dependencies import (
 )
 from runner.db.engine import get_session_dependency
 from runner.db.models import VoiceProfile
+from api.services.content_service import (
+    _format_sentence_patterns,
+    _format_signature_phrases,
+)
 
 
 router = APIRouter(
@@ -90,9 +94,9 @@ def _to_response(profile: VoiceProfile) -> VoiceProfileResponse:
         description=profile.description,
         is_preset=profile.is_preset,
         tone_description=profile.tone_description,
-        signature_phrases=profile.signature_phrases,
+        signature_phrases=_format_signature_phrases(profile.signature_phrases),
         word_choices=profile.word_choices,
-        example_excerpts=profile.example_excerpts,
+        example_excerpts=_format_sentence_patterns(profile.example_excerpts),
         avoid_patterns=profile.avoid_patterns,
     )
 

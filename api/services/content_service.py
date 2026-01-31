@@ -95,6 +95,47 @@ def _decode_legacy_voice_profile(description: Optional[str]) -> dict:
     return {}
 
 
+def _format_sentence_patterns(value: Optional[str]) -> Optional[str]:
+    """Format sentence_patterns JSON into human-readable text."""
+    if not value:
+        return None
+    # If it's already a plain string (preset), return as-is
+    if not value.startswith("{"):
+        return value
+    try:
+        patterns = json.loads(value)
+        if not isinstance(patterns, dict):
+            return value
+        parts = []
+        if patterns.get("average_length"):
+            parts.append(f"{patterns['average_length'].capitalize()} sentence length")
+        if patterns.get("variation"):
+            parts.append(f"{patterns['variation']} variation")
+        if patterns.get("common_structures"):
+            structures = patterns["common_structures"]
+            if isinstance(structures, list):
+                parts.append(f"Uses: {', '.join(structures)}")
+        return ". ".join(parts) if parts else value
+    except (json.JSONDecodeError, AttributeError):
+        return value
+
+
+def _format_signature_phrases(value: Optional[str]) -> Optional[str]:
+    """Format signature_phrases JSON array into human-readable text."""
+    if not value:
+        return None
+    # If it's already a plain string (preset), return as-is
+    if not value.startswith("["):
+        return value
+    try:
+        phrases = json.loads(value)
+        if isinstance(phrases, list):
+            return ", ".join(str(p) for p in phrases)
+        return value
+    except json.JSONDecodeError:
+        return value
+
+
 class ContentService:
     """Service for content strategy operations (SQLModel only)."""
 
@@ -889,17 +930,20 @@ class ContentService:
     ) -> VoiceProfileResponse:
         """Convert a VoiceProfile to VoiceProfileResponse."""
         legacy = _decode_legacy_voice_profile(profile.description)
+
+        # Get raw values (prefer legacy, fallback to native fields)
+        raw_sentence_patterns = legacy.get("sentence_patterns") or profile.example_excerpts
+        raw_signature_phrases = legacy.get("signature_phrases") or profile.signature_phrases
+
         return VoiceProfileResponse(
             id=str(profile.id),
             name=profile.name,
             description=None if legacy else profile.description,
             is_default=default_id == profile.id,
             tone=legacy.get("tone") or profile.tone_description,
-            sentence_patterns=legacy.get("sentence_patterns")
-            or profile.example_excerpts,
+            sentence_patterns=_format_sentence_patterns(raw_sentence_patterns),
             vocabulary_level=legacy.get("vocabulary_level") or profile.word_choices,
-            signature_phrases=legacy.get("signature_phrases")
-            or profile.signature_phrases,
+            signature_phrases=_format_signature_phrases(raw_signature_phrases),
             storytelling_style=legacy.get("storytelling_style")
             or profile.avoid_patterns,
             emotional_register=legacy.get("emotional_register"),
