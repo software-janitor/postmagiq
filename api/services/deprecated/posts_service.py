@@ -20,6 +20,7 @@ from runner.db.models import Chapter, ChapterCreate, Post, PostCreate
 
 class PostMetadata(BaseModel):
     """Metadata for a single post (API response model)."""
+
     post_id: str  # e.g., "post_07"
     post_number: int
     chapter: int
@@ -43,7 +44,6 @@ SHAPE_GUIDANCE = {
 5. The Scar - What did you learn?
 
 Include specific details: error messages, hours lost, tools used.""",
-
     "PARTIAL": """Tell a story WITHOUT resolution:
 1. The Failure - What broke?
 2. The Misunderstanding - What's the wrong assumption?
@@ -51,7 +51,6 @@ Include specific details: error messages, hours lost, tools used.""",
 
 Do NOT include a fix or lesson. End messy. "I don't have a clean answer yet."
 Include: specific errors, frustrations, what you tried that didn't work.""",
-
     "OBSERVATION": """Share something you noticed. No backstory needed, no lesson required.
 - What did you observe?
 - Why did it catch your attention?
@@ -59,12 +58,10 @@ Include: specific errors, frustrations, what you tried that didn't work.""",
 
 End with a question or open thought. "I'm not sure what to make of this yet."
 Keep it short and genuine.""",
-
     "SHORT": """One idea, under 200 words. No wrap-up needed.
 - What's the single insight?
 - One concrete example or moment
 - Just end. No conclusion.""",
-
     "REVERSAL": """Update or contradict something you said before.
 - What did you previously believe?
 - What changed your thinking?
@@ -90,7 +87,9 @@ DEFAULT_CHAPTER_ENEMIES = {
 class PostsService:
     """Service for managing posts using SQLModel."""
 
-    def get_all_posts(self, user_id: Optional[Union[str, UUID]] = None) -> list[PostMetadata]:
+    def get_all_posts(
+        self, user_id: Optional[Union[str, UUID]] = None
+    ) -> list[PostMetadata]:
         """Get all posts for a user."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -102,7 +101,9 @@ class PostsService:
             chapters = {c.id: c for c in chapter_repo.list_by_user(uid)}
             return [self._to_metadata(p, chapters) for p in posts]
 
-    def get_available_posts(self, user_id: Optional[Union[str, UUID]] = None) -> list[PostMetadata]:
+    def get_available_posts(
+        self, user_id: Optional[Union[str, UUID]] = None
+    ) -> list[PostMetadata]:
         """Get posts that need stories or are not started."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -111,12 +112,17 @@ class PostsService:
             chapters = {c.id: c for c in ChapterRepository(session).list_by_user(uid)}
             posts = session.exec(
                 select(Post)
-                .where(Post.user_id == uid, Post.status.in_(["not_started", "needs_story", "draft"]))
+                .where(
+                    Post.user_id == uid,
+                    Post.status.in_(["not_started", "needs_story", "draft"]),
+                )
                 .order_by(Post.post_number)
             ).all()
             return [self._to_metadata(p, chapters) for p in posts]
 
-    def get_post(self, user_id: Union[str, UUID], post_number: int) -> Optional[PostMetadata]:
+    def get_post(
+        self, user_id: Union[str, UUID], post_number: int
+    ) -> Optional[PostMetadata]:
         """Get a specific post by number."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -130,7 +136,9 @@ class PostsService:
             chapters = {c.id: c for c in chapter_repo.list_by_user(uid)}
             return self._to_metadata(post, chapters)
 
-    def update_post_status(self, user_id: Union[str, UUID], post_number: int, status: str) -> bool:
+    def update_post_status(
+        self, user_id: Union[str, UUID], post_number: int, status: str
+    ) -> bool:
         """Update a post's status."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -143,7 +151,9 @@ class PostsService:
             post_repo.update_status(post.id, status)
             return True
 
-    def update_post(self, user_id: Union[str, UUID], post_number: int, **kwargs) -> bool:
+    def update_post(
+        self, user_id: Union[str, UUID], post_number: int, **kwargs
+    ) -> bool:
         """Update post fields."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -200,6 +210,7 @@ class PostsService:
 # Legacy Support Functions
 # =============================================================================
 
+
 def _parse_table_header(header_line: str) -> dict[str, int]:
     """Parse table header to get column indices."""
     columns = [col.strip().lower() for col in header_line.split("|")]
@@ -243,7 +254,9 @@ def import_from_markdown(
     imported = 0
 
     # Parse chapter by chapter
-    chapter_pattern = r"## Chapter (\d+)[^\n]*\n+\*\*Weeks[^|]*\|\s*(?:Enemy:\s*)?([^*]+)\*\*"
+    chapter_pattern = (
+        r"## Chapter (\d+)[^\n]*\n+\*\*Weeks[^|]*\|\s*(?:Enemy:\s*)?([^*]+)\*\*"
+    )
 
     with get_session() as session:
         chapter_repo = ChapterRepository(session)
@@ -255,7 +268,9 @@ def import_from_markdown(
 
             # Get or create chapter
             chapters = chapter_repo.list_by_user(uid)
-            chapter = next((c for c in chapters if c.chapter_number == chapter_num), None)
+            chapter = next(
+                (c for c in chapters if c.chapter_number == chapter_num), None
+            )
 
             if not chapter:
                 chapter_record = ChapterCreate(
@@ -390,7 +405,9 @@ def get_available_posts(tracker_path: str) -> list[PostMetadata]:
     return service.get_available_posts()
 
 
-def import_posts_from_markdown(tracker_path: str, user_id: Optional[Union[str, UUID]] = None) -> int:
+def import_posts_from_markdown(
+    tracker_path: str, user_id: Optional[Union[str, UUID]] = None
+) -> int:
     """Explicitly import posts from markdown content tracker.
 
     Call this function directly when you want to import from markdown.

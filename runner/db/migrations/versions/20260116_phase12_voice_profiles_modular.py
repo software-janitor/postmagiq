@@ -26,8 +26,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision = '009_voice_profiles_modular'
-down_revision = '008_audit_logs'
+revision = "009_voice_profiles_modular"
+down_revision = "008_audit_logs"
 branch_labels = None
 depends_on = None
 
@@ -39,33 +39,33 @@ def upgrade() -> None:
 
     # Add slug column (unique identifier for the voice profile)
     op.add_column(
-        'voice_profiles',
-        sa.Column('slug', sa.String(), nullable=True),
+        "voice_profiles",
+        sa.Column("slug", sa.String(), nullable=True),
     )
-    op.create_index('ix_voice_profiles_slug', 'voice_profiles', ['slug'])
+    op.create_index("ix_voice_profiles_slug", "voice_profiles", ["slug"])
 
     # Add tone_description (more descriptive than the existing 'tone' column)
     op.add_column(
-        'voice_profiles',
-        sa.Column('tone_description', sa.Text(), nullable=True),
+        "voice_profiles",
+        sa.Column("tone_description", sa.Text(), nullable=True),
     )
 
     # Add word_choices (preferred word choices)
     op.add_column(
-        'voice_profiles',
-        sa.Column('word_choices', sa.Text(), nullable=True),
+        "voice_profiles",
+        sa.Column("word_choices", sa.Text(), nullable=True),
     )
 
     # Add example_excerpts (writing samples)
     op.add_column(
-        'voice_profiles',
-        sa.Column('example_excerpts', sa.Text(), nullable=True),
+        "voice_profiles",
+        sa.Column("example_excerpts", sa.Text(), nullable=True),
     )
 
     # Add is_preset (boolean for system presets)
     op.add_column(
-        'voice_profiles',
-        sa.Column('is_preset', sa.Boolean(), nullable=False, server_default='false'),
+        "voice_profiles",
+        sa.Column("is_preset", sa.Boolean(), nullable=False, server_default="false"),
     )
 
     # ==========================================================================
@@ -74,45 +74,45 @@ def upgrade() -> None:
 
     # Add slug column (unique identifier for the persona)
     op.add_column(
-        'workflow_personas',
-        sa.Column('slug', sa.String(), nullable=True),
+        "workflow_personas",
+        sa.Column("slug", sa.String(), nullable=True),
     )
-    op.create_index('ix_workflow_personas_slug', 'workflow_personas', ['slug'])
+    op.create_index("ix_workflow_personas_slug", "workflow_personas", ["slug"])
 
     # Add content column (persona prompt content)
     op.add_column(
-        'workflow_personas',
-        sa.Column('content', sa.Text(), nullable=True),
+        "workflow_personas",
+        sa.Column("content", sa.Text(), nullable=True),
     )
 
     # Add is_system column (boolean for system personas)
     op.add_column(
-        'workflow_personas',
-        sa.Column('is_system', sa.Boolean(), nullable=False, server_default='false'),
+        "workflow_personas",
+        sa.Column("is_system", sa.Boolean(), nullable=False, server_default="false"),
     )
 
     # Add model_tier column (optional model tier preference)
     op.add_column(
-        'workflow_personas',
-        sa.Column('model_tier', sa.String(), nullable=True),
+        "workflow_personas",
+        sa.Column("model_tier", sa.String(), nullable=True),
     )
 
     # Add voice_profile_id FK column
     op.add_column(
-        'workflow_personas',
-        sa.Column('voice_profile_id', postgresql.UUID(as_uuid=True), nullable=True),
+        "workflow_personas",
+        sa.Column("voice_profile_id", postgresql.UUID(as_uuid=True), nullable=True),
     )
     op.create_foreign_key(
-        'fk_workflow_personas_voice_profile_id',
-        'workflow_personas',
-        'voice_profiles',
-        ['voice_profile_id'],
-        ['id'],
+        "fk_workflow_personas_voice_profile_id",
+        "workflow_personas",
+        "voice_profiles",
+        ["voice_profile_id"],
+        ["id"],
     )
     op.create_index(
-        'ix_workflow_personas_voice_profile_id',
-        'workflow_personas',
-        ['voice_profile_id'],
+        "ix_workflow_personas_voice_profile_id",
+        "workflow_personas",
+        ["voice_profile_id"],
     )
 
     # ==========================================================================
@@ -162,21 +162,25 @@ def downgrade() -> None:
     # ==========================================================================
     # workflow_personas: Remove voice profile reference and new columns
     # ==========================================================================
-    op.drop_index('ix_workflow_personas_voice_profile_id', table_name='workflow_personas')
-    op.drop_constraint('fk_workflow_personas_voice_profile_id', 'workflow_personas', type_='foreignkey')
-    op.drop_column('workflow_personas', 'voice_profile_id')
-    op.drop_column('workflow_personas', 'model_tier')
-    op.drop_column('workflow_personas', 'is_system')
-    op.drop_column('workflow_personas', 'content')
-    op.drop_index('ix_workflow_personas_slug', table_name='workflow_personas')
-    op.drop_column('workflow_personas', 'slug')
+    op.drop_index(
+        "ix_workflow_personas_voice_profile_id", table_name="workflow_personas"
+    )
+    op.drop_constraint(
+        "fk_workflow_personas_voice_profile_id", "workflow_personas", type_="foreignkey"
+    )
+    op.drop_column("workflow_personas", "voice_profile_id")
+    op.drop_column("workflow_personas", "model_tier")
+    op.drop_column("workflow_personas", "is_system")
+    op.drop_column("workflow_personas", "content")
+    op.drop_index("ix_workflow_personas_slug", table_name="workflow_personas")
+    op.drop_column("workflow_personas", "slug")
 
     # ==========================================================================
     # voice_profiles: Remove modular voice columns
     # ==========================================================================
-    op.drop_column('voice_profiles', 'is_preset')
-    op.drop_column('voice_profiles', 'example_excerpts')
-    op.drop_column('voice_profiles', 'word_choices')
-    op.drop_column('voice_profiles', 'tone_description')
-    op.drop_index('ix_voice_profiles_slug', table_name='voice_profiles')
-    op.drop_column('voice_profiles', 'slug')
+    op.drop_column("voice_profiles", "is_preset")
+    op.drop_column("voice_profiles", "example_excerpts")
+    op.drop_column("voice_profiles", "word_choices")
+    op.drop_column("voice_profiles", "tone_description")
+    op.drop_index("ix_voice_profiles_slug", table_name="voice_profiles")
+    op.drop_column("voice_profiles", "slug")

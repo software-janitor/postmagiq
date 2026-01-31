@@ -2,14 +2,115 @@
 # WORKFLOW ORCHESTRATOR MAKEFILE
 # ============================================================================
 
+# CI configuration
+TEST_DIRS := tests/unit tests/integration
+SRC_DIRS := runner api
+CI_REPORT := ci-report.txt
+
+# Use bash for PIPESTATUS support
+SHELL := /bin/bash
+
+# Full CI: lint, format, Docker build, tests, stop
+ci-report:
+	@echo "================================================" > $(CI_REPORT)
+	@echo "CI BUILD REPORT - $$(date)" >> $(CI_REPORT)
+	@echo "================================================" >> $(CI_REPORT)
+	@echo "" >> $(CI_REPORT)
+	@LINT_OK=0; FORMAT_OK=0; BUILD_OK=0; TEST_OK=0; \
+	\
+	echo "\033[0;34m[1/4] Running Linter...\033[0m"; \
+	echo "## LINT" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	ruff check $(SRC_DIRS) 2>&1 | tee -a $(CI_REPORT); \
+	if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+		LINT_OK=1; \
+		echo "✅ LINT: PASSED" >> $(CI_REPORT); \
+	else \
+		echo "❌ LINT: FAILED" >> $(CI_REPORT); \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	\
+	echo "\033[0;34m[2/4] Checking Code Format...\033[0m"; \
+	echo "## FORMAT CHECK" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	ruff format $(SRC_DIRS) --check 2>&1 | tee -a $(CI_REPORT); \
+	if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+		FORMAT_OK=1; \
+		echo "✅ FORMAT: PASSED" >> $(CI_REPORT); \
+	else \
+		echo "❌ FORMAT: FAILED" >> $(CI_REPORT); \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	\
+	echo "\033[0;34m[3/4] Building Docker containers...\033[0m"; \
+	echo "## DOCKER BUILD" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	docker compose $(COMPOSE_FILES) build 2>&1 | tee -a $(CI_REPORT); \
+	if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+		echo "Starting services..." | tee -a $(CI_REPORT); \
+		docker compose $(COMPOSE_FILES) up -d postgres pgbouncer 2>&1 | tee -a $(CI_REPORT); \
+		sleep 3; \
+		docker compose exec postgres pg_isready -U orchestrator || sleep 5; \
+		cd runner/db/migrations && DATABASE_URL=postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator alembic upgrade head 2>&1 | tee -a $(CI_REPORT) && cd ../../..; \
+		docker compose $(COMPOSE_FILES) up -d 2>&1 | tee -a $(CI_REPORT); \
+		echo "Waiting for API to start..."; \
+		sleep 15; \
+		if curl -sf http://localhost:8002/api/health > /dev/null; then \
+			BUILD_OK=1; \
+			echo "✅ BUILD: PASSED (API healthy)" >> $(CI_REPORT); \
+		else \
+			echo "❌ BUILD: FAILED (API not healthy)" >> $(CI_REPORT); \
+		fi; \
+	else \
+		echo "❌ BUILD: FAILED" >> $(CI_REPORT); \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	\
+	echo "\033[0;34m[4/4] Running Tests...\033[0m"; \
+	echo "## TESTS" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	python3 -m pytest $(TEST_DIRS) -v --tb=short 2>&1 | tee -a $(CI_REPORT); \
+	if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+		TEST_OK=1; \
+		echo "✅ TESTS: PASSED" >> $(CI_REPORT); \
+	else \
+		echo "❌ TESTS: FAILED" >> $(CI_REPORT); \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	\
+	echo "Stopping services..." ; \
+	docker compose $(COMPOSE_FILES) down 2>&1 | tee -a $(CI_REPORT); \
+	\
+	echo "================================================" >> $(CI_REPORT); \
+	echo "SUMMARY" >> $(CI_REPORT); \
+	echo "================================================" >> $(CI_REPORT); \
+	TOTAL_PASS=$$((LINT_OK + FORMAT_OK + BUILD_OK + TEST_OK)); \
+	TOTAL_FAIL=$$((4 - TOTAL_PASS)); \
+	if [ $$LINT_OK -eq 1 ]; then echo "✅ Lint:   PASSED" >> $(CI_REPORT); else echo "❌ Lint:   FAILED" >> $(CI_REPORT); fi; \
+	if [ $$FORMAT_OK -eq 1 ]; then echo "✅ Format: PASSED" >> $(CI_REPORT); else echo "❌ Format: FAILED" >> $(CI_REPORT); fi; \
+	if [ $$BUILD_OK -eq 1 ]; then echo "✅ Build:  PASSED" >> $(CI_REPORT); else echo "❌ Build:  FAILED" >> $(CI_REPORT); fi; \
+	if [ $$TEST_OK -eq 1 ]; then echo "✅ Tests:  PASSED" >> $(CI_REPORT); else echo "❌ Tests:  FAILED" >> $(CI_REPORT); fi; \
+	echo "" >> $(CI_REPORT); \
+	if [ $$TOTAL_FAIL -eq 0 ]; then \
+		echo "🎉 ALL CHECKS PASSED ($$TOTAL_PASS/4)" >> $(CI_REPORT); \
+		echo "\033[0;32m🎉 ALL CHECKS PASSED\033[0m"; \
+	else \
+		echo "⚠️  $$TOTAL_FAIL/4 CHECKS FAILED" >> $(CI_REPORT); \
+		echo "\033[0;31m⚠️  $$TOTAL_FAIL/4 CHECKS FAILED\033[0m"; \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	echo "Full report saved to: $(CI_REPORT)"; \
+	cat $(CI_REPORT) | tail -15; \
+	exit $$TOTAL_FAIL
+
 .PHONY: help setup install-hooks install-deps install-gui-deps install-gh check-env \
         workflow workflow-interactive workflow-step list-configs check-config test test-unit test-int test-e2e \
-        coverage logs log-states log-tokens log-summary clean \
+        test-isolation coverage logs log-states log-tokens log-summary clean \
         up up-gpu up-cpu down api gui gui-build dev dev-stop restart ollama-pull ollama-list \
         eval-agents eval-costs eval-trend eval-post eval-summary \
         seed-db seed-db-force seed-voices seed-personas seed-sentiments sync-workflows \
         db-up db-down db-migrate db-rollback db-revision db-history db-current db-migrate-data db-init db-drop db-shell \
-        pr
+        pr ci-report
 
 # Default target
 help:
@@ -57,9 +158,11 @@ help:
 	@echo "  make test                      Run unit tests"
 	@echo "  make test-unit                 Run unit tests (verbose)"
 	@echo "  make test-int                  Run integration tests"
+	@echo "  make test-isolation            Run data isolation tests"
 	@echo "  make test-e2e                  Run e2e tests (costs money)"
 	@echo "  make coverage                  Generate coverage report"
 	@echo "  make test-file FILE=...        Run specific test file"
+	@echo "  make ci-report                 Run full CI pipeline with report"
 	@echo ""
 	@echo "Logging:"
 	@echo "  make logs                      List all runs"
@@ -114,7 +217,7 @@ setup: install-hooks install-deps install-gui-deps
 # Install git hooks (prevents AI self-attribution in commits)
 install-hooks:
 	@echo "Installing git hooks..."
-	@../hooks/install.sh
+	@./hooks/install.sh
 
 # Install Python dependencies
 install-deps:
@@ -193,6 +296,9 @@ test-unit:
 
 test-int:
 	python3 -m pytest tests/integration -v --tb=short
+
+test-isolation:
+	python3 -m pytest tests/integration/test_workspace_data_isolation.py tests/integration/test_voice_profiles_isolation.py -v --tb=short
 
 test-e2e:
 	python3 -m pytest tests/e2e -v --tb=short -m e2e

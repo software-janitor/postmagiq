@@ -53,7 +53,9 @@ class NativeSessionManager:
         """Save session ID to disk for resume across runs."""
         os.makedirs(self.session_dir, exist_ok=True)
         with open(self.session_file, "w") as f:
-            json.dump({"session_id": self.session_id, "agent": self.agent_name}, f, indent=2)
+            json.dump(
+                {"session_id": self.session_id, "agent": self.agent_name}, f, indent=2
+            )
 
     def has_session(self) -> bool:
         """Check if we have a valid session ID."""
@@ -83,7 +85,9 @@ class NativeSessionManager:
         else:
             template = agent_config.get("resume_command_args", [])
 
-        return [arg.format(prompt=prompt, session_id=self.session_id) for arg in template]
+        return [
+            arg.format(prompt=prompt, session_id=self.session_id) for arg in template
+        ]
 
     def clear_session(self):
         """Clear session (e.g., when starting a new workflow run)."""

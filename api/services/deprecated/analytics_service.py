@@ -125,11 +125,13 @@ class AnalyticsService:
             # XLSX/XLSM/etc (ZIP-based): starts with PK (0x504B)
             # XLS (older): starts with 0xD0CF11E0
             if len(file_content) >= 4:
-                if file_content[:2] == b'PK':  # ZIP-based (xlsx, xlsm)
+                if file_content[:2] == b"PK":  # ZIP-based (xlsx, xlsm)
                     is_excel = True
-                elif file_content[:4] == b'\xd0\xcf\x11\xe0':  # OLE (xls)
+                elif file_content[:4] == b"\xd0\xcf\x11\xe0":  # OLE (xls)
                     is_excel = True
-                elif file_content[:8] == b'\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1':  # Full OLE signature
+                elif (
+                    file_content[:8] == b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"
+                ):  # Full OLE signature
                     is_excel = True
 
             # Fallback to extension if content check didn't detect Excel
@@ -158,7 +160,7 @@ class AnalyticsService:
                     if not all_dfs:
                         return {
                             "success": False,
-                            "error": "No data found in Excel file."
+                            "error": "No data found in Excel file.",
                         }
 
                     combined_df = pd.concat(all_dfs, ignore_index=True)
@@ -176,7 +178,7 @@ class AnalyticsService:
                 if csv_content is None:
                     return {
                         "success": False,
-                        "error": "Could not decode file. Please upload a CSV or Excel file."
+                        "error": "Could not decode file. Please upload a CSV or Excel file.",
                     }
 
             return self.process_csv(user_id, import_id, platform_name, csv_content)
@@ -287,7 +289,9 @@ class AnalyticsService:
             iid = self._resolve_import_id(import_id)
             # Detect file type by sheets
             is_post_analytics = "PERFORMANCE" in sheet_names_upper
-            is_content_export = "ENGAGEMENT" in sheet_names_upper or "TOP POSTS" in sheet_names_upper
+            is_content_export = (
+                "ENGAGEMENT" in sheet_names_upper or "TOP POSTS" in sheet_names_upper
+            )
 
             # Determine import type
             import_type = "post_analytics" if is_post_analytics else "content_export"
@@ -299,7 +303,9 @@ class AnalyticsService:
                         uid, iid, excel_file
                     )
                     if daily_records:
-                        stats["daily_metrics"] = self._upsert_daily_metrics_batch(daily_records)
+                        stats["daily_metrics"] = self._upsert_daily_metrics_batch(
+                            daily_records
+                        )
 
                 # TOP POSTS sheet → post_metrics (impressions by URL)
                 if "TOP POSTS" in sheet_names_upper:
@@ -314,7 +320,9 @@ class AnalyticsService:
                                 "post_date": m.get("post_date"),
                                 "impressions": m.get("impressions"),
                                 "engagement_count": m.get("engagement_count"),
-                                "metric_date": m.get("metric_date", datetime.now().strftime("%Y-%m-%d")),
+                                "metric_date": m.get(
+                                    "metric_date", datetime.now().strftime("%Y-%m-%d")
+                                ),
                             }
                             self._upsert_post_metric(record)
                             stats["post_metrics"] += 1
@@ -325,7 +333,9 @@ class AnalyticsService:
                         uid, iid, excel_file
                     )
                     if follower_records:
-                        stats["follower_metrics"] = self._upsert_follower_metrics_batch(follower_records)
+                        stats["follower_metrics"] = self._upsert_follower_metrics_batch(
+                            follower_records
+                        )
 
                 # DEMOGRAPHICS sheet → audience_demographics
                 if "DEMOGRAPHICS" in sheet_names_upper:
@@ -333,7 +343,9 @@ class AnalyticsService:
                         uid, iid, excel_file
                     )
                     if demo_records:
-                        stats["audience_demographics"] = self._upsert_audience_demographics_batch(demo_records)
+                        stats["audience_demographics"] = (
+                            self._upsert_audience_demographics_batch(demo_records)
+                        )
 
             if is_post_analytics:
                 # PERFORMANCE sheet → post_metrics with delta calculation
@@ -353,7 +365,9 @@ class AnalyticsService:
                             "comments": m.get("comments"),
                             "shares": m.get("shares"),
                             "clicks": m.get("clicks"),
-                            "metric_date": m.get("metric_date", datetime.now().strftime("%Y-%m-%d")),
+                            "metric_date": m.get(
+                                "metric_date", datetime.now().strftime("%Y-%m-%d")
+                            ),
                         }
                         self._upsert_post_metric(record)
                         stats["post_metrics"] += 1
@@ -364,14 +378,16 @@ class AnalyticsService:
                         uid, iid, excel_file, performance_data
                     )
                     if post_demo_records:
-                        stats["post_demographics"] = self._upsert_post_demographics_batch(post_demo_records)
+                        stats["post_demographics"] = (
+                            self._upsert_post_demographics_batch(post_demo_records)
+                        )
 
             total_rows = sum(stats.values())
             logger.info(f"LinkedIn import stats: {stats}")
             if total_rows == 0:
                 return {
                     "success": False,
-                    "error": f"Could not find recognizable data in LinkedIn export. Sheets: {excel_file.sheet_names}"
+                    "error": f"Could not find recognizable data in LinkedIn export. Sheets: {excel_file.sheet_names}",
                 }
 
             # Update import status with import_type
@@ -489,12 +505,18 @@ class AnalyticsService:
             # Right table (columns 4-6): by Impressions
 
             # Try left table first (by engagements)
-            url_left = row[0] if pd.notna(row[0]) and str(row[0]).startswith("http") else None
+            url_left = (
+                row[0] if pd.notna(row[0]) and str(row[0]).startswith("http") else None
+            )
             if url_left:
                 metric = {
                     "url": str(url_left),
-                    "post_date": self._parse_date(str(row[1])) if pd.notna(row[1]) else None,
-                    "engagement_count": self._safe_int(row[2]) if len(row) > 2 else None,
+                    "post_date": self._parse_date(str(row[1]))
+                    if pd.notna(row[1])
+                    else None,
+                    "engagement_count": self._safe_int(row[2])
+                    if len(row) > 2
+                    else None,
                 }
                 if metric.get("post_date"):
                     metric["metric_date"] = metric["post_date"]
@@ -504,11 +526,17 @@ class AnalyticsService:
 
             # Try right table (by impressions) - usually columns 4-6
             if len(row) > 4:
-                url_right = row[4] if pd.notna(row[4]) and str(row[4]).startswith("http") else None
+                url_right = (
+                    row[4]
+                    if pd.notna(row[4]) and str(row[4]).startswith("http")
+                    else None
+                )
                 if url_right and str(url_right) != str(url_left):  # Avoid duplicates
                     metric = {
                         "url": str(url_right),
-                        "post_date": self._parse_date(str(row[5])) if len(row) > 5 and pd.notna(row[5]) else None,
+                        "post_date": self._parse_date(str(row[5]))
+                        if len(row) > 5 and pd.notna(row[5])
+                        else None,
                         "impressions": self._safe_int(row[6]) if len(row) > 6 else None,
                     }
                     if metric.get("post_date"):
@@ -756,7 +784,9 @@ class AnalyticsService:
                 external_url = p["url"]
                 break
 
-        logger.info(f"TOP DEMOGRAPHICS: external_url={external_url}, performance_data_count={len(performance_data)}")
+        logger.info(
+            f"TOP DEMOGRAPHICS: external_url={external_url}, performance_data_count={len(performance_data)}"
+        )
         if not external_url:
             logger.warning("TOP DEMOGRAPHICS: no URL found in performance data")
             return records
@@ -834,7 +864,9 @@ class AnalyticsService:
             # Handle various LinkedIn CSV column names
             metric = {
                 "metric_date": row.get("Date", ""),
-                "impressions": self._safe_int(row.get("Impressions", row.get("Views", ""))),
+                "impressions": self._safe_int(
+                    row.get("Impressions", row.get("Views", ""))
+                ),
                 "clicks": self._safe_int(row.get("Clicks", "")),
                 "likes": self._safe_int(row.get("Reactions", row.get("Likes", ""))),
                 "comments": self._safe_int(row.get("Comments", "")),
@@ -843,12 +875,18 @@ class AnalyticsService:
             }
 
             # Calculate engagement
-            engagement = (metric["likes"] or 0) + (metric["comments"] or 0) + (metric["shares"] or 0)
+            engagement = (
+                (metric["likes"] or 0)
+                + (metric["comments"] or 0)
+                + (metric["shares"] or 0)
+            )
             metric["engagement_count"] = engagement
 
             # Calculate engagement rate
             if metric["impressions"] and metric["impressions"] > 0:
-                metric["engagement_rate"] = round(engagement / metric["impressions"] * 100, 2)
+                metric["engagement_rate"] = round(
+                    engagement / metric["impressions"] * 100, 2
+                )
 
             # Parse date if present
             if metric["metric_date"]:
@@ -871,22 +909,32 @@ class AnalyticsService:
 
         for row in reader:
             metric = {
-                "metric_date": row.get("date", row.get("Date", datetime.now().strftime("%Y-%m-%d"))),
+                "metric_date": row.get(
+                    "date", row.get("Date", datetime.now().strftime("%Y-%m-%d"))
+                ),
                 "impressions": self._safe_int(row.get("views", row.get("Views", ""))),
                 "likes": self._safe_int(row.get("likes", row.get("Likes", ""))),
-                "comments": self._safe_int(row.get("replies", row.get("Replies", row.get("comments", "")))),
-                "shares": self._safe_int(row.get("reposts", row.get("Reposts", ""))) +
-                         self._safe_int(row.get("quotes", row.get("Quotes", ""))),
+                "comments": self._safe_int(
+                    row.get("replies", row.get("Replies", row.get("comments", "")))
+                ),
+                "shares": self._safe_int(row.get("reposts", row.get("Reposts", "")))
+                + self._safe_int(row.get("quotes", row.get("Quotes", ""))),
                 "url": row.get("url", row.get("URL", row.get("post_url", ""))),
             }
 
             # Calculate engagement
-            engagement = (metric["likes"] or 0) + (metric["comments"] or 0) + (metric["shares"] or 0)
+            engagement = (
+                (metric["likes"] or 0)
+                + (metric["comments"] or 0)
+                + (metric["shares"] or 0)
+            )
             metric["engagement_count"] = engagement
 
             # Calculate engagement rate
             if metric["impressions"] and metric["impressions"] > 0:
-                metric["engagement_rate"] = round(engagement / metric["impressions"] * 100, 2)
+                metric["engagement_rate"] = round(
+                    engagement / metric["impressions"] * 100, 2
+                )
 
             # Parse date
             if metric["metric_date"]:
@@ -909,13 +957,19 @@ class AnalyticsService:
         for row in reader:
             metric = {
                 "metric_date": row.get("time", row.get("Date", "")),
-                "impressions": self._safe_int(row.get("impressions", row.get("Impressions", ""))),
-                "engagement_count": self._safe_int(row.get("engagements", row.get("Engagements", ""))),
+                "impressions": self._safe_int(
+                    row.get("impressions", row.get("Impressions", ""))
+                ),
+                "engagement_count": self._safe_int(
+                    row.get("engagements", row.get("Engagements", ""))
+                ),
                 "likes": self._safe_int(row.get("likes", row.get("Likes", ""))),
                 "comments": self._safe_int(row.get("replies", row.get("Replies", ""))),
                 "shares": self._safe_int(row.get("retweets", row.get("Retweets", ""))),
-                "clicks": self._safe_int(row.get("url clicks", row.get("URL clicks", ""))) +
-                         self._safe_int(row.get("user profile clicks", "")),
+                "clicks": self._safe_int(
+                    row.get("url clicks", row.get("URL clicks", ""))
+                )
+                + self._safe_int(row.get("user profile clicks", "")),
                 "url": row.get("Tweet permalink", row.get("URL", "")),
             }
 
@@ -923,8 +977,14 @@ class AnalyticsService:
             rate_str = row.get("engagement rate", row.get("Engagement rate", ""))
             if rate_str:
                 metric["engagement_rate"] = self._safe_float(rate_str.replace("%", ""))
-            elif metric["impressions"] and metric["impressions"] > 0 and metric["engagement_count"]:
-                metric["engagement_rate"] = round(metric["engagement_count"] / metric["impressions"] * 100, 2)
+            elif (
+                metric["impressions"]
+                and metric["impressions"] > 0
+                and metric["engagement_count"]
+            ):
+                metric["engagement_rate"] = round(
+                    metric["engagement_count"] / metric["impressions"] * 100, 2
+                )
 
             # Parse date
             if metric["metric_date"]:
@@ -1003,22 +1063,34 @@ class AnalyticsService:
 
             if existing:
                 if record.get("impressions") is not None:
-                    existing.impressions_delta = (record.get("impressions") or 0) - (existing.impressions or 0)
+                    existing.impressions_delta = (record.get("impressions") or 0) - (
+                        existing.impressions or 0
+                    )
                     existing.impressions = record.get("impressions")
                 if record.get("engagement_count") is not None:
-                    existing.engagement_delta = (record.get("engagement_count") or 0) - (existing.engagement_count or 0)
+                    existing.engagement_delta = (
+                        record.get("engagement_count") or 0
+                    ) - (existing.engagement_count or 0)
                     existing.engagement_count = record.get("engagement_count")
                 if record.get("likes") is not None:
-                    existing.likes_delta = (record.get("likes") or 0) - (existing.likes or 0)
+                    existing.likes_delta = (record.get("likes") or 0) - (
+                        existing.likes or 0
+                    )
                     existing.likes = record.get("likes")
                 if record.get("comments") is not None:
-                    existing.comments_delta = (record.get("comments") or 0) - (existing.comments or 0)
+                    existing.comments_delta = (record.get("comments") or 0) - (
+                        existing.comments or 0
+                    )
                     existing.comments = record.get("comments")
                 if record.get("shares") is not None:
-                    existing.shares_delta = (record.get("shares") or 0) - (existing.shares or 0)
+                    existing.shares_delta = (record.get("shares") or 0) - (
+                        existing.shares or 0
+                    )
                     existing.shares = record.get("shares")
                 if record.get("clicks") is not None:
-                    existing.clicks_delta = (record.get("clicks") or 0) - (existing.clicks or 0)
+                    existing.clicks_delta = (record.get("clicks") or 0) - (
+                        existing.clicks or 0
+                    )
                     existing.clicks = record.get("clicks")
                 if record.get("engagement_rate") is not None:
                     existing.engagement_rate = record.get("engagement_rate")
@@ -1134,9 +1206,13 @@ class AnalyticsService:
                     AudienceDemographic.value == record["value"],
                 )
                 if metric_date is None:
-                    statement = statement.where(AudienceDemographic.metric_date.is_(None))
+                    statement = statement.where(
+                        AudienceDemographic.metric_date.is_(None)
+                    )
                 else:
-                    statement = statement.where(AudienceDemographic.metric_date == metric_date)
+                    statement = statement.where(
+                        AudienceDemographic.metric_date == metric_date
+                    )
                 existing = session.exec(statement).first()
                 if existing:
                     existing.percentage = record.get("percentage")
@@ -1200,9 +1276,11 @@ class AnalyticsService:
         """Get all imports for a user."""
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
-            statement = select(AnalyticsImport).where(
-                AnalyticsImport.user_id == uid
-            ).order_by(desc(AnalyticsImport.import_date))
+            statement = (
+                select(AnalyticsImport)
+                .where(AnalyticsImport.user_id == uid)
+                .order_by(desc(AnalyticsImport.import_date))
+            )
             imports = session.exec(statement).all()
             return [
                 AnalyticsImportResponse(
@@ -1235,9 +1313,7 @@ class AnalyticsService:
                 ("analytics_imports", AnalyticsImport),
             ]
             for name, model in tables:
-                rows = session.exec(
-                    select(model).where(model.user_id == uid)
-                ).all()
+                rows = session.exec(select(model).where(model.user_id == uid)).all()
                 deleted[name] = len(rows)
                 for row in rows:
                     session.delete(row)
@@ -1381,8 +1457,12 @@ class AnalyticsService:
         with get_session() as session:
             statement = select(FollowerMetric).where(FollowerMetric.user_id == uid)
             if platform_name:
-                statement = statement.where(FollowerMetric.platform_name == platform_name)
-            statement = statement.order_by(desc(FollowerMetric.metric_date)).limit(limit)
+                statement = statement.where(
+                    FollowerMetric.platform_name == platform_name
+                )
+            statement = statement.order_by(desc(FollowerMetric.metric_date)).limit(
+                limit
+            )
             metrics = session.exec(statement).all()
             return [
                 FollowerMetricResponse(
@@ -1419,9 +1499,13 @@ class AnalyticsService:
         """Get audience demographics for a user."""
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
-            statement = select(AudienceDemographic).where(AudienceDemographic.user_id == uid)
+            statement = select(AudienceDemographic).where(
+                AudienceDemographic.user_id == uid
+            )
             if platform_name:
-                statement = statement.where(AudienceDemographic.platform_name == platform_name)
+                statement = statement.where(
+                    AudienceDemographic.platform_name == platform_name
+                )
             if category:
                 statement = statement.where(AudienceDemographic.category == category)
             statement = statement.order_by(desc(AudienceDemographic.percentage))
@@ -1446,10 +1530,14 @@ class AnalyticsService:
         """Get demographics for a specific post."""
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
-            statement = select(PostDemographic).where(
-                PostDemographic.user_id == uid,
-                PostDemographic.external_url == external_url,
-            ).order_by(desc(PostDemographic.percentage))
+            statement = (
+                select(PostDemographic)
+                .where(
+                    PostDemographic.user_id == uid,
+                    PostDemographic.external_url == external_url,
+                )
+                .order_by(desc(PostDemographic.percentage))
+            )
             demographics = session.exec(statement).all()
             return [
                 PostDemographicResponse(

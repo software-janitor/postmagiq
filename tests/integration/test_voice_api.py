@@ -2,6 +2,13 @@
 
 import pytest
 
+from tests.db_utils import is_database_available
+
+pytestmark = pytest.mark.skipif(
+    not is_database_available(),
+    reason="Database not available"
+)
+
 
 class TestVoiceEndpoints:
     """Tests for /api/voice endpoints."""

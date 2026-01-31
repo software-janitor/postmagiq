@@ -55,6 +55,22 @@ export interface AnalysisResult {
     tone: string
     sentence_patterns: Record<string, unknown>
     vocabulary_level: string
+    punctuation_style?: {
+      em_dashes: string
+      semicolons: string
+      exclamations: string
+      ellipses: string
+      parentheticals: string
+    }
+    transition_style?: string
+    paragraph_rhythm?: {
+      length: string
+      opening_style: string
+    }
+    reader_address?: {
+      point_of_view: string
+      relationship: string
+    }
     signature_phrases: string[]
     storytelling_style: string
     emotional_register: string
@@ -65,16 +81,15 @@ export interface AnalysisResult {
 export interface VoiceProfile {
   id: string
   workspace_id: string | null
-  name: string | null
-  tone: string | null
-  sentence_patterns: string | null
-  vocabulary_level: string | null
+  name: string
+  slug: string
+  description: string | null
+  is_preset: boolean
+  tone_description: string | null
   signature_phrases: string | null
-  storytelling_style: string | null
-  emotional_register: string | null
-  is_library: boolean
-  is_shared: boolean
-  source_sample_count: number
+  word_choices: string | null
+  example_excerpts: string | null
+  avoid_patterns: string | null
 }
 
 // =============================================================================
@@ -142,11 +157,11 @@ export async function fetchVoiceProfiles(workspaceId: string): Promise<VoiceProf
 }
 
 /**
- * Get the workspace's own voice profile (not library presets).
+ * Get the workspace's own voice profile (not system presets).
  * Returns null if no custom profile exists.
  */
 export async function fetchWorkspaceVoiceProfile(workspaceId: string): Promise<VoiceProfile | null> {
   const profiles = await fetchVoiceProfiles(workspaceId)
-  // Find first profile that belongs to this workspace (not a library preset)
-  return profiles.find(p => p.workspace_id === workspaceId && !p.is_library) ?? null
+  // Find first profile that belongs to this workspace (not a system preset)
+  return profiles.find(p => p.workspace_id === workspaceId && !p.is_preset) ?? null
 }

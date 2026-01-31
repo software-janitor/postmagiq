@@ -14,7 +14,14 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.routing import Match
 
 try:
-    from prometheus_client import Counter, Gauge, Histogram, generate_latest, CONTENT_TYPE_LATEST
+    from prometheus_client import (
+        Counter,
+        Gauge,
+        Histogram,
+        generate_latest,
+        CONTENT_TYPE_LATEST,
+    )
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
@@ -48,9 +55,7 @@ class MetricsMiddleware(BaseHTTPMiddleware):
     Metrics are exposed via the /metrics endpoint.
     """
 
-    async def dispatch(
-        self, request: Request, call_next: Callable
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Process request and record metrics.
 
         Args:

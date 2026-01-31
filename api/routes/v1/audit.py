@@ -40,6 +40,7 @@ audit_service = AuditService()
 
 class AuditLogResponse(BaseModel):
     """Response model for audit log entries."""
+
     id: UUID
     workspace_id: UUID
     user_id: UUID
@@ -56,6 +57,7 @@ class AuditLogResponse(BaseModel):
 
 class AuditLogListResponse(BaseModel):
     """Response model for paginated audit log list."""
+
     items: list[AuditLogResponse]
     total: int
     limit: int
@@ -73,9 +75,15 @@ async def list_audit_logs(
     session: Annotated[Session, Depends(get_session_dependency)],
     user_id: Optional[UUID] = Query(default=None, description="Filter by user"),
     action: Optional[str] = Query(default=None, description="Filter by action type"),
-    resource_type: Optional[str] = Query(default=None, description="Filter by resource type"),
-    resource_id: Optional[UUID] = Query(default=None, description="Filter by specific resource"),
-    start_date: Optional[datetime] = Query(default=None, description="Start of date range"),
+    resource_type: Optional[str] = Query(
+        default=None, description="Filter by resource type"
+    ),
+    resource_id: Optional[UUID] = Query(
+        default=None, description="Filter by specific resource"
+    ),
+    start_date: Optional[datetime] = Query(
+        default=None, description="Start of date range"
+    ),
     end_date: Optional[datetime] = Query(default=None, description="End of date range"),
     limit: int = Query(default=50, ge=1, le=100, description="Max results"),
     offset: int = Query(default=0, ge=0, description="Results to skip"),
@@ -115,7 +123,9 @@ async def list_audit_logs(
                 id=log.id,
                 workspace_id=log.workspace_id,
                 user_id=log.user_id,
-                action=log.action.value if isinstance(log.action, AuditAction) else log.action,
+                action=log.action.value
+                if isinstance(log.action, AuditAction)
+                else log.action,
                 resource_type=log.resource_type,
                 resource_id=log.resource_id,
                 old_value=log.old_value,
@@ -149,7 +159,9 @@ async def get_audit_log(
             id=log.id,
             workspace_id=log.workspace_id,
             user_id=log.user_id,
-            action=log.action.value if isinstance(log.action, AuditAction) else log.action,
+            action=log.action.value
+            if isinstance(log.action, AuditAction)
+            else log.action,
             resource_type=log.resource_type,
             resource_id=log.resource_id,
             old_value=log.old_value,
@@ -166,7 +178,9 @@ async def get_audit_log(
         )
 
 
-@router.get("/resource/{resource_type}/{resource_id}", response_model=list[AuditLogResponse])
+@router.get(
+    "/resource/{resource_type}/{resource_id}", response_model=list[AuditLogResponse]
+)
 async def get_resource_history(
     resource_type: str,
     resource_id: UUID,
@@ -192,7 +206,9 @@ async def get_resource_history(
             id=log.id,
             workspace_id=log.workspace_id,
             user_id=log.user_id,
-            action=log.action.value if isinstance(log.action, AuditAction) else log.action,
+            action=log.action.value
+            if isinstance(log.action, AuditAction)
+            else log.action,
             resource_type=log.resource_type,
             resource_id=log.resource_id,
             old_value=log.old_value,
@@ -230,7 +246,9 @@ async def get_user_activity(
             id=log.id,
             workspace_id=log.workspace_id,
             user_id=log.user_id,
-            action=log.action.value if isinstance(log.action, AuditAction) else log.action,
+            action=log.action.value
+            if isinstance(log.action, AuditAction)
+            else log.action,
             resource_type=log.resource_type,
             resource_id=log.resource_id,
             old_value=log.old_value,

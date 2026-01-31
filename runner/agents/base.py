@@ -47,7 +47,9 @@ class BaseAgent(ABC):
         self._current_state = None
 
     @abstractmethod
-    def invoke(self, prompt: str, input_files: Optional[list[str]] = None) -> AgentResult:
+    def invoke(
+        self, prompt: str, input_files: Optional[list[str]] = None
+    ) -> AgentResult:
         """One-shot invocation (stateless)."""
         pass
 
@@ -86,5 +88,7 @@ class BaseAgent(ABC):
         return {
             "max": self.context_window,
             "used": total,
-            "percent": (total / self.context_window) * 100 if self.context_window > 0 else 0,
+            "percent": (total / self.context_window) * 100
+            if self.context_window > 0
+            else 0,
         }

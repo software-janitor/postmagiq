@@ -46,7 +46,6 @@ from runner.db.models import (
 )
 
 
-LEGACY_VOICE_KEY = "legacy"
 
 
 def _uuid_to_str(val: Union[UUID, str, None]) -> Optional[str]:
@@ -68,29 +67,55 @@ def _datetime_to_str(val) -> Optional[str]:
 def _generate_slug(name: str) -> str:
     """Generate a URL-safe slug from a name."""
     slug = name.lower().strip()
-    slug = "".join(ch if ch.isalnum() or ch.isspace() or ch == "-" else "" for ch in slug)
+    slug = "".join(
+        ch if ch.isalnum() or ch.isspace() or ch == "-" else "" for ch in slug
+    )
     slug = "-".join(slug.split())
     slug = "-".join(part for part in slug.split("-") if part)
     return slug or "voice-profile"
 
 
-def _encode_legacy_voice_profile(payload: dict) -> str:
-    """Encode legacy voice profile fields into JSON for storage."""
-    return json.dumps({LEGACY_VOICE_KEY: payload})
 
 
-def _decode_legacy_voice_profile(description: Optional[str]) -> dict:
-    """Decode legacy voice profile fields from JSON storage."""
-    if not description:
-        return {}
+def _format_sentence_patterns(value: Optional[str]) -> Optional[str]:
+    """Format sentence_patterns JSON into human-readable text."""
+    if not value:
+        return None
+    # If it's already a plain string (preset), return as-is
+    if not value.startswith("{"):
+        return value
     try:
-        data = json.loads(description)
+        patterns = json.loads(value)
+        if not isinstance(patterns, dict):
+            return value
+        parts = []
+        if patterns.get("average_length"):
+            parts.append(f"{patterns['average_length'].capitalize()} sentence length")
+        if patterns.get("variation"):
+            parts.append(f"{patterns['variation']} variation")
+        if patterns.get("common_structures"):
+            structures = patterns["common_structures"]
+            if isinstance(structures, list):
+                parts.append(f"Uses: {', '.join(structures)}")
+        return ". ".join(parts) if parts else value
+    except (json.JSONDecodeError, AttributeError):
+        return value
+
+
+def _format_signature_phrases(value: Optional[str]) -> Optional[str]:
+    """Format signature_phrases JSON array into human-readable text."""
+    if not value:
+        return None
+    # If it's already a plain string (preset), return as-is
+    if not value.startswith("["):
+        return value
+    try:
+        phrases = json.loads(value)
+        if isinstance(phrases, list):
+            return ", ".join(str(p) for p in phrases)
+        return value
     except json.JSONDecodeError:
-        return {}
-    if isinstance(data, dict) and LEGACY_VOICE_KEY in data:
-        legacy = data.get(LEGACY_VOICE_KEY)
-        return legacy if isinstance(legacy, dict) else {}
-    return {}
+        return value
 
 
 class ContentService:
@@ -119,13 +144,13 @@ class ContentService:
                 return None
 
             goal_repo = GoalRepository(session)
-            voice_repo = VoiceProfileRepository(session)
+            VoiceProfileRepository(session)
             post_repo = PostRepository(session)
 
             goals = goal_repo.list_by_user(uid)
             posts = post_repo.list_by_user(uid)
             voice_profiles = session.exec(
-                select(VoiceProfile).where(VoiceProfile.is_preset == False)
+                select(VoiceProfile).where(not VoiceProfile.is_preset)
             ).all()
 
             return UserResponse(
@@ -166,7 +191,7 @@ class ContentService:
 
             users = user_repo.list_all()
             voice_profiles = session.exec(
-                select(VoiceProfile).where(VoiceProfile.is_preset == False)
+                select(VoiceProfile).where(not VoiceProfile.is_preset)
             ).all()
             has_voice = len(voice_profiles) > 0
 
@@ -369,19 +394,29 @@ class ContentService:
             session.add(goal)
             session.commit()
 
-    def delete_strategy(self, user_id: Union[str, UUID], goal_id: Union[str, UUID]) -> dict:
+    def delete_strategy(
+        self, user_id: Union[str, UUID], goal_id: Union[str, UUID]
+    ) -> dict:
         """Delete a strategy (goal) and all related chapters and posts."""
         uid = normalize_user_id(user_id)
         gid = coerce_uuid(goal_id)
         if not uid or not gid:
-            return {"goal_id": _uuid_to_str(gid), "chapters_deleted": 0, "posts_deleted": 0}
+            return {
+                "goal_id": _uuid_to_str(gid),
+                "chapters_deleted": 0,
+                "posts_deleted": 0,
+            }
         with get_session() as session:
-            chapters = list(session.exec(select(Chapter).where(Chapter.user_id == uid)).all())
+            chapters = list(
+                session.exec(select(Chapter).where(Chapter.user_id == uid)).all()
+            )
             chapter_ids = [c.id for c in chapters]
             posts = []
             if chapter_ids:
                 posts = list(
-                    session.exec(select(Post).where(Post.chapter_id.in_(chapter_ids))).all()
+                    session.exec(
+                        select(Post).where(Post.chapter_id.in_(chapter_ids))
+                    ).all()
                 )
             for post in posts:
                 session.delete(post)
@@ -428,21 +463,25 @@ class ContentService:
             for post in posts:
                 post_counts[post.chapter_id] = post_counts.get(post.chapter_id, 0) + 1
                 if post.status in ("ready", "published"):
-                    completed_counts[post.chapter_id] = completed_counts.get(post.chapter_id, 0) + 1
+                    completed_counts[post.chapter_id] = (
+                        completed_counts.get(post.chapter_id, 0) + 1
+                    )
             result = []
             for chapter in chapters:
-                result.append({
-                    "id": str(chapter.id),
-                    "chapter_number": chapter.chapter_number,
-                    "title": chapter.title,
-                    "description": chapter.description,
-                    "theme": chapter.theme,
-                    "theme_description": chapter.theme_description,
-                    "weeks_start": chapter.weeks_start,
-                    "weeks_end": chapter.weeks_end,
-                    "post_count": post_counts.get(chapter.id, 0),
-                    "completed_count": completed_counts.get(chapter.id, 0),
-                })
+                result.append(
+                    {
+                        "id": str(chapter.id),
+                        "chapter_number": chapter.chapter_number,
+                        "title": chapter.title,
+                        "description": chapter.description,
+                        "theme": chapter.theme,
+                        "theme_description": chapter.theme_description,
+                        "weeks_start": chapter.weeks_start,
+                        "weeks_end": chapter.weeks_end,
+                        "post_count": post_counts.get(chapter.id, 0),
+                        "completed_count": completed_counts.get(chapter.id, 0),
+                    }
+                )
             return result
 
     def delete_strategy_for_workspace(self, workspace_id: UUID) -> dict:
@@ -522,7 +561,9 @@ class ContentService:
             chapter_repo = ChapterRepository(session)
             post_repo = PostRepository(session)
             chapters = (
-                chapter_repo.list_by_platform(uid, pid) if pid else chapter_repo.list_by_user(uid)
+                chapter_repo.list_by_platform(uid, pid)
+                if pid
+                else chapter_repo.list_by_user(uid)
             )
             posts = post_repo.list_by_user(uid)
             post_counts = {}
@@ -530,7 +571,9 @@ class ContentService:
             for post in posts:
                 post_counts[post.chapter_id] = post_counts.get(post.chapter_id, 0) + 1
                 if post.status in ("ready", "published"):
-                    completed_counts[post.chapter_id] = completed_counts.get(post.chapter_id, 0) + 1
+                    completed_counts[post.chapter_id] = (
+                        completed_counts.get(post.chapter_id, 0) + 1
+                    )
             result = []
             for chapter in chapters:
                 result.append(
@@ -669,7 +712,10 @@ class ContentService:
             chapters = {c.id: c for c in chapter_repo.list_by_user(uid)}
             posts = session.exec(
                 select(Post)
-                .where(Post.user_id == uid, Post.status.in_(["not_started", "needs_story", "draft"]))
+                .where(
+                    Post.user_id == uid,
+                    Post.status.in_(["not_started", "needs_story", "draft"]),
+                )
                 .order_by(Post.post_number)
             ).all()
             result = []
@@ -725,7 +771,9 @@ class ContentService:
                 published_url=post.published_url,
             )
 
-    def get_post_by_number(self, user_id: Union[str, UUID], post_number: int) -> Optional[PostResponse]:
+    def get_post_by_number(
+        self, user_id: Union[str, UUID], post_number: int
+    ) -> Optional[PostResponse]:
         """Get post by user and post number."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -801,7 +849,9 @@ class ContentService:
             sample = repo.create(record)
             return str(sample.id)
 
-    def get_writing_samples(self, user_id: Union[str, UUID]) -> list[WritingSampleRecord]:
+    def get_writing_samples(
+        self, user_id: Union[str, UUID]
+    ) -> list[WritingSampleRecord]:
         """Get all writing samples for a user."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -824,7 +874,9 @@ class ContentService:
                 for s in samples
             ]
 
-    def get_writing_samples_for_workspace(self, workspace_id: UUID) -> list[WritingSampleRecord]:
+    def get_writing_samples_for_workspace(
+        self, workspace_id: UUID
+    ) -> list[WritingSampleRecord]:
         """Get all writing samples for a workspace."""
         with get_session() as session:
             repo = WritingSampleRepository(session)
@@ -855,20 +907,21 @@ class ContentService:
             goal = repo.get_by_user(user_id)
             return goal.voice_profile_id if goal else None
 
-    def _voice_profile_response(self, profile: VoiceProfile, default_id: Optional[UUID]) -> VoiceProfileResponse:
+    def _voice_profile_response(
+        self, profile: VoiceProfile, default_id: Optional[UUID]
+    ) -> VoiceProfileResponse:
         """Convert a VoiceProfile to VoiceProfileResponse."""
-        legacy = _decode_legacy_voice_profile(profile.description)
         return VoiceProfileResponse(
             id=str(profile.id),
             name=profile.name,
-            description=None if legacy else profile.description,
+            description=profile.description,
             is_default=default_id == profile.id,
-            tone=legacy.get("tone") or profile.tone_description,
-            sentence_patterns=legacy.get("sentence_patterns") or profile.example_excerpts,
-            vocabulary_level=legacy.get("vocabulary_level") or profile.word_choices,
-            signature_phrases=legacy.get("signature_phrases") or profile.signature_phrases,
-            storytelling_style=legacy.get("storytelling_style") or profile.avoid_patterns,
-            emotional_register=legacy.get("emotional_register"),
+            tone=profile.tone_description,
+            sentence_patterns=_format_sentence_patterns(profile.example_excerpts),
+            vocabulary_level=profile.word_choices,
+            signature_phrases=_format_signature_phrases(profile.signature_phrases),
+            storytelling_style=profile.avoid_patterns,
+            emotional_register=None,
             created_at=_datetime_to_str(profile.created_at),
         )
 
@@ -889,7 +942,9 @@ class ContentService:
             raise ValueError("Invalid user_id")
         with get_session() as session:
             repo = VoiceProfileRepository(session)
-            existing = session.exec(select(VoiceProfile).where(VoiceProfile.is_preset == False)).all()
+            existing = session.exec(
+                select(VoiceProfile).where(not VoiceProfile.is_preset)
+            ).all()
             name = "Default" if not existing else f"Voice Profile {len(existing) + 1}"
             slug = _generate_slug(name)
             counter = 1
@@ -897,19 +952,10 @@ class ContentService:
                 counter += 1
                 slug = f"{_generate_slug(name)}-{counter}"
 
-            legacy_payload = {
-                "tone": tone,
-                "sentence_patterns": sentence_patterns,
-                "vocabulary_level": vocabulary_level,
-                "signature_phrases": signature_phrases,
-                "storytelling_style": storytelling_style,
-                "emotional_register": emotional_register,
-                "raw_analysis": raw_analysis,
-            }
             record = VoiceProfileCreate(
                 name=name,
                 slug=slug,
-                description=_encode_legacy_voice_profile(legacy_payload),
+                description=None,
                 is_preset=False,
                 tone_description=tone,
                 signature_phrases=signature_phrases,
@@ -944,19 +990,10 @@ class ContentService:
                 counter += 1
                 slug = f"{_generate_slug(name)}-{counter}"
 
-            legacy_payload = {
-                "tone": tone,
-                "sentence_patterns": sentence_patterns,
-                "vocabulary_level": vocabulary_level,
-                "signature_phrases": signature_phrases,
-                "storytelling_style": storytelling_style,
-                "emotional_register": emotional_register,
-                "raw_analysis": raw_analysis,
-            }
             record = VoiceProfileCreate(
                 name=name,
                 slug=slug,
-                description=_encode_legacy_voice_profile(legacy_payload),
+                description=None,
                 is_preset=False,
                 tone_description=tone,
                 signature_phrases=signature_phrases,
@@ -969,7 +1006,9 @@ class ContentService:
             profile = repo.create(record)
             return str(profile.id)
 
-    def get_voice_profile(self, user_id: Union[str, UUID]) -> Optional[VoiceProfileResponse]:
+    def get_voice_profile(
+        self, user_id: Union[str, UUID]
+    ) -> Optional[VoiceProfileResponse]:
         """Get user's default voice profile record."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -983,7 +1022,7 @@ class ContentService:
             if not profile:
                 profiles = session.exec(
                     select(VoiceProfile)
-                    .where(VoiceProfile.is_preset == False)
+                    .where(not VoiceProfile.is_preset)
                     .order_by(VoiceProfile.created_at.desc())
                 ).all()
                 profile = profiles[0] if profiles else None
@@ -1011,7 +1050,7 @@ class ContentService:
         with get_session() as session:
             profiles = session.exec(
                 select(VoiceProfile)
-                .where(VoiceProfile.is_preset == False)
+                .where(not VoiceProfile.is_preset)
                 .order_by(VoiceProfile.created_at.desc())
             ).all()
             return [self._voice_profile_response(p, default_id) for p in profiles]
@@ -1025,20 +1064,7 @@ class ContentService:
             profile = session.get(VoiceProfile, pid)
             if not profile:
                 return
-            legacy = _decode_legacy_voice_profile(profile.description)
-            for key in (
-                "tone",
-                "sentence_patterns",
-                "vocabulary_level",
-                "signature_phrases",
-                "storytelling_style",
-                "emotional_register",
-                "raw_analysis",
-            ):
-                if key in kwargs:
-                    legacy[key] = kwargs[key]
 
-            profile.description = _encode_legacy_voice_profile(legacy)
             if "tone" in kwargs:
                 profile.tone_description = kwargs["tone"]
             if "signature_phrases" in kwargs:
@@ -1053,7 +1079,9 @@ class ContentService:
             session.add(profile)
             session.commit()
 
-    def set_default_voice_profile(self, user_id: Union[str, UUID], profile_id: Union[str, UUID]) -> None:
+    def set_default_voice_profile(
+        self, user_id: Union[str, UUID], profile_id: Union[str, UUID]
+    ) -> None:
         """Set a voice profile as the default by attaching to the user's goal."""
         uid = normalize_user_id(user_id)
         pid = coerce_uuid(profile_id)

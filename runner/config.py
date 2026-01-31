@@ -11,17 +11,15 @@ PROJECT_ROOT = Path(__file__).parent.parent
 # =============================================================================
 
 # PostgreSQL connection URL
-# Default points to PgBouncer on port 6432 for connection pooling
+# Default points to PostgreSQL directly on port 5434
+# Use DATABASE_URL env var to point to PgBouncer (6434) in production
 DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://orchestrator:orchestrator_dev@localhost:6433/orchestrator"
+    "postgresql://orchestrator:orchestrator_dev@localhost:5434/orchestrator",
 )
 
 # Redis connection URL for caching
-REDIS_URL = os.environ.get(
-    "REDIS_URL",
-    "redis://localhost:6379/0"
-)
+REDIS_URL = os.environ.get("REDIS_URL", "redis://localhost:6379/0")
 
 # =============================================================================
 # Workflow runtime paths
@@ -30,8 +28,7 @@ REDIS_URL = os.environ.get(
 # Working directory for workflow runs
 # Default: workflow/data/ in project directory (persistent)
 WORKING_DIR = os.environ.get(
-    "WORKFLOW_WORKING_DIR",
-    str(PROJECT_ROOT / "workflow" / "data")
+    "WORKFLOW_WORKING_DIR", str(PROJECT_ROOT / "workflow" / "data")
 )
 
 # =============================================================================
@@ -121,26 +118,32 @@ def list_workflow_configs() -> list[dict]:
         with open(registry_path) as f:
             registry = yaml.safe_load(f)
             for name, meta in registry.get("workflows", {}).items():
-                config_path = WORKFLOW_CONFIGS_DIR / meta.get("config_file", "").replace("configs/", "")
-                configs.append({
-                    "name": name,
-                    "display_name": meta.get("name", name),
-                    "description": meta.get("description", ""),
-                    "environment": meta.get("environment", "production"),
-                    "enabled": meta.get("enabled", True),
-                    "path": str(config_path) if config_path.exists() else None,
-                })
+                config_path = WORKFLOW_CONFIGS_DIR / meta.get(
+                    "config_file", ""
+                ).replace("configs/", "")
+                configs.append(
+                    {
+                        "name": name,
+                        "display_name": meta.get("name", name),
+                        "description": meta.get("description", ""),
+                        "environment": meta.get("environment", "production"),
+                        "enabled": meta.get("enabled", True),
+                        "path": str(config_path) if config_path.exists() else None,
+                    }
+                )
     else:
         # Fallback: list files in configs directory
         if WORKFLOW_CONFIGS_DIR.exists():
             for config_file in WORKFLOW_CONFIGS_DIR.glob("*.yaml"):
-                configs.append({
-                    "name": config_file.stem,
-                    "display_name": config_file.stem,
-                    "description": "",
-                    "environment": "unknown",
-                    "enabled": True,
-                    "path": str(config_file),
-                })
+                configs.append(
+                    {
+                        "name": config_file.stem,
+                        "display_name": config_file.stem,
+                        "description": "",
+                        "environment": "unknown",
+                        "enabled": True,
+                        "path": str(config_file),
+                    }
+                )
 
     return configs

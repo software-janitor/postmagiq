@@ -13,6 +13,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 # WritingSample
 # =============================================================================
 
+
 class WritingSampleBase(SQLModel):
     """Base writing sample fields."""
 
@@ -59,6 +60,7 @@ class WritingSampleRead(WritingSampleBase):
 # VoiceProfile
 # =============================================================================
 
+
 class VoiceProfileBase(SQLModel):
     """Base voice profile fields."""
 
@@ -78,7 +80,14 @@ class VoiceProfile(UUIDModel, VoiceProfileBase, TimestampMixin, table=True):
 
     __tablename__ = "voice_profiles"
 
-    # Multi-tenancy: workspace_id is nullable for legacy/system presets
+    # Owner of the profile (nullable for system presets)
+    user_id: Optional[UUID] = Field(
+        default=None,
+        foreign_key="users.id",
+        index=True,
+    )
+
+    # Multi-tenancy: workspace_id is nullable for system presets
     workspace_id: Optional[UUID] = Field(
         default=None,
         foreign_key="workspaces.id",
@@ -86,9 +95,7 @@ class VoiceProfile(UUIDModel, VoiceProfileBase, TimestampMixin, table=True):
     )
 
     # Unique constraint on slug within workspace (including null workspace for presets)
-    __table_args__ = (
-        {"extend_existing": True},
-    )
+    __table_args__ = ({"extend_existing": True},)
 
 
 class VoiceProfileCreate(VoiceProfileBase):

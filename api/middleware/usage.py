@@ -8,7 +8,7 @@ from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from api.services.usage_service import UsageService, UsageLimitExceeded
+from api.services.usage_service import UsageService
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +36,7 @@ class UsageEnforcementMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.usage_service = usage_service or UsageService()
 
-    async def dispatch(
-        self, request: Request, call_next: Callable
-    ) -> Response:
+    async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """Check usage limits before processing request.
 
         For workspace-scoped routes that create resources, verifies

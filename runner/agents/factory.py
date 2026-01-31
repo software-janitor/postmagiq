@@ -30,24 +30,28 @@ def _lazy_load_registries():
         from runner.agents.codex import CodexAgent
         from runner.agents.ollama import OllamaAgent
 
-        CLI_AGENT_REGISTRY.update({
-            "claude": ClaudeAgent,
-            "gemini": GeminiAgent,
-            "codex": CodexAgent,
-            "gpt-5.2": CodexAgent,
-            "ollama": OllamaAgent,
-        })
+        CLI_AGENT_REGISTRY.update(
+            {
+                "claude": ClaudeAgent,
+                "gemini": GeminiAgent,
+                "codex": CodexAgent,
+                "gpt-5.2": CodexAgent,
+                "ollama": OllamaAgent,
+            }
+        )
 
     # API agents are optional - only load if SDK dependencies are available
     if not API_AGENT_REGISTRY:
         try:
             from runner.agents.claude_api import ClaudeAPIAgent
+
             API_AGENT_REGISTRY["claude"] = ClaudeAPIAgent
         except ImportError:
             pass
 
         try:
             from runner.agents.openai_api import OpenAIAPIAgent
+
             API_AGENT_REGISTRY["openai"] = OpenAIAPIAgent
             API_AGENT_REGISTRY["gpt"] = OpenAIAPIAgent  # Alias
         except ImportError:
@@ -55,12 +59,14 @@ def _lazy_load_registries():
 
         try:
             from runner.agents.gemini_api import GeminiAPIAgent
+
             API_AGENT_REGISTRY["gemini"] = GeminiAPIAgent
         except ImportError:
             pass
 
         try:
             from runner.agents.groq_api import GroqAPIAgent
+
             API_AGENT_REGISTRY["groq"] = GroqAPIAgent
         except ImportError:
             pass
@@ -96,7 +102,7 @@ def create_agent(
     name: str,
     config: dict,
     session_dir: str = "workflow/sessions",
-    mode: str | None = None
+    mode: str | None = None,
 ) -> BaseAgent:
     """Factory to create agent instances.
 
@@ -140,8 +146,7 @@ def _create_cli_agent(name: str, config: dict, session_dir: str) -> BaseAgent:
     base_agent = _get_base_agent(name, CLI_AGENT_REGISTRY)
     if base_agent is None:
         raise ValueError(
-            f"Unknown CLI agent: {name}. "
-            f"Available: {list(CLI_AGENT_REGISTRY.keys())}"
+            f"Unknown CLI agent: {name}. Available: {list(CLI_AGENT_REGISTRY.keys())}"
         )
 
     agent_config = {**config, "name": name}

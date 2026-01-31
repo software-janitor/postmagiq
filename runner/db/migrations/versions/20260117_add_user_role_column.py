@@ -14,8 +14,8 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '009_user_role'
-down_revision = '009_voice_profiles_modular'
+revision = "009_user_role"
+down_revision = "009_voice_profiles_modular"
 branch_labels = None
 depends_on = None
 
@@ -26,13 +26,13 @@ def upgrade() -> None:
 
     # Add role column to users table with default 'user'
     op.add_column(
-        'users',
+        "users",
         sa.Column(
-            'role',
-            sa.Enum('owner', 'admin', 'user', name='userrole'),
+            "role",
+            sa.Enum("owner", "admin", "user", name="userrole"),
             nullable=False,
-            server_default='user'
-        )
+            server_default="user",
+        ),
     )
 
     # Set the first user (by created_at) as owner
@@ -49,5 +49,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column('users', 'role')
+    op.drop_column("users", "role")
     op.execute("DROP TYPE userrole")

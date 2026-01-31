@@ -20,7 +20,6 @@ from api.routes.v1.dependencies import (
 )
 from api.services.domain_service import (
     DomainService,
-    DomainServiceError,
     DomainNotFoundError,
     DomainAlreadyVerifiedError,
     DomainVerificationFailedError,
@@ -41,6 +40,7 @@ domain_service = DomainService()
 
 class InitiateDomainVerificationRequest(BaseModel):
     """Request to initiate domain verification."""
+
     custom_domain: str = Field(
         min_length=3,
         max_length=255,
@@ -51,6 +51,7 @@ class InitiateDomainVerificationRequest(BaseModel):
 
 class DomainVerificationResponse(BaseModel):
     """Response with domain verification instructions."""
+
     custom_domain: str
     verification_token: str
     dns_instructions: dict
@@ -59,6 +60,7 @@ class DomainVerificationResponse(BaseModel):
 
 class DomainStatusResponse(BaseModel):
     """Response with current domain verification status."""
+
     configured: bool
     custom_domain: Optional[str]
     verified: bool
@@ -70,6 +72,7 @@ class DomainStatusResponse(BaseModel):
 
 class DomainVerificationResultResponse(BaseModel):
     """Response after domain verification attempt."""
+
     verified: bool
     custom_domain: str
     verified_at: Optional[datetime]
@@ -78,6 +81,7 @@ class DomainVerificationResultResponse(BaseModel):
 
 class InitiateDKIMRequest(BaseModel):
     """Request to generate DKIM keys."""
+
     email_domain: str = Field(
         min_length=3,
         max_length=255,
@@ -88,6 +92,7 @@ class InitiateDKIMRequest(BaseModel):
 
 class DKIMResponse(BaseModel):
     """Response with DKIM setup information."""
+
     selector: str
     email_domain: str
     dns_record_name: str
@@ -98,6 +103,7 @@ class DKIMResponse(BaseModel):
 
 class DKIMStatusResponse(BaseModel):
     """Response with current DKIM status."""
+
     configured: bool
     email_domain: Optional[str]
     selector: Optional[str]
@@ -107,6 +113,7 @@ class DKIMStatusResponse(BaseModel):
 
 class DKIMVerificationResultResponse(BaseModel):
     """Response after DKIM verification attempt."""
+
     verified: bool
     email_domain: str
     message: str
@@ -114,6 +121,7 @@ class DKIMVerificationResultResponse(BaseModel):
 
 class MessageResponse(BaseModel):
     """Simple message response."""
+
     message: str
 
 
@@ -122,10 +130,16 @@ class MessageResponse(BaseModel):
 # =============================================================================
 
 
-@router.post("/verify", response_model=DomainVerificationResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/verify",
+    response_model=DomainVerificationResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def initiate_domain_verification(
     request: InitiateDomainVerificationRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Initiate domain verification by generating a verification token.
@@ -164,13 +178,15 @@ async def initiate_domain_verification(
                 "value": "app.quillexir.com",
             },
         },
-        message=f"Add the DNS records, then verify at POST /domains/verify",
+        message="Add the DNS records, then verify at POST /domains/verify",
     )
 
 
 @router.get("/status", response_model=DomainStatusResponse)
 async def get_domain_status(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Get the current domain verification status.
@@ -185,7 +201,9 @@ async def get_domain_status(
 
 @router.post("/verify/check", response_model=DomainVerificationResultResponse)
 async def verify_domain(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Verify the domain by checking DNS TXT record.
@@ -220,7 +238,9 @@ async def verify_domain(
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
 async def remove_custom_domain(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Remove the custom domain from the workspace.
@@ -246,7 +266,9 @@ async def remove_custom_domain(
 @router.post("/dkim", response_model=DKIMResponse, status_code=status.HTTP_201_CREATED)
 async def generate_dkim_keys(
     request: InitiateDKIMRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Generate DKIM keypair for email authentication.
@@ -280,7 +302,9 @@ async def generate_dkim_keys(
 
 @router.get("/dkim/status", response_model=DKIMStatusResponse)
 async def get_dkim_status(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Get the current DKIM configuration status.
@@ -295,7 +319,9 @@ async def get_dkim_status(
 
 @router.post("/dkim/verify", response_model=DKIMVerificationResultResponse)
 async def verify_dkim_setup(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Verify the DKIM DNS record is properly configured.

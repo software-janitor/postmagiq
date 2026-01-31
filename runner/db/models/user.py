@@ -51,6 +51,11 @@ class User(UUIDModel, UserBase, TimestampMixin, table=True):
     is_active: bool = Field(default=True)
     is_superuser: bool = Field(default=False)
 
+    # External auth provider fields
+    # For users authenticated via external providers (Clerk, Auth0, etc.)
+    external_id: Optional[str] = Field(default=None, index=True)
+    external_provider: Optional[str] = Field(default=None)
+
     # User-level role for feature flags
     role: UserRole = Field(default=UserRole.user)
 
@@ -59,6 +64,14 @@ class User(UUIDModel, UserBase, TimestampMixin, table=True):
 
     # Owner can simulate other tiers for testing (nullable = use actual tier)
     view_as_tier_id: Optional[UUID] = Field(default=None, foreign_key="subscription_tiers.id")
+
+    # Default workspace for individual tier users (hide multi-tenancy UX)
+    # When set, API routes can infer workspace without explicit workspace_id in URL
+    default_workspace_id: Optional[UUID] = Field(
+        default=None,
+        foreign_key="workspaces.id",
+        index=True,
+    )
 
 
 class UserCreate(UserBase):
@@ -76,6 +89,7 @@ class UserRead(UserBase):
     is_superuser: bool = False
     role: UserRole = UserRole.user
     view_as_tier_id: Optional[UUID] = None
+    default_workspace_id: Optional[UUID] = None
 
 
 class PasswordResetToken(UUIDModel, table=True):

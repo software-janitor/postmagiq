@@ -47,7 +47,9 @@ class SessionTokens:
     def context_remaining(self) -> int:
         return max(0, self.context_window_max - self.cumulative_total)
 
-    def add_invocation(self, tokens: TokenUsage, cost: float, state: str) -> TokenRecord:
+    def add_invocation(
+        self, tokens: TokenUsage, cost: float, state: str
+    ) -> TokenRecord:
         """Record a new invocation."""
         self.invocations += 1
         self.cumulative_input += tokens.input_tokens

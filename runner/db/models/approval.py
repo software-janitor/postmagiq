@@ -24,6 +24,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 
 class PostPriority(str, Enum):
     """Post priority levels."""
+
     LOW = "low"
     MEDIUM = "medium"
     HIGH = "high"
@@ -32,6 +33,7 @@ class PostPriority(str, Enum):
 
 class ApprovalStatus(str, Enum):
     """Status of an approval request."""
+
     PENDING = "pending"
     APPROVED = "approved"
     REJECTED = "rejected"
@@ -41,6 +43,7 @@ class ApprovalStatus(str, Enum):
 
 class AssignmentAction(str, Enum):
     """Types of assignment history actions."""
+
     ASSIGNED = "assigned"
     REASSIGNED = "reassigned"
     UNASSIGNED = "unassigned"
@@ -58,7 +61,9 @@ class PostAssignmentHistoryBase(SQLModel):
     notes: Optional[str] = None
 
 
-class PostAssignmentHistory(UUIDModel, PostAssignmentHistoryBase, TimestampMixin, table=True):
+class PostAssignmentHistory(
+    UUIDModel, PostAssignmentHistoryBase, TimestampMixin, table=True
+):
     """Tracks all assignment changes for posts.
 
     Each row represents a single assignment event (assigned, reassigned, unassigned).

@@ -4,6 +4,13 @@ from uuid import UUID, uuid4
 
 import pytest
 
+from tests.db_utils import is_database_available
+
+pytestmark = pytest.mark.skipif(
+    not is_database_available(),
+    reason="Database not available"
+)
+
 
 def _assert_uuid(value: str) -> str:
     UUID(value)

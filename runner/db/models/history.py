@@ -17,6 +17,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 # RunRecord
 # =============================================================================
 
+
 class RunRecordBase(SQLModel):
     """Base run record fields."""
 
@@ -24,7 +25,9 @@ class RunRecordBase(SQLModel):
     story: str = Field(index=True)
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
-    status: str = Field(default="running", index=True)  # running, complete, failed, halted
+    status: str = Field(
+        default="running", index=True
+    )  # running, complete, failed, halted
     duration_s: Optional[float] = None
     total_tokens: int = Field(default=0)
     total_cost_usd: float = Field(default=0.0)
@@ -57,6 +60,7 @@ class RunRecordRead(RunRecordBase):
 # =============================================================================
 # InvocationRecord
 # =============================================================================
+
 
 class InvocationRecordBase(SQLModel):
     """Base invocation record fields."""
@@ -92,6 +96,7 @@ class InvocationRecordCreate(InvocationRecordBase):
 # AuditScoreRecord
 # =============================================================================
 
+
 class AuditScoreRecordBase(SQLModel):
     """Base audit score record fields."""
 
@@ -124,6 +129,7 @@ class AuditScoreRecordCreate(AuditScoreRecordBase):
 # PostIterationRecord
 # =============================================================================
 
+
 class PostIterationRecordBase(SQLModel):
     """Base post iteration record fields."""
 
@@ -134,7 +140,9 @@ class PostIterationRecordBase(SQLModel):
     improvements: Optional[str] = None
 
 
-class PostIterationRecord(UUIDModel, PostIterationRecordBase, TimestampMixin, table=True):
+class PostIterationRecord(
+    UUIDModel, PostIterationRecordBase, TimestampMixin, table=True
+):
     """PostIterationRecord table - iterations of the same story."""
 
     __tablename__ = "post_iteration_records"

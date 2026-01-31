@@ -17,7 +17,9 @@ depends_on = None
 
 def upgrade() -> None:
     # Drop existing foreign key constraint (references id, should reference run_id)
-    op.drop_constraint("workflow_outputs_run_id_fkey", "workflow_outputs", type_="foreignkey")
+    op.drop_constraint(
+        "workflow_outputs_run_id_fkey", "workflow_outputs", type_="foreignkey"
+    )
 
     # Drop index on old run_id column
     op.drop_index("ix_workflow_outputs_run_id", table_name="workflow_outputs")
@@ -28,17 +30,27 @@ def upgrade() -> None:
     op.drop_column("workflow_outputs", "run_id")
 
     # Add new columns to match model
-    op.add_column("workflow_outputs", sa.Column("state_name", sa.String(), nullable=False, server_default="unknown"))
+    op.add_column(
+        "workflow_outputs",
+        sa.Column("state_name", sa.String(), nullable=False, server_default="unknown"),
+    )
     op.add_column("workflow_outputs", sa.Column("agent", sa.String(), nullable=True))
-    op.add_column("workflow_outputs", sa.Column("updated_at", sa.DateTime(), nullable=True))
-    op.add_column("workflow_outputs", sa.Column("run_id", sa.String(), nullable=False, server_default=""))
+    op.add_column(
+        "workflow_outputs", sa.Column("updated_at", sa.DateTime(), nullable=True)
+    )
+    op.add_column(
+        "workflow_outputs",
+        sa.Column("run_id", sa.String(), nullable=False, server_default=""),
+    )
 
     # Remove server defaults after column creation
     op.alter_column("workflow_outputs", "state_name", server_default=None)
     op.alter_column("workflow_outputs", "run_id", server_default=None)
 
     # Create indexes
-    op.create_index("ix_workflow_outputs_state_name", "workflow_outputs", ["state_name"])
+    op.create_index(
+        "ix_workflow_outputs_state_name", "workflow_outputs", ["state_name"]
+    )
     op.create_index("ix_workflow_outputs_run_id", "workflow_outputs", ["run_id"])
 
     # Add foreign key to workflow_runs.run_id (string column)
@@ -53,7 +65,9 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # Drop new foreign key
-    op.drop_constraint("workflow_outputs_run_id_fkey", "workflow_outputs", type_="foreignkey")
+    op.drop_constraint(
+        "workflow_outputs_run_id_fkey", "workflow_outputs", type_="foreignkey"
+    )
 
     # Drop new indexes
     op.drop_index("ix_workflow_outputs_state_name", table_name="workflow_outputs")
@@ -67,8 +81,13 @@ def downgrade() -> None:
 
     # Re-add old columns
     op.add_column("workflow_outputs", sa.Column("run_id", sa.UUID(), nullable=False))
-    op.add_column("workflow_outputs", sa.Column("file_path", sa.String(), nullable=True))
-    op.add_column("workflow_outputs", sa.Column("version", sa.Integer(), nullable=False, server_default="1"))
+    op.add_column(
+        "workflow_outputs", sa.Column("file_path", sa.String(), nullable=True)
+    )
+    op.add_column(
+        "workflow_outputs",
+        sa.Column("version", sa.Integer(), nullable=False, server_default="1"),
+    )
 
     # Re-create old index
     op.create_index("ix_workflow_outputs_run_id", "workflow_outputs", ["run_id"])

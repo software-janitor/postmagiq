@@ -8,21 +8,20 @@ from typing import Annotated, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlmodel import Session, select
 
 from api.auth.scopes import Scope
 from api.routes.v1.dependencies import (
     WorkspaceCtx,
     WorkspaceContext,
-    get_workspace_context,
     require_workspace_scope,
 )
 from runner.db.engine import get_session_dependency
 from runner.db.models import (
-    Goal, GoalCreate,
-    Chapter, ChapterCreate,
-    Post, PostCreate,
+    Goal,
+    Chapter,
+    Post,
 )
 from runner.content.repository import WorkflowRunRepository, WorkflowOutputRepository
 
@@ -190,7 +189,9 @@ async def list_goals(
 @router.post("/goals", response_model=GoalResponse, status_code=status.HTTP_201_CREATED)
 async def create_goal(
     request: CreateGoalRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Create a new goal in the workspace.
@@ -255,7 +256,9 @@ async def get_goal(
 async def update_goal(
     goal_id: UUID,
     request: UpdateGoalRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Update a goal.
@@ -295,7 +298,9 @@ async def update_goal(
 @router.delete("/goals/{goal_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_goal(
     goal_id: UUID,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Delete a goal.
@@ -357,10 +362,14 @@ async def list_chapters(
     return result
 
 
-@router.post("/chapters", response_model=ChapterResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/chapters", response_model=ChapterResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_chapter(
     request: CreateChapterRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Create a new chapter.
@@ -488,7 +497,9 @@ async def list_posts(
 @router.post("/posts", response_model=PostResponse, status_code=status.HTTP_201_CREATED)
 async def create_post(
     request: CreatePostRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Create a new post.
@@ -581,7 +592,9 @@ async def get_post(
 async def update_post(
     post_id: UUID,
     request: UpdatePostRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Update a post.
@@ -628,7 +641,9 @@ async def update_post(
 @router.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_post(
     post_id: UUID,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Delete a post.
@@ -649,6 +664,7 @@ async def delete_post(
 
 class ResetPostResponse(BaseModel):
     """Response for post reset."""
+
     status: str
     post_id: UUID
     post_number: int
@@ -658,7 +674,9 @@ class ResetPostResponse(BaseModel):
 @router.post("/posts/{post_id}/reset", response_model=ResetPostResponse)
 async def reset_post(
     post_id: str,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_WRITE))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Reset a post to 'not started' state.
@@ -671,7 +689,6 @@ async def reset_post(
 
     Requires content:write scope.
     """
-    import re
 
     # Parse post_id to find the post
     post = None
@@ -680,6 +697,7 @@ async def reset_post(
     # Try UUID first
     try:
         from uuid import UUID as UUIDType
+
         post_uuid = UUIDType(post_id)
         post = session.get(Post, post_uuid)
         if post:

@@ -21,7 +21,6 @@ from api.routes.v1.dependencies import (
 )
 from api.services.notification_service import (
     NotificationService,
-    NotificationServiceError,
     NotificationNotFoundError,
     ChannelNotFoundError,
 )
@@ -40,6 +39,7 @@ notification_service = NotificationService()
 
 class NotificationChannelResponse(BaseModel):
     """Response model for notification channels."""
+
     id: UUID
     channel_type: str
     name: str
@@ -50,6 +50,7 @@ class NotificationChannelResponse(BaseModel):
 
 class NotificationPreferenceResponse(BaseModel):
     """Response model for notification preferences."""
+
     id: UUID
     channel_id: UUID
     notification_type: str
@@ -58,6 +59,7 @@ class NotificationPreferenceResponse(BaseModel):
 
 class UpdatePreferenceRequest(BaseModel):
     """Request to update a notification preference."""
+
     channel_id: UUID
     notification_type: str
     is_enabled: bool
@@ -65,11 +67,13 @@ class UpdatePreferenceRequest(BaseModel):
 
 class BulkUpdatePreferencesRequest(BaseModel):
     """Request to update multiple notification preferences."""
+
     preferences: list[UpdatePreferenceRequest]
 
 
 class NotificationResponse(BaseModel):
     """Response model for notifications."""
+
     id: UUID
     notification_type: str
     title: str
@@ -87,6 +91,7 @@ class NotificationResponse(BaseModel):
 
 class NotificationListResponse(BaseModel):
     """Response for listing notifications with metadata."""
+
     notifications: list[NotificationResponse]
     unread_count: int
     total: int
@@ -94,17 +99,20 @@ class NotificationListResponse(BaseModel):
 
 class MarkReadRequest(BaseModel):
     """Request to mark notification(s) as read."""
+
     notification_ids: list[UUID] = Field(default_factory=list)
     mark_all: bool = False
 
 
 class UnreadCountResponse(BaseModel):
     """Response for unread notification count."""
+
     count: int
 
 
 class MarkReadResponse(BaseModel):
     """Response after marking notifications as read."""
+
     marked_count: int
 
 
@@ -115,7 +123,9 @@ class MarkReadResponse(BaseModel):
 
 @router.get("/channels", response_model=list[NotificationChannelResponse])
 async def list_channels(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """List all available notification channels."""
@@ -140,7 +150,9 @@ async def list_channels(
 
 @router.get("/preferences", response_model=list[NotificationPreferenceResponse])
 async def get_preferences(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Get notification preferences for the current user."""
@@ -161,7 +173,9 @@ async def get_preferences(
 @router.patch("/preferences", response_model=list[NotificationPreferenceResponse])
 async def update_preferences(
     request: BulkUpdatePreferencesRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Update notification preferences for the current user."""
@@ -190,18 +204,28 @@ async def update_preferences(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
-@router.put("/preferences/{channel_id}/{notification_type}", response_model=NotificationPreferenceResponse)
+@router.put(
+    "/preferences/{channel_id}/{notification_type}",
+    response_model=NotificationPreferenceResponse,
+)
 async def set_preference(
     channel_id: UUID,
     notification_type: str,
     is_enabled: bool,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Set a specific notification preference."""
     try:
         pref = notification_service.set_preference(
-            session, ctx.user_id, ctx.workspace_id, channel_id, notification_type, is_enabled
+            session,
+            ctx.user_id,
+            ctx.workspace_id,
+            channel_id,
+            notification_type,
+            is_enabled,
         )
         return NotificationPreferenceResponse(
             id=pref.id,
@@ -220,10 +244,14 @@ async def set_preference(
 
 @router.get("", response_model=NotificationListResponse)
 async def list_notifications(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
     unread_only: bool = Query(False, description="Only return unread notifications"),
-    include_dismissed: bool = Query(False, description="Include dismissed notifications"),
+    include_dismissed: bool = Query(
+        False, description="Include dismissed notifications"
+    ),
     limit: int = Query(50, ge=1, le=100, description="Maximum notifications to return"),
     offset: int = Query(0, ge=0, description="Offset for pagination"),
 ):
@@ -268,7 +296,9 @@ async def list_notifications(
 
 @router.get("/unread-count", response_model=UnreadCountResponse)
 async def get_unread_count(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Get count of unread notifications."""
@@ -281,7 +311,9 @@ async def get_unread_count(
 @router.get("/{notification_id}", response_model=NotificationResponse)
 async def get_notification(
     notification_id: UUID,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Get a specific notification."""
@@ -312,7 +344,9 @@ async def get_notification(
 @router.post("/mark-read", response_model=MarkReadResponse)
 async def mark_notifications_read(
     request: MarkReadRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Mark notifications as read.
@@ -336,7 +370,9 @@ async def mark_notifications_read(
 @router.post("/{notification_id}/read", response_model=NotificationResponse)
 async def mark_notification_read(
     notification_id: UUID,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Mark a specific notification as read."""
@@ -367,7 +403,9 @@ async def mark_notification_read(
 @router.post("/{notification_id}/dismiss", response_model=NotificationResponse)
 async def dismiss_notification(
     notification_id: UUID,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Dismiss a notification (hide from list)."""
@@ -397,7 +435,9 @@ async def dismiss_notification(
 
 @router.post("/dismiss-all", response_model=MarkReadResponse)
 async def dismiss_all_notifications(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.CONTENT_READ))
+    ],
     session: Annotated[Session, Depends(get_session_dependency)],
 ):
     """Dismiss all notifications."""

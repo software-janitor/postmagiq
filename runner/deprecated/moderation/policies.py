@@ -20,6 +20,7 @@ from typing import Optional
 @dataclass
 class PolicyViolation:
     """A policy violation found in content."""
+
     code: str
     message: str
     confidence: float
@@ -89,20 +90,24 @@ class PolicyChecker:
         # Run pattern-based checks
         for name, rule in self._patterns.items():
             if re.search(rule["pattern"], content, re.IGNORECASE):
-                violations.append(PolicyViolation(
-                    code=rule["code"],
-                    message=rule["message"],
-                    confidence=rule["confidence"],
-                    details={"pattern_name": name},
-                ))
+                violations.append(
+                    PolicyViolation(
+                        code=rule["code"],
+                        message=rule["message"],
+                        confidence=rule["confidence"],
+                        details={"pattern_name": name},
+                    )
+                )
 
         # Check for empty or near-empty content
         if len(content.strip()) < 10:
-            violations.append(PolicyViolation(
-                code="too_short",
-                message="Content is too short",
-                confidence=1.0,
-            ))
+            violations.append(
+                PolicyViolation(
+                    code="too_short",
+                    message="Content is too short",
+                    confidence=1.0,
+                )
+            )
 
         # Check for potential prompt injection patterns
         prompt_injection_patterns = [
@@ -113,11 +118,13 @@ class PolicyChecker:
         ]
         for pattern in prompt_injection_patterns:
             if re.search(pattern, content, re.IGNORECASE):
-                violations.append(PolicyViolation(
-                    code="prompt_injection",
-                    message="Potential prompt injection detected",
-                    confidence=0.75,
-                ))
+                violations.append(
+                    PolicyViolation(
+                        code="prompt_injection",
+                        message="Potential prompt injection detected",
+                        confidence=0.75,
+                    )
+                )
                 break  # Only flag once
 
         return violations
@@ -134,7 +141,9 @@ class AdvancedPolicyChecker:
         result = await checker.check(content)
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "omni-moderation-latest"):
+    def __init__(
+        self, api_key: Optional[str] = None, model: str = "omni-moderation-latest"
+    ):
         """Initialize with OpenAI API key for moderation."""
         self.api_key = api_key
         self.model = model
@@ -170,10 +179,16 @@ class AdvancedPolicyChecker:
                 "hate": ("hate_speech", "Hate speech detected"),
                 "hate/threatening": ("hate_speech", "Threatening hate speech detected"),
                 "harassment": ("harassment", "Harassment detected"),
-                "harassment/threatening": ("harassment", "Threatening harassment detected"),
+                "harassment/threatening": (
+                    "harassment",
+                    "Threatening harassment detected",
+                ),
                 "self-harm": ("self_harm", "Self-harm content detected"),
                 "self-harm/intent": ("self_harm", "Self-harm intent detected"),
-                "self-harm/instructions": ("self_harm", "Self-harm instructions detected"),
+                "self-harm/instructions": (
+                    "self_harm",
+                    "Self-harm instructions detected",
+                ),
                 "sexual": ("sexual", "Sexual content detected"),
                 "sexual/minors": ("csam", "CSAM content detected"),
                 "violence": ("violence", "Violent content detected"),
@@ -184,14 +199,18 @@ class AdvancedPolicyChecker:
                 # Get the category score (0-1)
                 score_attr = category.replace("/", "_") + "_score"
                 if hasattr(result.category_scores, score_attr.replace("-", "_")):
-                    score = getattr(result.category_scores, score_attr.replace("-", "_"))
+                    score = getattr(
+                        result.category_scores, score_attr.replace("-", "_")
+                    )
                     if score > 0.5:  # Flag if >50% confidence
-                        violations.append(PolicyViolation(
-                            code=code,
-                            message=message,
-                            confidence=score,
-                            details={"openai_category": category},
-                        ))
+                        violations.append(
+                            PolicyViolation(
+                                code=code,
+                                message=message,
+                                confidence=score,
+                                details={"openai_category": category},
+                            )
+                        )
 
             return violations
 
@@ -203,9 +222,11 @@ class AdvancedPolicyChecker:
             # API error, fall back to basic
             basic = PolicyChecker()
             violations = basic.check(content)
-            violations.append(PolicyViolation(
-                code="moderation_error",
-                message=f"Moderation API error: {str(e)}",
-                confidence=0.5,
-            ))
+            violations.append(
+                PolicyViolation(
+                    code="moderation_error",
+                    message=f"Moderation API error: {str(e)}",
+                    confidence=0.5,
+                )
+            )
             return violations

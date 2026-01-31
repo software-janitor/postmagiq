@@ -20,26 +20,31 @@ from runner.db.models import (
 
 class APIKeyServiceError(Exception):
     """Base exception for API key service errors."""
+
     pass
 
 
 class KeyNotFoundError(APIKeyServiceError):
     """Raised when an API key is not found."""
+
     pass
 
 
 class KeyRevokedError(APIKeyServiceError):
     """Raised when trying to use a revoked key."""
+
     pass
 
 
 class KeyExpiredError(APIKeyServiceError):
     """Raised when trying to use an expired key."""
+
     pass
 
 
 class RateLimitExceededError(APIKeyServiceError):
     """Raised when rate limit is exceeded."""
+
     pass
 
 
@@ -202,8 +207,11 @@ class APIKeyService:
 
         # Only allow updating certain fields
         allowed_fields = {
-            "name", "description", "scopes",
-            "rate_limit_per_minute", "rate_limit_per_day",
+            "name",
+            "description",
+            "scopes",
+            "rate_limit_per_minute",
+            "rate_limit_per_day",
         }
 
         for field, value in updates.items():

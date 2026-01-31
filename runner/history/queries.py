@@ -71,7 +71,9 @@ class HistoryQueries:
             results.append(
                 AgentPerformance(
                     agent=agent,
-                    avg_score=sum(s.overall_score or 0 for s in items) / sample_size if sample_size else 0.0,
+                    avg_score=sum(s.overall_score or 0 for s in items) / sample_size
+                    if sample_size
+                    else 0.0,
                     avg_hook=_avg_optional(items, "hook_score"),
                     avg_specifics=_avg_optional(items, "specifics_score"),
                     avg_voice=_avg_optional(items, "voice_score"),
@@ -108,7 +110,9 @@ class HistoryQueries:
                     invocations=invocations_count,
                     total_tokens=total_tokens,
                     total_cost=total_cost,
-                    avg_cost=total_cost / invocations_count if invocations_count else 0.0,
+                    avg_cost=total_cost / invocations_count
+                    if invocations_count
+                    else 0.0,
                 )
             )
         return sorted(results, key=lambda r: r.total_cost or 0, reverse=True)
@@ -147,12 +151,16 @@ class HistoryQueries:
     def post_iterations(self, story: str) -> list[PostIteration]:
         """Get iteration history for a specific post/story."""
         with get_session() as session:
-            statement = select(PostIterationRecord).where(PostIterationRecord.story == story)
+            statement = select(PostIterationRecord).where(
+                PostIterationRecord.story == story
+            )
             if self.user_id:
                 run_ids = {r.run_id for r in self._runs_for_user()}
                 if run_ids:
                     statement = statement.where(PostIterationRecord.run_id.in_(run_ids))
-            records = session.exec(statement.order_by(PostIterationRecord.iteration)).all()
+            records = session.exec(
+                statement.order_by(PostIterationRecord.iteration)
+            ).all()
 
         return [
             PostIteration(
@@ -169,14 +177,20 @@ class HistoryQueries:
         """Get which agent performs best for a given state (draft, audit, etc)."""
         run_ids = {r.run_id for r in self._runs_for_user()} if self.user_id else None
         with get_session() as session:
-            inv_statement = select(InvocationRecord).where(InvocationRecord.state == state)
+            inv_statement = select(InvocationRecord).where(
+                InvocationRecord.state == state
+            )
             if run_ids:
-                inv_statement = inv_statement.where(InvocationRecord.run_id.in_(run_ids))
+                inv_statement = inv_statement.where(
+                    InvocationRecord.run_id.in_(run_ids)
+                )
             invocations = session.exec(inv_statement).all()
 
             score_statement = select(AuditScoreRecord)
             if run_ids:
-                score_statement = score_statement.where(AuditScoreRecord.run_id.in_(run_ids))
+                score_statement = score_statement.where(
+                    AuditScoreRecord.run_id.in_(run_ids)
+                )
             scores = session.exec(score_statement).all()
 
         scores_by_run_agent = defaultdict(list)
@@ -198,7 +212,9 @@ class HistoryQueries:
             results.append(
                 AgentPerformance(
                     agent=agent,
-                    avg_score=sum(s.overall_score or 0 for s in items) / sample_size if sample_size else 0.0,
+                    avg_score=sum(s.overall_score or 0 for s in items) / sample_size
+                    if sample_size
+                    else 0.0,
                     avg_hook=_avg_optional(items, "hook_score"),
                     avg_specifics=_avg_optional(items, "specifics_score"),
                     avg_voice=_avg_optional(items, "voice_score"),
@@ -240,7 +256,9 @@ class HistoryQueries:
             statement = select(RunRecord).where(RunRecord.story == story)
             if self.user_id:
                 statement = statement.where(RunRecord.user_id == self.user_id)
-            records = session.exec(statement.order_by(RunRecord.started_at.desc()).limit(limit)).all()
+            records = session.exec(
+                statement.order_by(RunRecord.started_at.desc()).limit(limit)
+            ).all()
             return [
                 {
                     "run_id": r.run_id,
@@ -257,7 +275,9 @@ class HistoryQueries:
 
 def _avg_optional(items, field: str) -> Optional[float]:
     """Average numeric field across records."""
-    values = [getattr(item, field) for item in items if getattr(item, field) is not None]
+    values = [
+        getattr(item, field) for item in items if getattr(item, field) is not None
+    ]
     if not values:
         return None
     return sum(values) / len(values)

@@ -1,0 +1,262 @@
+# ============================================================================
+# WORKFLOW ORCHESTRATOR CONFIGURATION - GROQ FREE TIER
+# ============================================================================
+# Uses Groq's smaller/faster models for free tier users
+# Cost-optimized: ~$0.10/run max (10 credits)
+# Models: gpt-oss-20b, llama-8b (no premium models)
+
+orchestrator:
+  agent: groq-gpt-oss-20b
+  session:
+    enabled: true
+
+# ============================================================================
+# WORKFLOW TIERS
+# ============================================================================
+# Free tier only has access to basic agents
+
+tiers:
+  standard:
+    draft_agents: [groq-gpt-oss-20b, groq-8b]
+    audit_agents: [groq-8b]
+
+credit_weights:
+  base_cost: 1
+  standard:
+    - groq-gpt-oss-20b
+    - groq-8b
+
+# ============================================================================
+# AGENT DEFINITIONS - Free Tier Models Only
+# ============================================================================
+
+agents:
+  groq-gpt-oss-20b:
+    type: api
+    model: gpt-oss-20b
+    context_window: 131072
+
+  groq-8b:
+    type: api
+    model: llama-8b
+    context_window: 131072
+
+  # Split auditor agents (same models, different personas)
+  groq-fabrication-auditor:
+    type: api
+    model: gpt-oss-20b
+    context_window: 131072
+
+  groq-style-auditor:
+    type: api
+    model: llama-8b
+    context_window: 131072
+
+# ============================================================================
+# PERSONA DEFINITIONS
+# ============================================================================
+
+personas:
+  story-reviewer: prompts/templates/story_reviewer.md
+  story-processor: prompts/templates/story_processor.md
+  writer: prompts/templates/writer.md
+  auditor: prompts/templates/auditor.md
+  synthesizer: prompts/templates/synthesizer.md
+  fabrication-auditor: prompts/templates/fabrication_auditor.md
+  style-auditor: prompts/templates/style_auditor.md
+
+# ============================================================================
+# STATE MACHINE
+# ============================================================================
+
+states:
+  start:
+    type: initial
+    next: story-review
+
+  # --------------------------------------------------------------------------
+  # PHASE 1: Story Review & Processing
+  # --------------------------------------------------------------------------
+
+  story-review:
+    type: single
+    description: "Review raw story for completeness - ask questions if needed"
+    agent: groq-gpt-oss-20b
+    persona: story-reviewer
+    input: "workflow/input/story_input.md"
+    output: "workflow/review/review_result.json"
+    output_type: review
+    transitions:
+      proceed: story-process
+      retry: story-feedback
+      halt: halt
+
+  story-feedback:
+    type: human-approval
+    description: "Get more details from user based on reviewer questions"
+    input: "workflow/review/review_result.json"
+    prompt: |
+      The reviewer has questions about your story.
+      Review the feedback above and either:
+      - Type 'proceed' to continue with what you have
+      - Type 'abort' to cancel
+      - Provide the requested details to strengthen your story
+    transitions:
+      approved: story-process
+      feedback: story-review
+      abort: halt
+
+  story-process:
+    type: single
+    description: "Extract 5 elements, determine shape, create processed template"
+    agent: groq-gpt-oss-20b
+    persona: story-processor
+    input: "workflow/input/story_input.md"
+    output: "workflow/processed/processed_story.md"
+    output_type: processed
+    transitions:
+      success: draft
+      failure: story-review
+
+  # --------------------------------------------------------------------------
+  # PHASE 2: Post Drafting (2 agents for free tier)
+  # --------------------------------------------------------------------------
+
+  draft:
+    type: fan-out
+    description: "Generate post drafts from processed story"
+    agents: [groq-gpt-oss-20b, groq-8b]
+    persona: writer
+    input: "workflow/processed/processed_story.md"
+    output: "workflow/drafts/{agent}_draft.md"
+    output_type: draft
+    transitions:
+      all_success: cross-audit
+      partial_success: cross-audit
+      all_failure: halt
+
+  # --------------------------------------------------------------------------
+  # PHASE 3: Auditing & Synthesis
+  # --------------------------------------------------------------------------
+
+  cross-audit:
+    type: fan-out
+    description: "Split audit: fabrication + style checks on drafts"
+    agents: [groq-fabrication-auditor, groq-style-auditor]
+    personas:
+      groq-fabrication-auditor: fabrication-auditor
+      groq-style-auditor: style-auditor
+    input:
+      - "workflow/processed/processed_story.md"
+      - "workflow/input/story_input.md"
+      - "workflow/drafts/*.md"
+    output: "workflow/audits/{agent}_audit.json"
+    output_type: audit
+    transitions:
+      proceed: synthesize
+      retry: draft
+      halt: halt
+
+  synthesize:
+    type: orchestrator-task
+    description: "Combine best elements from drafts based on audits"
+    agent: groq-gpt-oss-20b
+    persona: synthesizer
+    input:
+      - "workflow/drafts/*.md"
+      - "workflow/audits/*.json"
+    output: "workflow/final/final_post.md"
+    output_type: final
+    transitions:
+      success: final-audit
+      failure: cross-audit
+
+  # --------------------------------------------------------------------------
+  # PHASE 4: Final Review & Approval
+  # --------------------------------------------------------------------------
+
+  final-audit:
+    type: fan-out
+    description: "Final split audit: fabrication + style checks on final post"
+    agents: [groq-fabrication-auditor, groq-style-auditor]
+    personas:
+      groq-fabrication-auditor: fabrication-auditor
+      groq-style-auditor: style-auditor
+    input:
+      - "workflow/processed/processed_story.md"
+      - "workflow/input/story_input.md"
+      - "workflow/final/final_post.md"
+    output: "workflow/final/{agent}_final_audit.json"
+    output_type: final_audit
+    transitions:
+      proceed: human-approval
+      retry: final-audit-feedback
+      halt: final-audit-feedback
+
+  final-audit-feedback:
+    type: human-approval
+    description: "Review audit feedback on final post"
+    input: "workflow/final/final_post.md"
+    prompt: |
+      The auditors flagged issues with the final post.
+      Review the post above and either:
+      - Type 'approve' to publish as-is
+      - Type 'abort' to cancel
+      - Provide feedback to guide the revision
+    transitions:
+      approved: complete
+      feedback: synthesize
+      abort: halt
+
+  human-approval:
+    type: human-approval
+    description: "Human reviews final post and approves or requests changes"
+    input: "workflow/final/final_post.md"
+    prompt: |
+      Review the final post above and either:
+      - Type 'approve' to finalize
+      - Type 'retry' to generate new drafts
+      - Provide feedback for specific changes
+    transitions:
+      approved: complete
+      retry: draft
+      feedback: synthesize
+
+  complete:
+    type: terminal
+    description: "Workflow complete - post ready for publishing"
+
+  halt:
+    type: terminal
+    description: "Workflow halted due to failure or user abort"
+
+# ============================================================================
+# CIRCUIT BREAKER (Strict limits for free tier)
+# ============================================================================
+
+circuit_breaker:
+  rules:
+    - name: state_visit_limit
+      limit: 2
+    - name: cycle_detection
+    - name: transition_limit
+      limit: 15
+    - name: timeout
+      seconds: 900  # 15 minutes
+    - name: cost_limit
+      limit: 0.10  # 10 credits max
+
+  safety_limits:
+    max_transitions_hard: 20
+    max_runtime_hard: 1800  # 30 minutes
+    max_cost_hard: 0.20  # 20 credits hard limit
+
+# ============================================================================
+# RUNTIME SETTINGS
+# ============================================================================
+
+runtime:
+  working_dir: "workflow"
+  parallel_fanout: true
+  timeout_per_agent: 180  # 3 minutes per agent
+  retry_count: 1  # Limited retries for free tier

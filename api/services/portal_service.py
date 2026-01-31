@@ -19,7 +19,6 @@ from runner.db.models import (
     User,
     Workspace,
     WorkspaceMembership,
-    WorkspaceRole,
     InviteStatus,
     WhitelabelConfig,
 )
@@ -27,21 +26,25 @@ from runner.db.models import (
 
 class PortalServiceError(Exception):
     """Base exception for portal service errors."""
+
     pass
 
 
 class PostNotFoundError(PortalServiceError):
     """Raised when a post is not found."""
+
     pass
 
 
 class UnauthorizedError(PortalServiceError):
     """Raised when a user is not authorized for an action."""
+
     pass
 
 
 class InvalidStateError(PortalServiceError):
     """Raised when an action is invalid for the current state."""
+
     pass
 
 
@@ -84,31 +87,35 @@ class PortalService:
         }
 
         if whitelabel and whitelabel.is_active:
-            branding.update({
-                "company_name": whitelabel.company_name or workspace.name,
-                "logo_url": whitelabel.logo_url,
-                "logo_dark_url": whitelabel.logo_dark_url,
-                "favicon_url": whitelabel.favicon_url,
-                "primary_color": whitelabel.primary_color,
-                "secondary_color": whitelabel.secondary_color,
-                "accent_color": whitelabel.accent_color,
-                "portal_welcome_text": whitelabel.portal_welcome_text,
-                "portal_footer_text": whitelabel.portal_footer_text,
-                "support_email": whitelabel.support_email,
-            })
+            branding.update(
+                {
+                    "company_name": whitelabel.company_name or workspace.name,
+                    "logo_url": whitelabel.logo_url,
+                    "logo_dark_url": whitelabel.logo_dark_url,
+                    "favicon_url": whitelabel.favicon_url,
+                    "primary_color": whitelabel.primary_color,
+                    "secondary_color": whitelabel.secondary_color,
+                    "accent_color": whitelabel.accent_color,
+                    "portal_welcome_text": whitelabel.portal_welcome_text,
+                    "portal_footer_text": whitelabel.portal_footer_text,
+                    "support_email": whitelabel.support_email,
+                }
+            )
         else:
-            branding.update({
-                "company_name": workspace.name,
-                "logo_url": None,
-                "logo_dark_url": None,
-                "favicon_url": None,
-                "primary_color": None,
-                "secondary_color": None,
-                "accent_color": None,
-                "portal_welcome_text": None,
-                "portal_footer_text": None,
-                "support_email": None,
-            })
+            branding.update(
+                {
+                    "company_name": workspace.name,
+                    "logo_url": None,
+                    "logo_dark_url": None,
+                    "favicon_url": None,
+                    "primary_color": None,
+                    "secondary_color": None,
+                    "accent_color": None,
+                    "portal_welcome_text": None,
+                    "portal_footer_text": None,
+                    "support_email": None,
+                }
+            )
 
         return branding
 
@@ -136,11 +143,13 @@ class PortalService:
         else:
             # Default: posts that are in review-related statuses
             stmt = stmt.where(
-                Post.status.in_([
-                    "pending_approval",
-                    "ready",
-                    "changes_requested",
-                ])
+                Post.status.in_(
+                    [
+                        "pending_approval",
+                        "ready",
+                        "changes_requested",
+                    ]
+                )
             )
 
         stmt = stmt.order_by(Post.post_number)
@@ -149,10 +158,14 @@ class PortalService:
         result = []
         for post in posts:
             # Get the latest approval request for this post
-            approval_stmt = select(ApprovalRequest).where(
-                ApprovalRequest.post_id == post.id,
-                ApprovalRequest.workspace_id == workspace_id,
-            ).order_by(ApprovalRequest.submitted_at.desc())
+            approval_stmt = (
+                select(ApprovalRequest)
+                .where(
+                    ApprovalRequest.post_id == post.id,
+                    ApprovalRequest.workspace_id == workspace_id,
+                )
+                .order_by(ApprovalRequest.submitted_at.desc())
+            )
 
             latest_approval = session.exec(approval_stmt).first()
 
@@ -197,10 +210,14 @@ class PortalService:
             return None
 
         # Get latest approval request
-        approval_stmt = select(ApprovalRequest).where(
-            ApprovalRequest.post_id == post_id,
-            ApprovalRequest.workspace_id == workspace_id,
-        ).order_by(ApprovalRequest.submitted_at.desc())
+        approval_stmt = (
+            select(ApprovalRequest)
+            .where(
+                ApprovalRequest.post_id == post_id,
+                ApprovalRequest.workspace_id == workspace_id,
+            )
+            .order_by(ApprovalRequest.submitted_at.desc())
+        )
 
         latest_approval = session.exec(approval_stmt).first()
 
@@ -219,11 +236,11 @@ class PortalService:
                 str(latest_approval.id) if latest_approval else None
             ),
             "approval_status": latest_approval.status if latest_approval else None,
-            "decision_notes": latest_approval.decision_notes if latest_approval else None,
+            "decision_notes": latest_approval.decision_notes
+            if latest_approval
+            else None,
             "submitted_at": (
-                latest_approval.submitted_at.isoformat()
-                if latest_approval
-                else None
+                latest_approval.submitted_at.isoformat() if latest_approval else None
             ),
         }
 
@@ -392,9 +409,7 @@ class PortalService:
         from api.auth.password import verify_password
 
         # Find user by email
-        user = session.exec(
-            select(User).where(User.email == email)
-        ).first()
+        user = session.exec(select(User).where(User.email == email)).first()
 
         if not user:
             return None

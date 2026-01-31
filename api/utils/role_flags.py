@@ -84,7 +84,7 @@ def get_flags_for_role(role: UserRole) -> RoleFlags:
         Dictionary of feature flags for the role
     """
     # Handle both enum and string values
-    role_key = role.value if hasattr(role, 'value') else role
+    role_key = role.value if hasattr(role, "value") else role
     return ROLE_FLAGS.get(role_key, ROLE_FLAGS["user"])
 
 

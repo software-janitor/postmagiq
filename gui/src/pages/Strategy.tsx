@@ -1,14 +1,23 @@
 import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Target, Users, BookOpen, FileText, Loader2, RefreshCw, Calendar, ChevronDown, ChevronUp, Crosshair, Edit2, Check, X, BarChart3, Upload, TrendingUp, Eye, Heart, MessageCircle, Share2, MousePointer, ExternalLink } from 'lucide-react'
+import { Target, Users, BookOpen, FileText, Loader2, RefreshCw, Calendar, ChevronDown, ChevronUp, Crosshair, Edit2, Check, X, BarChart3, Upload, TrendingUp, Eye, Heart, MessageCircle, Share2, MousePointer, ExternalLink, Mic } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { clsx } from 'clsx'
 import { fetchExistingStrategy, ExistingChapter } from '../api/onboarding'
-import { apiGet, apiPut } from '../api/client'
+import { apiGet, apiPut, apiPatch } from '../api/client'
 import { useWorkspaceStore } from '../stores/workspaceStore'
 import { useThemeClasses } from '../hooks/useThemeClasses'
 import AIAssistant from '../components/AIAssistant'
 import ThemeIcon from '../components/ThemeIcon'
+
+interface VoiceProfile {
+  id: string
+  workspace_id: string | null
+  name: string
+  slug: string
+  description: string | null
+  is_preset: boolean
+}
 
 interface Post {
   id: string
@@ -119,6 +128,22 @@ export default function Strategy() {
     queryKey: ['posts', workspaceId],
     queryFn: () => apiGet<Post[]>(`/v1/w/${workspaceId}/posts`),
     enabled: !!workspaceId,
+  })
+
+  // Fetch voice profiles for selector
+  const { data: voiceProfiles = [] } = useQuery({
+    queryKey: ['voice-profiles', workspaceId],
+    queryFn: () => apiGet<VoiceProfile[]>(`/v1/w/${workspaceId}/voice-profiles`),
+    enabled: !!workspaceId,
+  })
+
+  // Update goal mutation (for voice profile selection)
+  const updateGoalMutation = useMutation({
+    mutationFn: ({ goalId, voice_profile_id }: { goalId: string; voice_profile_id: string | null }) =>
+      apiPatch(`/v1/w/${workspaceId}/goals/${goalId}`, { voice_profile_id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['strategy', workspaceId] })
+    },
   })
 
   // Analytics queries
@@ -405,6 +430,59 @@ export default function Strategy() {
                   </span>
                 </div>
               )}
+            </div>
+
+            {/* Voice Profile Selector */}
+            <div className="flex items-center gap-3 pt-3 border-t border-zinc-700/50 mt-3">
+              <Mic className={clsx('w-4 h-4', theme.iconPrimary)} />
+              <span className="text-sm text-zinc-500">Voice:</span>
+              <select
+                value={goal?.voice_profile_id || ''}
+                onChange={(e) => {
+                  if (goal?.id) {
+                    updateGoalMutation.mutate({
+                      goalId: goal.id,
+                      voice_profile_id: e.target.value || null,
+                    })
+                  }
+                }}
+                disabled={updateGoalMutation.isPending}
+                className={clsx(
+                  'px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white',
+                  'focus:outline-none focus:ring-1',
+                  theme.borderHover,
+                  updateGoalMutation.isPending && 'opacity-50'
+                )}
+              >
+                <option value="">No voice profile</option>
+                {voiceProfiles.filter(p => p.is_preset).length > 0 && (
+                  <optgroup label="Presets">
+                    {voiceProfiles.filter(p => p.is_preset).map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                {voiceProfiles.filter(p => !p.is_preset).length > 0 && (
+                  <optgroup label="Custom">
+                    {voiceProfiles.filter(p => !p.is_preset).map((profile) => (
+                      <option key={profile.id} value={profile.id}>
+                        {profile.name}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+              {updateGoalMutation.isPending && (
+                <Loader2 className="w-4 h-4 animate-spin text-zinc-400" />
+              )}
+              <Link
+                to="/voice-profiles"
+                className={clsx('text-xs hover:underline', theme.textPrimary)}
+              >
+                Manage voices
+              </Link>
             </div>
           </div>
 

@@ -5,11 +5,9 @@ Handles strategy creation via quick mode and deep mode conversations.
 """
 
 from typing import Annotated, Optional
-from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
-from sqlmodel import Session
 
 from api.auth.scopes import Scope
 from api.routes.v1.dependencies import (
@@ -22,10 +20,8 @@ from api.services.onboarding_service import (
     OnboardingService,
     QuickOnboardingAnswers,
     DeepModeState,
-    DeepModeMessage,
     GeneratedPlan,
 )
-from runner.db.engine import get_session_dependency
 
 
 router = APIRouter(prefix="/v1/w/{workspace_id}/onboarding", tags=["onboarding"])
@@ -156,7 +152,9 @@ async def get_post_shapes(
 @router.post("/quick", response_model=QuickModeResponse)
 async def process_quick_mode(
     request: QuickModeRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
 ):
     """Process quick mode onboarding.
 
@@ -189,7 +187,9 @@ async def process_quick_mode(
 @router.post("/deep/message", response_model=DeepModeResponse)
 async def send_deep_mode_message(
     request: DeepModeMessageRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
 ):
     """Send a message in deep mode conversation.
 
@@ -216,7 +216,9 @@ async def send_deep_mode_message(
 @router.post("/deep/generate-plan", response_model=PlanResponse)
 async def generate_plan_from_deep_mode(
     request: GeneratePlanRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
 ):
     """Generate content plan from deep mode conversation.
 
@@ -243,7 +245,9 @@ async def generate_plan_from_deep_mode(
 @router.post("/approve", response_model=ApproveResponse)
 async def approve_plan(
     request: ApprovePlanRequest,
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
 ):
     """Approve and save generated plan.
 
@@ -310,7 +314,9 @@ async def get_strategy(
 
 @router.delete("/strategy", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_strategy(
-    ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))],
+    ctx: Annotated[
+        WorkspaceContext, Depends(require_workspace_scope(Scope.STRATEGY_WRITE))
+    ],
 ):
     """Delete the current strategy.
 

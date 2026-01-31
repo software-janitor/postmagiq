@@ -20,25 +20,41 @@ from sqlmodel import Session, select
 
 from runner.db.models import (
     # Core
-    User, UserCreate,
-    Platform, PlatformCreate,
-    Goal, GoalCreate,
-    Chapter, ChapterCreate,
-    Post, PostCreate,
+    User,
+    UserCreate,
+    Platform,
+    PlatformCreate,
+    Goal,
+    GoalCreate,
+    Chapter,
+    ChapterCreate,
+    Post,
+    PostCreate,
     # Voice
-    WritingSample, WritingSampleCreate,
-    VoiceProfile, VoiceProfileCreate,
+    WritingSample,
+    WritingSampleCreate,
+    VoiceProfile,
+    VoiceProfileCreate,
     # Workflow
-    WorkflowRun, WorkflowRunCreate,
-    WorkflowOutput, WorkflowOutputCreate,
-    WorkflowPersona, WorkflowPersonaCreate,
-    WorkflowSession, WorkflowSessionCreate,
-    WorkflowStateMetric, WorkflowStateMetricCreate,
+    WorkflowRun,
+    WorkflowRunCreate,
+    WorkflowOutput,
+    WorkflowOutputCreate,
+    WorkflowPersona,
+    WorkflowPersonaCreate,
+    WorkflowSession,
+    WorkflowSessionCreate,
+    WorkflowStateMetric,
+    WorkflowStateMetricCreate,
     # History
-    RunRecord, RunRecordCreate,
-    InvocationRecord, InvocationRecordCreate,
-    AuditScoreRecord, AuditScoreRecordCreate,
-    PostIterationRecord, PostIterationRecordCreate,
+    RunRecord,
+    RunRecordCreate,
+    InvocationRecord,
+    InvocationRecordCreate,
+    AuditScoreRecord,
+    AuditScoreRecordCreate,
+    PostIterationRecord,
+    PostIterationRecordCreate,
 )
 
 T = TypeVar("T")
@@ -48,6 +64,7 @@ CreateT = TypeVar("CreateT")
 # =============================================================================
 # Base Repository
 # =============================================================================
+
 
 class BaseRepository(Generic[T, CreateT]):
     """Base repository with common CRUD operations."""
@@ -96,6 +113,7 @@ class BaseRepository(Generic[T, CreateT]):
 # User Repository
 # =============================================================================
 
+
 class UserRepository(BaseRepository[User, UserCreate]):
     """Repository for User operations."""
 
@@ -111,23 +129,27 @@ class UserRepository(BaseRepository[User, UserCreate]):
 # Platform Repository
 # =============================================================================
 
+
 class PlatformRepository(BaseRepository[Platform, PlatformCreate]):
     """Repository for Platform operations."""
 
     model = Platform
 
-    def list_by_user(self, user_id: UUID, workspace_id: Optional[UUID] = None) -> list[Platform]:
+    def list_by_user(
+        self, user_id: UUID, workspace_id: Optional[UUID] = None
+    ) -> list[Platform]:
         """List all platforms for a user, optionally filtered by workspace."""
         statement = select(Platform).where(Platform.user_id == user_id)
         if workspace_id is not None:
             statement = statement.where(Platform.workspace_id == workspace_id)
         return list(self.session.exec(statement).all())
 
-    def list_active(self, user_id: UUID, workspace_id: Optional[UUID] = None) -> list[Platform]:
+    def list_active(
+        self, user_id: UUID, workspace_id: Optional[UUID] = None
+    ) -> list[Platform]:
         """List active platforms for a user, optionally filtered by workspace."""
         statement = select(Platform).where(
-            Platform.user_id == user_id,
-            Platform.is_active == True
+            Platform.user_id == user_id, Platform.is_active
         )
         if workspace_id is not None:
             statement = statement.where(Platform.workspace_id == workspace_id)
@@ -138,23 +160,27 @@ class PlatformRepository(BaseRepository[Platform, PlatformCreate]):
 # Goal Repository
 # =============================================================================
 
+
 class GoalRepository(BaseRepository[Goal, GoalCreate]):
     """Repository for Goal operations."""
 
     model = Goal
 
-    def get_by_user(self, user_id: UUID, workspace_id: Optional[UUID] = None) -> Optional[Goal]:
+    def get_by_user(
+        self, user_id: UUID, workspace_id: Optional[UUID] = None
+    ) -> Optional[Goal]:
         """Get the goal for a user, optionally filtered by workspace."""
         statement = select(Goal).where(Goal.user_id == user_id)
         if workspace_id is not None:
             statement = statement.where(Goal.workspace_id == workspace_id)
         return self.session.exec(statement).first()
 
-    def get_by_platform(self, user_id: UUID, platform_id: UUID, workspace_id: Optional[UUID] = None) -> Optional[Goal]:
+    def get_by_platform(
+        self, user_id: UUID, platform_id: UUID, workspace_id: Optional[UUID] = None
+    ) -> Optional[Goal]:
         """Get the goal for a specific user and platform, optionally filtered by workspace."""
         statement = select(Goal).where(
-            Goal.user_id == user_id,
-            Goal.platform_id == platform_id
+            Goal.user_id == user_id, Goal.platform_id == platform_id
         )
         if workspace_id is not None:
             statement = statement.where(Goal.workspace_id == workspace_id)
@@ -165,7 +191,9 @@ class GoalRepository(BaseRepository[Goal, GoalCreate]):
         statement = select(Goal).where(Goal.workspace_id == workspace_id)
         return self.session.exec(statement).first()
 
-    def list_by_user(self, user_id: UUID, workspace_id: Optional[UUID] = None) -> list[Goal]:
+    def list_by_user(
+        self, user_id: UUID, workspace_id: Optional[UUID] = None
+    ) -> list[Goal]:
         """List all goals for a user, optionally filtered by workspace."""
         statement = select(Goal).where(Goal.user_id == user_id)
         if workspace_id is not None:
@@ -177,38 +205,57 @@ class GoalRepository(BaseRepository[Goal, GoalCreate]):
 # Chapter Repository
 # =============================================================================
 
+
 class ChapterRepository(BaseRepository[Chapter, ChapterCreate]):
     """Repository for Chapter operations."""
 
     model = Chapter
 
-    def list_by_user(self, user_id: UUID, workspace_id: Optional[UUID] = None) -> list[Chapter]:
+    def list_by_user(
+        self, user_id: UUID, workspace_id: Optional[UUID] = None
+    ) -> list[Chapter]:
         """List all chapters for a user, optionally filtered by workspace."""
-        statement = select(Chapter).where(Chapter.user_id == user_id).order_by(Chapter.chapter_number)
+        statement = (
+            select(Chapter)
+            .where(Chapter.user_id == user_id)
+            .order_by(Chapter.chapter_number)
+        )
         if workspace_id is not None:
             statement = statement.where(Chapter.workspace_id == workspace_id)
         return list(self.session.exec(statement).all())
 
-    def list_by_platform(self, user_id: UUID, platform_id: UUID, workspace_id: Optional[UUID] = None) -> list[Chapter]:
+    def list_by_platform(
+        self, user_id: UUID, platform_id: UUID, workspace_id: Optional[UUID] = None
+    ) -> list[Chapter]:
         """List chapters for a specific platform, optionally filtered by workspace."""
-        statement = select(Chapter).where(
-            Chapter.user_id == user_id,
-            Chapter.platform_id == platform_id
-        ).order_by(Chapter.chapter_number)
+        statement = (
+            select(Chapter)
+            .where(Chapter.user_id == user_id, Chapter.platform_id == platform_id)
+            .order_by(Chapter.chapter_number)
+        )
         if workspace_id is not None:
             statement = statement.where(Chapter.workspace_id == workspace_id)
         return list(self.session.exec(statement).all())
 
     def list_by_workspace(self, workspace_id: UUID) -> list[Chapter]:
         """List all chapters for a workspace."""
-        statement = select(Chapter).where(Chapter.workspace_id == workspace_id).order_by(Chapter.chapter_number)
+        statement = (
+            select(Chapter)
+            .where(Chapter.workspace_id == workspace_id)
+            .order_by(Chapter.chapter_number)
+        )
         return list(self.session.exec(statement).all())
 
-    def get_by_number(self, user_id: UUID, chapter_number: int, platform_id: Optional[UUID] = None, workspace_id: Optional[UUID] = None) -> Optional[Chapter]:
+    def get_by_number(
+        self,
+        user_id: UUID,
+        chapter_number: int,
+        platform_id: Optional[UUID] = None,
+        workspace_id: Optional[UUID] = None,
+    ) -> Optional[Chapter]:
         """Get a chapter by number, optionally filtered by platform and/or workspace."""
         statement = select(Chapter).where(
-            Chapter.user_id == user_id,
-            Chapter.chapter_number == chapter_number
+            Chapter.user_id == user_id, Chapter.chapter_number == chapter_number
         )
         if platform_id is not None:
             statement = statement.where(Chapter.platform_id == platform_id)
@@ -221,45 +268,62 @@ class ChapterRepository(BaseRepository[Chapter, ChapterCreate]):
 # Post Repository
 # =============================================================================
 
+
 class PostRepository(BaseRepository[Post, PostCreate]):
     """Repository for Post operations."""
 
     model = Post
 
-    def list_by_user(self, user_id: UUID, workspace_id: Optional[UUID] = None) -> list[Post]:
+    def list_by_user(
+        self, user_id: UUID, workspace_id: Optional[UUID] = None
+    ) -> list[Post]:
         """List all posts for a user, optionally filtered by workspace."""
-        statement = select(Post).where(Post.user_id == user_id).order_by(Post.post_number)
+        statement = (
+            select(Post).where(Post.user_id == user_id).order_by(Post.post_number)
+        )
         if workspace_id is not None:
             statement = statement.where(Post.workspace_id == workspace_id)
         return list(self.session.exec(statement).all())
 
-    def list_by_chapter(self, chapter_id: UUID, workspace_id: Optional[UUID] = None) -> list[Post]:
+    def list_by_chapter(
+        self, chapter_id: UUID, workspace_id: Optional[UUID] = None
+    ) -> list[Post]:
         """List posts for a specific chapter, optionally filtered by workspace."""
-        statement = select(Post).where(Post.chapter_id == chapter_id).order_by(Post.post_number)
+        statement = (
+            select(Post).where(Post.chapter_id == chapter_id).order_by(Post.post_number)
+        )
         if workspace_id is not None:
             statement = statement.where(Post.workspace_id == workspace_id)
         return list(self.session.exec(statement).all())
 
     def list_by_workspace(self, workspace_id: UUID) -> list[Post]:
         """List all posts for a workspace."""
-        statement = select(Post).where(Post.workspace_id == workspace_id).order_by(Post.post_number)
+        statement = (
+            select(Post)
+            .where(Post.workspace_id == workspace_id)
+            .order_by(Post.post_number)
+        )
         return list(self.session.exec(statement).all())
 
-    def list_by_status(self, user_id: UUID, status: str, workspace_id: Optional[UUID] = None) -> list[Post]:
+    def list_by_status(
+        self, user_id: UUID, status: str, workspace_id: Optional[UUID] = None
+    ) -> list[Post]:
         """List posts with a specific status, optionally filtered by workspace."""
-        statement = select(Post).where(
-            Post.user_id == user_id,
-            Post.status == status
-        ).order_by(Post.post_number)
+        statement = (
+            select(Post)
+            .where(Post.user_id == user_id, Post.status == status)
+            .order_by(Post.post_number)
+        )
         if workspace_id is not None:
             statement = statement.where(Post.workspace_id == workspace_id)
         return list(self.session.exec(statement).all())
 
-    def get_by_number(self, user_id: UUID, post_number: int, workspace_id: Optional[UUID] = None) -> Optional[Post]:
+    def get_by_number(
+        self, user_id: UUID, post_number: int, workspace_id: Optional[UUID] = None
+    ) -> Optional[Post]:
         """Get a post by number, optionally filtered by workspace."""
         statement = select(Post).where(
-            Post.user_id == user_id,
-            Post.post_number == post_number
+            Post.user_id == user_id, Post.post_number == post_number
         )
         if workspace_id is not None:
             statement = statement.where(Post.workspace_id == workspace_id)
@@ -280,12 +344,15 @@ class PostRepository(BaseRepository[Post, PostCreate]):
 # Voice Repositories
 # =============================================================================
 
+
 class WritingSampleRepository(BaseRepository[WritingSample, WritingSampleCreate]):
     """Repository for WritingSample operations."""
 
     model = WritingSample
 
-    def list_by_user(self, user_id: UUID, workspace_id: Optional[UUID] = None) -> list[WritingSample]:
+    def list_by_user(
+        self, user_id: UUID, workspace_id: Optional[UUID] = None
+    ) -> list[WritingSample]:
         """List all writing samples for a user, optionally filtered by workspace."""
         statement = select(WritingSample).where(WritingSample.user_id == user_id)
         if workspace_id is not None:
@@ -294,7 +361,9 @@ class WritingSampleRepository(BaseRepository[WritingSample, WritingSampleCreate]
 
     def list_by_workspace(self, workspace_id: UUID) -> list[WritingSample]:
         """List all writing samples for a workspace."""
-        statement = select(WritingSample).where(WritingSample.workspace_id == workspace_id)
+        statement = select(WritingSample).where(
+            WritingSample.workspace_id == workspace_id
+        )
         return list(self.session.exec(statement).all())
 
 
@@ -303,30 +372,31 @@ class VoiceProfileRepository(BaseRepository[VoiceProfile, VoiceProfileCreate]):
 
     model = VoiceProfile
 
-    def get_by_slug(self, slug: str, workspace_id: Optional[UUID] = None) -> Optional[VoiceProfile]:
+    def get_by_slug(
+        self, slug: str, workspace_id: Optional[UUID] = None
+    ) -> Optional[VoiceProfile]:
         """Get a voice profile by slug, optionally within a workspace."""
         if workspace_id:
             statement = select(VoiceProfile).where(
-                VoiceProfile.slug == slug,
-                VoiceProfile.workspace_id == workspace_id
+                VoiceProfile.slug == slug, VoiceProfile.workspace_id == workspace_id
             )
         else:
             statement = select(VoiceProfile).where(
-                VoiceProfile.slug == slug,
-                VoiceProfile.workspace_id == None
+                VoiceProfile.slug == slug, VoiceProfile.workspace_id is None
             )
         return self.session.exec(statement).first()
 
     def list_by_workspace(self, workspace_id: UUID) -> list[VoiceProfile]:
         """List voice profiles for a workspace."""
-        statement = select(VoiceProfile).where(VoiceProfile.workspace_id == workspace_id)
+        statement = select(VoiceProfile).where(
+            VoiceProfile.workspace_id == workspace_id
+        )
         return list(self.session.exec(statement).all())
 
     def list_presets(self) -> list[VoiceProfile]:
         """List system preset voice profiles (workspace_id is None, is_preset is True)."""
         statement = select(VoiceProfile).where(
-            VoiceProfile.workspace_id == None,
-            VoiceProfile.is_preset == True
+            VoiceProfile.workspace_id is None, VoiceProfile.is_preset
         )
         return list(self.session.exec(statement).all())
 
@@ -334,6 +404,7 @@ class VoiceProfileRepository(BaseRepository[VoiceProfile, VoiceProfileCreate]):
 # =============================================================================
 # Workflow Repositories
 # =============================================================================
+
 
 class WorkflowRunRepository(BaseRepository[WorkflowRun, WorkflowRunCreate]):
     """Repository for WorkflowRun operations."""
@@ -345,20 +416,30 @@ class WorkflowRunRepository(BaseRepository[WorkflowRun, WorkflowRunCreate]):
         statement = select(WorkflowRun).where(WorkflowRun.run_id == run_id)
         return self.session.exec(statement).first()
 
-    def list_by_user(self, user_id: UUID, limit: int = 50, workspace_id: Optional[UUID] = None) -> list[WorkflowRun]:
+    def list_by_user(
+        self, user_id: UUID, limit: int = 50, workspace_id: Optional[UUID] = None
+    ) -> list[WorkflowRun]:
         """List recent workflow runs for a user, optionally filtered by workspace."""
-        statement = select(WorkflowRun).where(
-            WorkflowRun.user_id == user_id
-        ).order_by(WorkflowRun.started_at.desc()).limit(limit)
+        statement = (
+            select(WorkflowRun)
+            .where(WorkflowRun.user_id == user_id)
+            .order_by(WorkflowRun.started_at.desc())
+            .limit(limit)
+        )
         if workspace_id is not None:
             statement = statement.where(WorkflowRun.workspace_id == workspace_id)
         return list(self.session.exec(statement).all())
 
-    def list_by_workspace(self, workspace_id: UUID, limit: int = 50) -> list[WorkflowRun]:
+    def list_by_workspace(
+        self, workspace_id: UUID, limit: int = 50
+    ) -> list[WorkflowRun]:
         """List recent workflow runs for a workspace."""
-        statement = select(WorkflowRun).where(
-            WorkflowRun.workspace_id == workspace_id
-        ).order_by(WorkflowRun.started_at.desc()).limit(limit)
+        statement = (
+            select(WorkflowRun)
+            .where(WorkflowRun.workspace_id == workspace_id)
+            .order_by(WorkflowRun.started_at.desc())
+            .limit(limit)
+        )
         return list(self.session.exec(statement).all())
 
     def get_latest_by_story(
@@ -368,10 +449,14 @@ class WorkflowRunRepository(BaseRepository[WorkflowRun, WorkflowRunCreate]):
         workspace_id: Optional[UUID] = None,
     ) -> Optional[WorkflowRun]:
         """Get the latest workflow run for a story."""
-        statement = select(WorkflowRun).where(
-            WorkflowRun.user_id == user_id,
-            WorkflowRun.story == story,
-        ).order_by(WorkflowRun.started_at.desc())
+        statement = (
+            select(WorkflowRun)
+            .where(
+                WorkflowRun.user_id == user_id,
+                WorkflowRun.story == story,
+            )
+            .order_by(WorkflowRun.started_at.desc())
+        )
         if workspace_id is not None:
             statement = statement.where(WorkflowRun.workspace_id == workspace_id)
         return self.session.exec(statement).first()
@@ -397,12 +482,15 @@ class WorkflowRunRepository(BaseRepository[WorkflowRun, WorkflowRunCreate]):
             statement = statement.where(WorkflowRun.workspace_id == workspace_id)
         return self.session.exec(statement).first()
 
-    def list_by_status(self, user_id: UUID, status: str, workspace_id: Optional[UUID] = None) -> list[WorkflowRun]:
+    def list_by_status(
+        self, user_id: UUID, status: str, workspace_id: Optional[UUID] = None
+    ) -> list[WorkflowRun]:
         """List workflow runs by status, optionally filtered by workspace."""
-        statement = select(WorkflowRun).where(
-            WorkflowRun.user_id == user_id,
-            WorkflowRun.status == status
-        ).order_by(WorkflowRun.started_at.desc())
+        statement = (
+            select(WorkflowRun)
+            .where(WorkflowRun.user_id == user_id, WorkflowRun.status == status)
+            .order_by(WorkflowRun.started_at.desc())
+        )
         if workspace_id is not None:
             statement = statement.where(WorkflowRun.workspace_id == workspace_id)
         return list(self.session.exec(statement).all())
@@ -415,25 +503,36 @@ class WorkflowOutputRepository(BaseRepository[WorkflowOutput, WorkflowOutputCrea
 
     def list_by_run(self, run_id: str) -> list[WorkflowOutput]:
         """List all outputs for a workflow run."""
-        statement = select(WorkflowOutput).where(
-            WorkflowOutput.run_id == run_id
-        ).order_by(WorkflowOutput.created_at)
+        statement = (
+            select(WorkflowOutput)
+            .where(WorkflowOutput.run_id == run_id)
+            .order_by(WorkflowOutput.created_at)
+        )
         return list(self.session.exec(statement).all())
 
     def list_by_type(self, run_id: str, output_type: str) -> list[WorkflowOutput]:
         """List all outputs for a workflow run by output type."""
-        statement = select(WorkflowOutput).where(
-            WorkflowOutput.run_id == run_id,
-            WorkflowOutput.output_type == output_type,
-        ).order_by(WorkflowOutput.created_at)
+        statement = (
+            select(WorkflowOutput)
+            .where(
+                WorkflowOutput.run_id == run_id,
+                WorkflowOutput.output_type == output_type,
+            )
+            .order_by(WorkflowOutput.created_at)
+        )
         return list(self.session.exec(statement).all())
 
-    def get_latest_by_state(self, run_id: str, state_name: str) -> Optional[WorkflowOutput]:
+    def get_latest_by_state(
+        self, run_id: str, state_name: str
+    ) -> Optional[WorkflowOutput]:
         """Get the latest output for a specific state."""
-        statement = select(WorkflowOutput).where(
-            WorkflowOutput.run_id == run_id,
-            WorkflowOutput.state_name == state_name
-        ).order_by(WorkflowOutput.created_at.desc())
+        statement = (
+            select(WorkflowOutput)
+            .where(
+                WorkflowOutput.run_id == run_id, WorkflowOutput.state_name == state_name
+            )
+            .order_by(WorkflowOutput.created_at.desc())
+        )
         return self.session.exec(statement).first()
 
 
@@ -442,17 +541,20 @@ class WorkflowPersonaRepository(BaseRepository[WorkflowPersona, WorkflowPersonaC
 
     model = WorkflowPersona
 
-    def get_by_slug(self, user_id: UUID, slug: str, workspace_id: Optional[UUID] = None) -> Optional[WorkflowPersona]:
+    def get_by_slug(
+        self, user_id: UUID, slug: str, workspace_id: Optional[UUID] = None
+    ) -> Optional[WorkflowPersona]:
         """Get a persona by slug, optionally filtered by workspace."""
         statement = select(WorkflowPersona).where(
-            WorkflowPersona.user_id == user_id,
-            WorkflowPersona.slug == slug
+            WorkflowPersona.user_id == user_id, WorkflowPersona.slug == slug
         )
         if workspace_id is not None:
             statement = statement.where(WorkflowPersona.workspace_id == workspace_id)
         return self.session.exec(statement).first()
 
-    def list_by_user(self, user_id: UUID, workspace_id: Optional[UUID] = None) -> list[WorkflowPersona]:
+    def list_by_user(
+        self, user_id: UUID, workspace_id: Optional[UUID] = None
+    ) -> list[WorkflowPersona]:
         """List all personas for a user, optionally filtered by workspace."""
         statement = select(WorkflowPersona).where(WorkflowPersona.user_id == user_id)
         if workspace_id is not None:
@@ -461,12 +563,14 @@ class WorkflowPersonaRepository(BaseRepository[WorkflowPersona, WorkflowPersonaC
 
     def list_by_workspace(self, workspace_id: UUID) -> list[WorkflowPersona]:
         """List all personas for a workspace."""
-        statement = select(WorkflowPersona).where(WorkflowPersona.workspace_id == workspace_id)
+        statement = select(WorkflowPersona).where(
+            WorkflowPersona.workspace_id == workspace_id
+        )
         return list(self.session.exec(statement).all())
 
     def list_system_personas(self) -> list[WorkflowPersona]:
         """List system-wide personas."""
-        statement = select(WorkflowPersona).where(WorkflowPersona.is_system == True)
+        statement = select(WorkflowPersona).where(WorkflowPersona.is_system)
         return list(self.session.exec(statement).all())
 
 
@@ -487,7 +591,7 @@ class WorkflowSessionRepository(BaseRepository[WorkflowSession, WorkflowSessionC
             WorkflowSession.agent_name == agent_name,
         )
         if run_id is None:
-            statement = statement.where(WorkflowSession.run_id == None)
+            statement = statement.where(WorkflowSession.run_id is None)
         else:
             statement = statement.where(WorkflowSession.run_id == run_id)
         return self.session.exec(statement).first()
@@ -531,7 +635,9 @@ class WorkflowSessionRepository(BaseRepository[WorkflowSession, WorkflowSessionC
         return True
 
 
-class WorkflowStateMetricRepository(BaseRepository[WorkflowStateMetric, WorkflowStateMetricCreate]):
+class WorkflowStateMetricRepository(
+    BaseRepository[WorkflowStateMetric, WorkflowStateMetricCreate]
+):
     """Repository for WorkflowStateMetric operations."""
 
     model = WorkflowStateMetric
@@ -549,6 +655,7 @@ class WorkflowStateMetricRepository(BaseRepository[WorkflowStateMetric, Workflow
 # =============================================================================
 # History Repositories
 # =============================================================================
+
 
 class RunRecordRepository(BaseRepository[RunRecord, RunRecordCreate]):
     """Repository for RunRecord operations."""
@@ -615,7 +722,9 @@ class RunRecordRepository(BaseRepository[RunRecord, RunRecordCreate]):
         return record
 
 
-class InvocationRecordRepository(BaseRepository[InvocationRecord, InvocationRecordCreate]):
+class InvocationRecordRepository(
+    BaseRepository[InvocationRecord, InvocationRecordCreate]
+):
     """Repository for InvocationRecord operations."""
 
     model = InvocationRecord
@@ -639,7 +748,9 @@ class InvocationRecordRepository(BaseRepository[InvocationRecord, InvocationReco
         return list(self.session.exec(statement).all())
 
 
-class AuditScoreRecordRepository(BaseRepository[AuditScoreRecord, AuditScoreRecordCreate]):
+class AuditScoreRecordRepository(
+    BaseRepository[AuditScoreRecord, AuditScoreRecordCreate]
+):
     """Repository for AuditScoreRecord operations."""
 
     model = AuditScoreRecord
@@ -649,19 +760,20 @@ class AuditScoreRecordRepository(BaseRepository[AuditScoreRecord, AuditScoreReco
         statement = select(AuditScoreRecord).where(AuditScoreRecord.run_id == run_id)
         return list(self.session.exec(statement).all())
 
-    def list_by_auditor(self, auditor_agent: str, run_id: str) -> list[AuditScoreRecord]:
+    def list_by_auditor(
+        self, auditor_agent: str, run_id: str
+    ) -> list[AuditScoreRecord]:
         """List audit scores from a specific auditor."""
-        statement = (
-            select(AuditScoreRecord)
-            .where(
-                AuditScoreRecord.run_id == run_id,
-                AuditScoreRecord.auditor_agent == auditor_agent,
-            )
+        statement = select(AuditScoreRecord).where(
+            AuditScoreRecord.run_id == run_id,
+            AuditScoreRecord.auditor_agent == auditor_agent,
         )
         return list(self.session.exec(statement).all())
 
 
-class PostIterationRecordRepository(BaseRepository[PostIterationRecord, PostIterationRecordCreate]):
+class PostIterationRecordRepository(
+    BaseRepository[PostIterationRecord, PostIterationRecordCreate]
+):
     """Repository for PostIterationRecord operations."""
 
     model = PostIterationRecord
@@ -677,7 +789,9 @@ class PostIterationRecordRepository(BaseRepository[PostIterationRecord, PostIter
 
     def list_by_run(self, run_id: str) -> list[PostIterationRecord]:
         """List all iterations for a specific run."""
-        statement = select(PostIterationRecord).where(PostIterationRecord.run_id == run_id)
+        statement = select(PostIterationRecord).where(
+            PostIterationRecord.run_id == run_id
+        )
         return list(self.session.exec(statement).all())
 
     def get_next_iteration_number(self, story: str) -> int:

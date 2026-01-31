@@ -1,7 +1,6 @@
 """API routes for analytics import and querying."""
 
 from typing import Annotated, Optional
-from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 
@@ -36,6 +35,7 @@ def _verify_user_access(current_user: CurrentUser, target_user_id: str) -> None:
 
 class ImportResponse(BaseModel):
     """Response for analytics import."""
+
     import_id: str
     success: bool
     rows_imported: Optional[int] = None
@@ -44,16 +44,19 @@ class ImportResponse(BaseModel):
 
 class ImportsListResponse(BaseModel):
     """List of imports."""
+
     imports: list[AnalyticsImportResponse]
 
 
 class MetricsListResponse(BaseModel):
     """List of metrics."""
+
     metrics: list[PostMetricResponse]
 
 
 class TopPostsResponse(BaseModel):
     """Top performing posts."""
+
     posts: list[PostMetricResponse]
 
 
@@ -200,7 +203,15 @@ def get_top_posts(
     """
     _verify_user_access(current_user, user_id)
 
-    valid_metrics = ["impressions", "engagement_count", "engagement_rate", "likes", "comments", "shares", "clicks"]
+    valid_metrics = [
+        "impressions",
+        "engagement_count",
+        "engagement_rate",
+        "likes",
+        "comments",
+        "shares",
+        "clicks",
+    ]
     if metric not in valid_metrics:
         raise HTTPException(
             status_code=400,
@@ -236,6 +247,7 @@ def get_summary(
 
 class DailyMetricsResponse(BaseModel):
     """Daily metrics list."""
+
     metrics: list[DailyMetricResponse]
 
 
@@ -266,6 +278,7 @@ def get_daily_metrics(
 
 class FollowerMetricsResponse(BaseModel):
     """Follower metrics list."""
+
     metrics: list[FollowerMetricResponse]
     latest_total: Optional[int] = None
 
@@ -287,7 +300,9 @@ def get_follower_metrics(
     _verify_user_access(current_user, user_id)
 
     metrics = analytics_service.get_follower_metrics(user_id, platform, limit)
-    latest = analytics_service.get_latest_follower_count(user_id, platform or "linkedin")
+    latest = analytics_service.get_latest_follower_count(
+        user_id, platform or "linkedin"
+    )
     return FollowerMetricsResponse(metrics=metrics, latest_total=latest)
 
 
@@ -298,15 +313,19 @@ def get_follower_metrics(
 
 class AudienceDemographicsResponse(BaseModel):
     """Audience demographics list."""
+
     demographics: list[AudienceDemographicResponse]
 
 
 class PostDemographicsResponse(BaseModel):
     """Post demographics list."""
+
     demographics: list[PostDemographicResponse]
 
 
-@router.get("/users/{user_id}/demographics", response_model=AudienceDemographicsResponse)
+@router.get(
+    "/users/{user_id}/demographics", response_model=AudienceDemographicsResponse
+)
 def get_audience_demographics(
     user_id: str,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -322,18 +341,29 @@ def get_audience_demographics(
     """
     _verify_user_access(current_user, user_id)
 
-    valid_categories = ["job_title", "job_function", "location", "industry", "seniority", "company_size"]
+    valid_categories = [
+        "job_title",
+        "job_function",
+        "location",
+        "industry",
+        "seniority",
+        "company_size",
+    ]
     if category and category not in valid_categories:
         raise HTTPException(
             status_code=400,
             detail=f"Invalid category. Must be one of: {', '.join(valid_categories)}",
         )
 
-    demographics = analytics_service.get_audience_demographics(user_id, platform, category)
+    demographics = analytics_service.get_audience_demographics(
+        user_id, platform, category
+    )
     return AudienceDemographicsResponse(demographics=demographics)
 
 
-@router.get("/users/{user_id}/posts/demographics", response_model=PostDemographicsResponse)
+@router.get(
+    "/users/{user_id}/posts/demographics", response_model=PostDemographicsResponse
+)
 def get_post_demographics(
     user_id: str,
     url: str,

@@ -1,7 +1,6 @@
 """Claude CLI agent implementation."""
 
 import json
-from typing import Optional
 
 from runner.agents.cli_base import CLIAgent
 from runner.models import TokenUsage
@@ -12,9 +11,9 @@ class ClaudeAgent(CLIAgent):
 
     # Pricing per 1k tokens by model
     MODEL_PRICING = {
-        "opus": {"input": 0.015, "output": 0.075},      # Claude 3 Opus
-        "sonnet": {"input": 0.003, "output": 0.015},    # Claude 3.5 Sonnet
-        "haiku": {"input": 0.00025, "output": 0.00125}, # Claude 3 Haiku
+        "opus": {"input": 0.015, "output": 0.075},  # Claude 3 Opus
+        "sonnet": {"input": 0.003, "output": 0.015},  # Claude 3.5 Sonnet
+        "haiku": {"input": 0.00025, "output": 0.00125},  # Claude 3 Haiku
     }
 
     def __init__(self, config: dict, session_dir: str = "workflow/sessions"):
@@ -51,7 +50,9 @@ class ClaudeAgent(CLIAgent):
             content = data.get("result", data.get("content", ""))
             if isinstance(content, list):
                 content = "\n".join(
-                    block.get("text", "") for block in content if block.get("type") == "text"
+                    block.get("text", "")
+                    for block in content
+                    if block.get("type") == "text"
                 )
 
             usage = data.get("usage", {})

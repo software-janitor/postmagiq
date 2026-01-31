@@ -25,6 +25,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 
 class APIKeyStatus(str, Enum):
     """Status of an API key."""
+
     ACTIVE = "active"
     REVOKED = "revoked"
     EXPIRED = "expired"
@@ -32,6 +33,7 @@ class APIKeyStatus(str, Enum):
 
 class WebhookStatus(str, Enum):
     """Status of a webhook."""
+
     ACTIVE = "active"
     PAUSED = "paused"
     DISABLED = "disabled"
@@ -39,6 +41,7 @@ class WebhookStatus(str, Enum):
 
 class DeliveryStatus(str, Enum):
     """Status of a webhook delivery attempt."""
+
     PENDING = "pending"
     SUCCESS = "success"
     FAILED = "failed"
@@ -47,6 +50,7 @@ class DeliveryStatus(str, Enum):
 
 class WebhookEventType(str, Enum):
     """Types of events that can trigger webhooks."""
+
     POST_CREATED = "post.created"
     POST_UPDATED = "post.updated"
     POST_PUBLISHED = "post.published"

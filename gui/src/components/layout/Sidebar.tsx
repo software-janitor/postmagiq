@@ -23,7 +23,6 @@ import {
 import { clsx } from 'clsx'
 import { useQuery } from '@tanstack/react-query'
 import { fetchExistingStrategy } from '../../api/onboarding'
-import WorkspaceSwitcher from '../WorkspaceSwitcher'
 import ThemeSwitcher from '../ThemeSwitcher'
 import { useAuthStore } from '../../stores/authStore'
 import { useWorkspaceStore } from '../../stores/workspaceStore'
@@ -50,7 +49,7 @@ const navItems: NavItem[] = [
   { path: '/story', icon: PenTool, label: 'New Story' },
   { path: '/finished', icon: FileCheck, label: 'Finished Posts' },
   { path: '/workflow', icon: Play, label: 'Live Workflow', flag: 'show_live_workflow' },
-  { path: '/runs', icon: History, label: 'Run History' },
+  { path: '/runs', icon: History, label: 'Run History', flag: 'show_internal_workflow' },
   { path: '/editor', icon: GitBranch, label: 'State Editor', flag: 'show_state_editor' },
   { path: '/approvals', icon: CheckSquare, label: 'Approvals', scope: 'content:read' as const, flag: 'show_approvals' },
   { path: '/team', icon: UsersRound, label: 'Team', scope: 'team:read' as const, flag: 'show_teams' },
@@ -120,12 +119,6 @@ export default function Sidebar() {
           <span className={`bg-gradient-to-r ${theme.gradientText} bg-clip-text text-transparent`}>Postmagiq</span>
         </h1>
         <p className={`text-xs ${theme.textMuted} mt-1`}>AI Content Platform</p>
-      </div>
-
-      {/* Workspace Switcher */}
-      <div className={`px-4 py-3 border-b ${theme.border}`}>
-        <div className="text-xs text-zinc-500 uppercase tracking-wide mb-2">Workspace</div>
-        <WorkspaceSwitcher />
       </div>
 
       {/* Strategy Indicator */}

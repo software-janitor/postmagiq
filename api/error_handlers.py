@@ -79,11 +79,13 @@ async def validation_exception_handler(
     errors = []
     for error in exc.errors():
         loc = ".".join(str(x) for x in error.get("loc", []))
-        errors.append({
-            "field": loc,
-            "message": error.get("msg", "Invalid value"),
-            "type": error.get("type", "value_error"),
-        })
+        errors.append(
+            {
+                "field": loc,
+                "message": error.get("msg", "Invalid value"),
+                "type": error.get("type", "value_error"),
+            }
+        )
 
     logger.info(
         "Validation error: %d field errors (path=%s)",
@@ -148,9 +150,7 @@ async def http_exception_handler(
     )
 
 
-async def unhandled_exception_handler(
-    request: Request, exc: Exception
-) -> JSONResponse:
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle unexpected exceptions.
 
     Logs the full traceback but returns a generic message to clients.

@@ -57,7 +57,9 @@ class WatermarkService:
 
         # Default output path
         if output_path is None:
-            output_path = input_path.parent / f"{input_path.stem}_clean{input_path.suffix}"
+            output_path = (
+                input_path.parent / f"{input_path.stem}_clean{input_path.suffix}"
+            )
         else:
             output_path = Path(output_path)
 

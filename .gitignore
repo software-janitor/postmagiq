@@ -65,3 +65,4 @@ workflow/.db_backup/
 workflow/*.db
 workflow/content/*.db
 workflow/history/*.db
+ci-report.txt

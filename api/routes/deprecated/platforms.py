@@ -28,6 +28,7 @@ def _verify_user_access(current_user: CurrentUser, target_user_id: UUID) -> None
 
 class CreatePlatformRequest(BaseModel):
     """Create a new platform."""
+
     user_id: UUID
     name: str
     description: Optional[str] = None
@@ -38,6 +39,7 @@ class CreatePlatformRequest(BaseModel):
 
 class UpdatePlatformRequest(BaseModel):
     """Update platform fields."""
+
     name: Optional[str] = None
     description: Optional[str] = None
     post_format: Optional[str] = None

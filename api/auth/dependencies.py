@@ -5,7 +5,6 @@ Provides:
 - require_scope: Decorator/dependency to enforce RBAC scopes
 """
 
-from functools import wraps
 from typing import Callable, Optional
 from uuid import UUID
 
@@ -116,7 +115,7 @@ async def get_current_user(
 
     # Load user from database
     from runner.db.engine import engine
-    from sqlmodel import Session, select
+    from sqlmodel import Session
 
     try:
         user_id = UUID(user_id_str)

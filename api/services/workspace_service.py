@@ -10,9 +10,12 @@ from uuid import UUID
 
 from runner.db.engine import engine
 from runner.db.models import (
-    Workspace, WorkspaceCreate, WorkspaceRead,
-    WorkspaceMembership, WorkspaceMembershipCreate,
-    WorkspaceRole, InviteStatus,
+    Workspace,
+    WorkspaceCreate,
+    WorkspaceMembership,
+    WorkspaceMembershipCreate,
+    WorkspaceRole,
+    InviteStatus,
 )
 from runner.content.workspace_repository import (
     WorkspaceRepository,
@@ -76,7 +79,7 @@ class WorkspaceService:
         """
         with Session(engine) as session:
             workspace_repo = WorkspaceRepository(session)
-            membership_repo = WorkspaceMembershipRepository(session)
+            WorkspaceMembershipRepository(session)
 
             # Generate slug if not provided
             if not slug:
@@ -87,6 +90,7 @@ class WorkspaceService:
             if existing:
                 # Append a random suffix to make it unique
                 import uuid
+
                 slug = f"{slug}-{str(uuid.uuid4())[:8]}"
 
             # Create workspace
@@ -100,6 +104,7 @@ class WorkspaceService:
 
             # Get owner's email for the membership record
             from runner.db.models import User
+
             owner = session.get(User, owner_id)
             owner_email = owner.email if owner else f"user-{owner_id}@workspace.local"
 
@@ -219,9 +224,7 @@ class WorkspaceService:
             workspace_repo = WorkspaceRepository(session)
             return workspace_repo.delete(workspace_id)
 
-    def get_workspace_members(
-        self, workspace_id: UUID
-    ) -> list[WorkspaceMembership]:
+    def get_workspace_members(self, workspace_id: UUID) -> list[WorkspaceMembership]:
         """Get all members of a workspace.
 
         Args:

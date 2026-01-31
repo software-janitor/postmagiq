@@ -12,9 +12,12 @@ from uuid import UUID
 from sqlmodel import Session, select
 
 from runner.db.models import (
-    WhitelabelConfig, WhitelabelConfigCreate,
-    WhitelabelAsset, WhitelabelAssetCreate,
-    AssetType, DomainVerificationStatus,
+    WhitelabelConfig,
+    WhitelabelConfigCreate,
+    WhitelabelAsset,
+    WhitelabelAssetCreate,
+    AssetType,
+    DomainVerificationStatus,
 )
 
 
@@ -55,16 +58,16 @@ class WhitelabelConfigRepository:
         """
         statement = select(WhitelabelConfig).where(
             WhitelabelConfig.custom_domain == domain,
-            WhitelabelConfig.domain_verified == True,
-            WhitelabelConfig.is_active == True,
+            WhitelabelConfig.domain_verified,
+            WhitelabelConfig.is_active,
         )
         return self.session.exec(statement).first()
 
     def list_verified_domains(self) -> list[WhitelabelConfig]:
         """List all verified custom domain configurations."""
         statement = select(WhitelabelConfig).where(
-            WhitelabelConfig.domain_verified == True,
-            WhitelabelConfig.is_active == True,
+            WhitelabelConfig.domain_verified,
+            WhitelabelConfig.is_active,
         )
         return list(self.session.exec(statement).all())
 

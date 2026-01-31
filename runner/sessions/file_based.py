@@ -98,7 +98,9 @@ class FileBasedSessionManager:
             Updated session dict
         """
         if not self.session_id:
-            raise ValueError("No session loaded. Call create_session or load_session first.")
+            raise ValueError(
+                "No session loaded. Call create_session or load_session first."
+            )
 
         session = self.load_session(self.session_id)
         if not session:
@@ -132,8 +134,7 @@ class FileBasedSessionManager:
             return []
 
         return [
-            {"role": m["role"], "content": m["content"]}
-            for m in session["messages"]
+            {"role": m["role"], "content": m["content"]} for m in session["messages"]
         ]
 
     def get_total_tokens(self) -> int:
@@ -157,9 +158,7 @@ class FileBasedSessionManager:
 
     def list_sessions(self) -> list[str]:
         """List all session IDs in the session directory."""
-        return [
-            p.stem for p in self.session_dir.glob("*.json")
-        ]
+        return [p.stem for p in self.session_dir.glob("*.json")]
 
     def _trim_if_needed(self, session: dict) -> dict:
         """Keep session within max_messages limit.

@@ -7,12 +7,12 @@ from typing import Optional, TYPE_CHECKING
 import requests
 
 from runner.agents.base import BaseAgent
-from runner.agents.gpu_detect import detect_gpu, get_model_tier, GPUInfo
+from runner.agents.gpu_detect import detect_gpu, get_model_tier
 from runner.models import AgentResult, TokenUsage
 from runner.sessions.file_based import FileBasedSessionManager
 
 if TYPE_CHECKING:
-    from runner.logging.dev_logger import DevLogger
+    pass
 
 
 # Model tier configurations
@@ -142,8 +142,10 @@ class OllamaAgent(BaseAgent):
         return self.tier_config["models"].get(tier, self.model)
 
     def invoke(
-        self, prompt: str, input_files: Optional[list[str]] = None,
-        json_mode: bool = None
+        self,
+        prompt: str,
+        input_files: Optional[list[str]] = None,
+        json_mode: bool = None,
     ) -> AgentResult:
         """One-shot invocation without session context.
 
@@ -158,7 +160,9 @@ class OllamaAgent(BaseAgent):
         # Auto-detect JSON mode if not explicitly set
         if json_mode is None:
             json_mode = self._should_use_json_mode(prompt)
-        return self._invoke_internal(prompt, input_files, use_session=False, json_mode=json_mode)
+        return self._invoke_internal(
+            prompt, input_files, use_session=False, json_mode=json_mode
+        )
 
     def _should_use_json_mode(self, prompt: str) -> bool:
         """Detect if prompt requires JSON output.
@@ -201,7 +205,9 @@ class OllamaAgent(BaseAgent):
         if not self.session_manager.load_session(session_id):
             self.session_manager.create_session(session_id)
 
-        return self._invoke_internal(prompt, input_files, use_session=True, json_mode=json_mode)
+        return self._invoke_internal(
+            prompt, input_files, use_session=True, json_mode=json_mode
+        )
 
     def _invoke_internal(
         self,
@@ -243,7 +249,13 @@ class OllamaAgent(BaseAgent):
 
         # Look for content markers as the split point
         # Everything before is system instructions, everything after is user input
-        for marker in ["## Input Files", "## Reviewer Context", "## USER FEEDBACK", "## Context", "## File:"]:
+        for marker in [
+            "## Input Files",
+            "## Reviewer Context",
+            "## USER FEEDBACK",
+            "## Context",
+            "## File:",
+        ]:
             if marker in full_prompt:
                 idx = full_prompt.find(marker)
                 system_content = full_prompt[:idx].strip()

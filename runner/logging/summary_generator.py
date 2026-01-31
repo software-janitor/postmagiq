@@ -1,7 +1,6 @@
 """Generate human-readable run summaries."""
 
 import os
-from datetime import datetime
 from typing import Optional
 
 from runner.models import RunManifest
@@ -89,7 +88,11 @@ class SummaryGenerator:
 
         for agent, session in summary.by_agent.items():
             percent = session.context_used_percent
-            status = "Healthy" if percent < 60 else ("Warning" if percent < 80 else "Critical")
+            status = (
+                "Healthy"
+                if percent < 60
+                else ("Warning" if percent < 80 else "Critical")
+            )
             lines.append(
                 f"| {agent} | {session.cumulative_total:,} | "
                 f"{session.context_window_max:,} | {percent:.1f}% | {status} |"
@@ -126,7 +129,9 @@ class SummaryGenerator:
             lines.append("### Errors")
             lines.append("")
             for err in errors:
-                lines.append(f"- **{err.get('state', 'unknown')}**: {err.get('error', 'Unknown error')}")
+                lines.append(
+                    f"- **{err.get('state', 'unknown')}**: {err.get('error', 'Unknown error')}"
+                )
             lines.append("")
 
         circuit_breaks = [e for e in entries if e.get("event") == "circuit_break"]

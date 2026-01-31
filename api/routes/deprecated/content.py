@@ -1,6 +1,5 @@
 """API routes for content strategy database."""
 
-import os
 import re
 from pathlib import Path
 from typing import Optional
@@ -319,7 +318,9 @@ def update_post_status_by_story(
     """Update post status by story ID (e.g., 'post_04')."""
     match = re.search(r"post_(\d+)", story_id)
     if not match:
-        raise HTTPException(status_code=400, detail="Invalid story ID format. Expected 'post_XX'")
+        raise HTTPException(
+            status_code=400, detail="Invalid story ID format. Expected 'post_XX'"
+        )
 
     post_number = int(match.group(1))
     post = content_service.get_post_by_number(user_id, post_number)

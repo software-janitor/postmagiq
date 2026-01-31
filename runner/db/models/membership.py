@@ -45,7 +45,9 @@ class WorkspaceMembershipBase(SQLModel):
     role: WorkspaceRole = Field(default=WorkspaceRole.viewer)
 
 
-class WorkspaceMembership(UUIDModel, WorkspaceMembershipBase, TimestampMixin, table=True):
+class WorkspaceMembership(
+    UUIDModel, WorkspaceMembershipBase, TimestampMixin, table=True
+):
     """Workspace membership table - links users to workspaces.
 
     This is the junction table that enables multi-tenancy. Each row

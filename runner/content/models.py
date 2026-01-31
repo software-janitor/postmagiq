@@ -1,6 +1,5 @@
 """Pydantic models for content strategy database records."""
 
-from datetime import datetime
 from typing import Optional, Union
 from uuid import UUID
 
@@ -12,6 +11,7 @@ IdOpt = Optional[IdType]
 
 class UserRecord(BaseModel):
     """User record."""
+
     id: IdOpt = None
     name: str
     email: Optional[str] = None
@@ -20,6 +20,7 @@ class UserRecord(BaseModel):
 
 class PlatformRecord(BaseModel):
     """Content platform/stream (LinkedIn, Threads, etc.)."""
+
     id: IdOpt = None
     user_id: IdType
     name: str  # "LinkedIn", "Threads", "Twitter/X"
@@ -33,6 +34,7 @@ class PlatformRecord(BaseModel):
 
 class GoalRecord(BaseModel):
     """Content positioning goals."""
+
     id: IdOpt = None
     user_id: IdType
     platform_id: IdOpt = None  # Which platform this strategy is for
@@ -42,7 +44,9 @@ class GoalRecord(BaseModel):
     positioning: Optional[str] = None  # "Distinguished Engineer", etc.
     signature_thesis: Optional[str] = None
     target_audience: Optional[str] = None
-    content_style: Optional[str] = None  # "narrative", "teaching", "informational", "mixed"
+    content_style: Optional[str] = (
+        None  # "narrative", "teaching", "informational", "mixed"
+    )
     onboarding_mode: Optional[str] = None  # "quick" or "deep"
     onboarding_transcript: Optional[str] = None  # JSON of conversation
     created_at: Optional[str] = None
@@ -50,6 +54,7 @@ class GoalRecord(BaseModel):
 
 class ChapterRecord(BaseModel):
     """Content chapter/theme."""
+
     id: IdOpt = None
     user_id: IdType
     platform_id: IdOpt = None  # Which platform this chapter belongs to
@@ -64,6 +69,7 @@ class ChapterRecord(BaseModel):
 
 class PostRecord(BaseModel):
     """Individual content post."""
+
     id: IdOpt = None
     user_id: IdType
     chapter_id: IdType
@@ -72,7 +78,9 @@ class PostRecord(BaseModel):
     shape: Optional[str] = None  # "FULL", "PARTIAL", "OBSERVATION", "SHORT", "REVERSAL"
     cadence: Optional[str] = None  # "Teaching", "Field Note", "Informational"
     entry_point: Optional[str] = None
-    status: str = "not_started"  # "not_started", "needs_story", "draft", "ready", "published"
+    status: str = (
+        "not_started"  # "not_started", "needs_story", "draft", "ready", "published"
+    )
     story_used: Optional[str] = None
     published_at: Optional[str] = None
     published_url: Optional[str] = None
@@ -81,6 +89,7 @@ class PostRecord(BaseModel):
 
 class WritingSampleRecord(BaseModel):
     """Writing sample for voice learning."""
+
     id: IdOpt = None
     user_id: IdType
     source_type: str  # "prompt" or "upload"
@@ -94,6 +103,7 @@ class WritingSampleRecord(BaseModel):
 
 class VoiceProfileRecord(BaseModel):
     """Extracted voice characteristics."""
+
     id: IdOpt = None
     user_id: IdType
     name: str = "Default"  # Profile name for library
@@ -112,6 +122,7 @@ class VoiceProfileRecord(BaseModel):
 
 class ImagePromptRecord(BaseModel):
     """Generated image prompt for a post."""
+
     id: IdOpt = None
     user_id: IdType
     post_id: IdType  # e.g., "c1p1"
@@ -130,6 +141,7 @@ class ImagePromptRecord(BaseModel):
 
 class ImageConfigSetRecord(BaseModel):
     """Image configuration set that groups scenes, poses, and props."""
+
     id: IdOpt = None
     user_id: IdType
     name: str  # "Robot + Engineer", "Minimalist", etc.
@@ -140,6 +152,7 @@ class ImageConfigSetRecord(BaseModel):
 
 class WorkflowPersonaRecord(BaseModel):
     """Workflow persona definition for AI agents."""
+
     id: IdOpt = None
     user_id: IdType
     name: str  # "Writer", "Auditor", "Input Validator"
@@ -147,13 +160,16 @@ class WorkflowPersonaRecord(BaseModel):
     description: Optional[str] = None
     content: str  # The full persona prompt content
     is_system: bool = False  # True for built-in personas
-    model_tier: Optional[str] = None  # "writer", "auditor", "coder" for Ollama model selection
+    model_tier: Optional[str] = (
+        None  # "writer", "auditor", "coder" for Ollama model selection
+    )
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 
 
 class WorkflowRunRecord(BaseModel):
     """Workflow execution run."""
+
     id: IdOpt = None
     user_id: IdType
     run_id: IdType  # e.g., "2024-01-15_143022_post_03"
@@ -170,6 +186,7 @@ class WorkflowRunRecord(BaseModel):
 
 class WorkflowOutputRecord(BaseModel):
     """Output from a workflow step."""
+
     id: IdOpt = None
     run_id: IdType
     state_name: str  # e.g., "story-review", "story-process", "draft"
@@ -181,6 +198,7 @@ class WorkflowOutputRecord(BaseModel):
 
 class WorkflowSessionRecord(BaseModel):
     """CLI session for workflow agents."""
+
     id: IdOpt = None
     user_id: IdType
     run_id: IdOpt = None  # Link to workflow run (optional)
@@ -194,8 +212,10 @@ class WorkflowSessionRecord(BaseModel):
 # API Response Models (for endpoints)
 # =============================================================================
 
+
 class UserResponse(BaseModel):
     """User data for API responses."""
+
     id: IdType  # UUID string
     name: str
     email: Optional[str] = None
@@ -206,6 +226,7 @@ class UserResponse(BaseModel):
 
 class PlatformResponse(BaseModel):
     """Platform data for API responses."""
+
     id: IdType  # UUID string
     user_id: IdType
     name: str
@@ -219,6 +240,7 @@ class PlatformResponse(BaseModel):
 
 class GoalResponse(BaseModel):
     """Goal data for API responses."""
+
     id: IdType  # UUID string
     strategy_type: str = "series"
     voice_profile_id: IdOpt = None
@@ -232,6 +254,7 @@ class GoalResponse(BaseModel):
 
 class ChapterResponse(BaseModel):
     """Chapter data with post counts."""
+
     id: IdType  # UUID string
     chapter_number: int
     title: str
@@ -246,6 +269,7 @@ class ChapterResponse(BaseModel):
 
 class PostResponse(BaseModel):
     """Post data for API responses."""
+
     id: IdType  # UUID string
     post_number: int
     chapter_id: IdType
@@ -262,6 +286,7 @@ class PostResponse(BaseModel):
 
 class VoiceProfileResponse(BaseModel):
     """Voice profile for API responses."""
+
     id: IdType  # UUID string
     name: str = "Default"
     description: Optional[str] = None
@@ -277,6 +302,7 @@ class VoiceProfileResponse(BaseModel):
 
 class ImagePromptResponse(BaseModel):
     """Image prompt for API responses."""
+
     id: IdType
     post_id: IdType
     sentiment: Optional[str] = None
@@ -295,6 +321,7 @@ class ImagePromptResponse(BaseModel):
 
 class ImageConfigSetResponse(BaseModel):
     """Image config set for API responses."""
+
     id: IdType
     user_id: IdType
     name: str
@@ -310,6 +337,7 @@ class ImageConfigSetResponse(BaseModel):
 
 class CharacterTemplateRecord(BaseModel):
     """Character template (human_male, human_female, robot, etc.)."""
+
     id: IdOpt = None
     name: str  # 'human_male', 'human_female', 'robot', etc.
     description: Optional[str] = None
@@ -319,6 +347,7 @@ class CharacterTemplateRecord(BaseModel):
 
 class OutfitPartRecord(BaseModel):
     """Individual outfit part (hat, glasses, jacket, etc.)."""
+
     id: IdOpt = None
     user_id: IdType
     part_type: str  # 'hat', 'glasses', 'jacket', 'vest', 'blouse', etc.
@@ -329,6 +358,7 @@ class OutfitPartRecord(BaseModel):
 
 class OutfitRecord(BaseModel):
     """Complete outfit in the Outfit Bank."""
+
     id: IdOpt = None
     user_id: IdType
     name: str  # 'Casual Friday', 'Conference Speaker'
@@ -339,6 +369,7 @@ class OutfitRecord(BaseModel):
 
 class OutfitItemRecord(BaseModel):
     """Link between outfit and parts."""
+
     id: IdOpt = None
     outfit_id: IdType
     part_id: IdType
@@ -346,6 +377,7 @@ class OutfitItemRecord(BaseModel):
 
 class CharacterRecord(BaseModel):
     """Character with structured face details."""
+
     id: IdOpt = None
     user_id: IdType
     name: str  # 'Engineer', 'Robot Sidekick'
@@ -368,6 +400,7 @@ class CharacterRecord(BaseModel):
 
 class CharacterOutfitRecord(BaseModel):
     """Link between character and outfit."""
+
     id: IdOpt = None
     character_id: IdType
     outfit_id: IdType
@@ -376,6 +409,7 @@ class CharacterOutfitRecord(BaseModel):
 
 class SentimentRecord(BaseModel):
     """Configurable scene sentiment."""
+
     id: IdOpt = None
     user_id: IdType
     name: str  # 'success', 'failure', 'discovery', etc.
@@ -390,6 +424,7 @@ class SentimentRecord(BaseModel):
 
 class SceneCharacterRecord(BaseModel):
     """Link between scene and character."""
+
     id: IdOpt = None
     scene_id: IdType
     character_id: IdType
@@ -399,6 +434,7 @@ class SceneCharacterRecord(BaseModel):
 
 class PropCategoryRecord(BaseModel):
     """Dynamic prop category."""
+
     id: IdOpt = None
     user_id: IdType
     name: str  # 'notes', 'drinks', 'tech'
@@ -410,6 +446,7 @@ class PropCategoryRecord(BaseModel):
 
 class ScenePropRuleRecord(BaseModel):
     """Prop rules per scene."""
+
     id: IdOpt = None
     scene_id: IdType
     prop_category_id: IdOpt = None
@@ -421,6 +458,7 @@ class ScenePropRuleRecord(BaseModel):
 
 class ContextPropRuleRecord(BaseModel):
     """Prop rules per context."""
+
     id: IdOpt = None
     user_id: IdType
     context: str  # 'software', 'hardware'
@@ -433,6 +471,7 @@ class ContextPropRuleRecord(BaseModel):
 
 class CharacterTemplateResponse(BaseModel):
     """Character template for API responses."""
+
     id: IdType
     name: str
     description: Optional[str] = None
@@ -442,6 +481,7 @@ class CharacterTemplateResponse(BaseModel):
 
 class OutfitPartResponse(BaseModel):
     """Outfit part for API responses."""
+
     id: IdType
     user_id: IdType
     part_type: str
@@ -452,6 +492,7 @@ class OutfitPartResponse(BaseModel):
 
 class OutfitResponse(BaseModel):
     """Outfit for API responses."""
+
     id: IdType
     user_id: IdType
     name: str
@@ -464,6 +505,7 @@ class OutfitResponse(BaseModel):
 
 class CharacterResponse(BaseModel):
     """Character for API responses."""
+
     id: IdType
     user_id: IdType
     name: str
@@ -485,6 +527,7 @@ class CharacterResponse(BaseModel):
 
 class SentimentResponse(BaseModel):
     """Sentiment for API responses."""
+
     id: IdType
     user_id: IdType
     name: str
@@ -499,6 +542,7 @@ class SentimentResponse(BaseModel):
 
 class PropCategoryResponse(BaseModel):
     """Prop category for API responses."""
+
     id: IdType
     user_id: IdType
     name: str
@@ -511,6 +555,7 @@ class PropCategoryResponse(BaseModel):
 
 class SceneCharacterResponse(BaseModel):
     """Scene-character link for API responses."""
+
     id: IdType
     scene_id: IdType
     character_id: IdType
@@ -527,6 +572,7 @@ class SceneCharacterResponse(BaseModel):
 
 class AnalyticsImportRecord(BaseModel):
     """Track uploaded analytics files."""
+
     id: IdOpt = None
     user_id: IdType
     platform_name: str  # 'linkedin', 'threads', 'x'
@@ -540,6 +586,7 @@ class AnalyticsImportRecord(BaseModel):
 
 class PostMetricRecord(BaseModel):
     """Normalized metrics from all platforms."""
+
     id: IdOpt = None
     user_id: IdType
     post_id: IdOpt = None  # Link to internal post
@@ -564,6 +611,7 @@ class PostMetricRecord(BaseModel):
 
 class AnalyticsImportResponse(BaseModel):
     """Analytics import for API responses."""
+
     id: IdType
     platform_name: str
     filename: str
@@ -576,6 +624,7 @@ class AnalyticsImportResponse(BaseModel):
 
 class PostMetricResponse(BaseModel):
     """Post metric for API responses."""
+
     id: IdType
     post_id: IdOpt = None
     platform_name: str
@@ -595,6 +644,7 @@ class PostMetricResponse(BaseModel):
 
 class AnalyticsSummary(BaseModel):
     """Summary analytics for a user/strategy."""
+
     total_impressions: int = 0
     total_engagements: int = 0
     total_likes: int = 0
@@ -608,6 +658,7 @@ class AnalyticsSummary(BaseModel):
 
 class DailyMetricRecord(BaseModel):
     """Daily aggregate metrics from ENGAGEMENT sheet."""
+
     id: IdOpt = None
     user_id: IdType
     platform_name: str
@@ -620,6 +671,7 @@ class DailyMetricRecord(BaseModel):
 
 class DailyMetricResponse(BaseModel):
     """Daily metric for API responses."""
+
     id: IdType
     platform_name: str
     metric_date: str
@@ -629,6 +681,7 @@ class DailyMetricResponse(BaseModel):
 
 class FollowerMetricRecord(BaseModel):
     """Daily follower data from FOLLOWERS sheet."""
+
     id: IdOpt = None
     user_id: IdType
     platform_name: str
@@ -641,6 +694,7 @@ class FollowerMetricRecord(BaseModel):
 
 class FollowerMetricResponse(BaseModel):
     """Follower metric for API responses."""
+
     id: IdType
     platform_name: str
     metric_date: str
@@ -650,6 +704,7 @@ class FollowerMetricResponse(BaseModel):
 
 class AudienceDemographicRecord(BaseModel):
     """Overall audience demographics from DEMOGRAPHICS sheet."""
+
     id: IdOpt = None
     user_id: IdType
     platform_name: str
@@ -663,6 +718,7 @@ class AudienceDemographicRecord(BaseModel):
 
 class AudienceDemographicResponse(BaseModel):
     """Audience demographic for API responses."""
+
     id: IdType
     platform_name: str
     category: str
@@ -673,6 +729,7 @@ class AudienceDemographicResponse(BaseModel):
 
 class PostDemographicRecord(BaseModel):
     """Per-post demographics from TOP DEMOGRAPHICS sheet."""
+
     id: IdOpt = None
     user_id: IdType
     platform_name: str
@@ -686,6 +743,7 @@ class PostDemographicRecord(BaseModel):
 
 class PostDemographicResponse(BaseModel):
     """Post demographic for API responses."""
+
     id: IdType
     platform_name: str
     external_url: str

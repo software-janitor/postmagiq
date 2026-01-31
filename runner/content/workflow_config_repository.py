@@ -10,7 +10,9 @@ from uuid import UUID
 from sqlmodel import Session, select
 
 from runner.db.models import (
-    WorkflowConfig, WorkflowConfigCreate, WorkflowConfigUpdate,
+    WorkflowConfig,
+    WorkflowConfigCreate,
+    WorkflowConfigUpdate,
     WorkflowEnvironment,
 )
 
@@ -41,8 +43,8 @@ class WorkflowConfigRepository:
     def get_default(self) -> Optional[WorkflowConfig]:
         """Get the default workflow config (is_default=True and enabled=True)."""
         statement = select(WorkflowConfig).where(
-            WorkflowConfig.is_default == True,
-            WorkflowConfig.enabled == True,
+            WorkflowConfig.is_default,
+            WorkflowConfig.enabled,
         )
         return self.session.exec(statement).first()
 
@@ -55,7 +57,7 @@ class WorkflowConfigRepository:
         """List all enabled workflow configs."""
         statement = (
             select(WorkflowConfig)
-            .where(WorkflowConfig.enabled == True)
+            .where(WorkflowConfig.enabled)
             .order_by(WorkflowConfig.name)
         )
         return list(self.session.exec(statement).all())
@@ -68,7 +70,7 @@ class WorkflowConfigRepository:
             select(WorkflowConfig)
             .where(
                 WorkflowConfig.environment == environment,
-                WorkflowConfig.enabled == True,
+                WorkflowConfig.enabled,
             )
             .order_by(WorkflowConfig.name)
         )
@@ -85,8 +87,8 @@ class WorkflowConfigRepository:
             statement = (
                 select(WorkflowConfig)
                 .where(
-                    WorkflowConfig.tier_required == None,
-                    WorkflowConfig.enabled == True,
+                    WorkflowConfig.tier_required is None,
+                    WorkflowConfig.enabled,
                 )
                 .order_by(WorkflowConfig.name)
             )
@@ -95,11 +97,11 @@ class WorkflowConfigRepository:
             statement = (
                 select(WorkflowConfig)
                 .where(
-                    WorkflowConfig.enabled == True,
+                    WorkflowConfig.enabled,
                 )
                 .where(
-                    (WorkflowConfig.tier_required == None) |
-                    (WorkflowConfig.tier_required == tier)
+                    (WorkflowConfig.tier_required is None)
+                    | (WorkflowConfig.tier_required == tier)
                 )
                 .order_by(WorkflowConfig.name)
             )
@@ -119,8 +121,8 @@ class WorkflowConfigRepository:
                 select(WorkflowConfig)
                 .where(
                     WorkflowConfig.environment == environment,
-                    WorkflowConfig.enabled == True,
-                    WorkflowConfig.tier_required == None,
+                    WorkflowConfig.enabled,
+                    WorkflowConfig.tier_required is None,
                 )
                 .order_by(WorkflowConfig.name)
             )
@@ -129,11 +131,11 @@ class WorkflowConfigRepository:
                 select(WorkflowConfig)
                 .where(
                     WorkflowConfig.environment == environment,
-                    WorkflowConfig.enabled == True,
+                    WorkflowConfig.enabled,
                 )
                 .where(
-                    (WorkflowConfig.tier_required == None) |
-                    (WorkflowConfig.tier_required == tier)
+                    (WorkflowConfig.tier_required is None)
+                    | (WorkflowConfig.tier_required == tier)
                 )
                 .order_by(WorkflowConfig.name)
             )

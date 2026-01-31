@@ -17,9 +17,18 @@ from api.auth.jwt import (
 )
 from api.auth.password import hash_password, verify_password
 from runner.db.models import (
-    User, UserRole, ActiveSession, PasswordResetToken,
-    Workspace, WorkspaceMembership, WorkspaceRole, InviteStatus,
-    SubscriptionTier, AccountSubscription, SubscriptionStatus, BillingPeriod,
+    User,
+    UserRole,
+    ActiveSession,
+    PasswordResetToken,
+    Workspace,
+    WorkspaceMembership,
+    WorkspaceRole,
+    InviteStatus,
+    SubscriptionTier,
+    AccountSubscription,
+    SubscriptionStatus,
+    BillingPeriod,
 )
 
 
@@ -61,9 +70,7 @@ class AuthService:
             PermissionError: If too many free accounts from this IP
         """
         # Check if email already exists
-        existing = self._session.exec(
-            select(User).where(User.email == email)
-        ).first()
+        existing = self._session.exec(select(User).where(User.email == email)).first()
         if existing:
             raise ValueError("Email already registered")
 
@@ -98,14 +105,15 @@ class AuthService:
         self._session.refresh(user)
 
         # Create a personal workspace for the user
-        workspace = self._create_user_workspace(user)
+        self._create_user_workspace(user)
 
         return user
 
     def _create_user_workspace(self, user: User) -> Workspace:
         """Create a personal workspace for a new user.
 
-        Also creates a free tier subscription for the workspace.
+        Also creates a free tier subscription for the workspace and sets
+        the workspace as the user's default (for hide multi-tenancy UX).
 
         Args:
             user: The user to create a workspace for
@@ -138,6 +146,11 @@ class AuthService:
             accepted_at=datetime.utcnow(),
         )
         self._session.add(membership)
+
+        # Set this workspace as the user's default (for individual tier UX)
+        user.default_workspace_id = workspace.id
+        self._session.add(user)
+
         self._session.commit()
 
         # Create free tier subscription for the workspace
@@ -145,7 +158,9 @@ class AuthService:
 
         return workspace
 
-    def _create_free_subscription(self, workspace: Workspace) -> Optional[AccountSubscription]:
+    def _create_free_subscription(
+        self, workspace: Workspace
+    ) -> Optional[AccountSubscription]:
         """Create a free tier subscription for a workspace.
 
         Args:
@@ -158,7 +173,7 @@ class AuthService:
         free_tier = self._session.exec(
             select(SubscriptionTier).where(
                 SubscriptionTier.slug == "free",
-                SubscriptionTier.is_active == True,
+                SubscriptionTier.is_active,
             )
         ).first()
 
@@ -179,7 +194,9 @@ class AuthService:
             tier_id=free_tier.id,
             status=SubscriptionStatus.active,
             billing_period=BillingPeriod.monthly,
-            current_period_start=now.replace(day=1, hour=0, minute=0, second=0, microsecond=0),
+            current_period_start=now.replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            ),
             current_period_end=period_end,
         )
         self._session.add(subscription)
@@ -233,9 +250,7 @@ class AuthService:
         Returns:
             User instance if authentication succeeds, None otherwise
         """
-        user = self._session.exec(
-            select(User).where(User.email == email)
-        ).first()
+        user = self._session.exec(select(User).where(User.email == email)).first()
 
         if not user:
             return None
@@ -387,9 +402,7 @@ class AuthService:
         Returns:
             User instance if found, None otherwise
         """
-        return self._session.exec(
-            select(User).where(User.email == email)
-        ).first()
+        return self._session.exec(select(User).where(User.email == email)).first()
 
     def create_password_reset_token(self, user_id: UUID) -> str:
         """Create a password reset token for a user.

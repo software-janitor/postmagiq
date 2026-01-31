@@ -1,7 +1,6 @@
 """Gemini CLI agent implementation."""
 
 import json
-from typing import Optional
 
 from runner.agents.cli_base import CLIAgent
 from runner.models import TokenUsage
@@ -13,8 +12,11 @@ class GeminiAgent(CLIAgent):
     # Pricing per 1k tokens by model family
     # Gemini Pro has tiered pricing: $2/$12 (<=200k) and $4/$18 (>200k) - using average
     MODEL_PRICING = {
-        "pro": {"input": 0.003, "output": 0.015},        # Gemini 2.5 Pro: avg $3/$15 per M
-        "flash": {"input": 0.000075, "output": 0.0003},  # Gemini Flash: $0.075/$0.30 per M
+        "pro": {"input": 0.003, "output": 0.015},  # Gemini 2.5 Pro: avg $3/$15 per M
+        "flash": {
+            "input": 0.000075,
+            "output": 0.0003,
+        },  # Gemini Flash: $0.075/$0.30 per M
     }
 
     def __init__(self, config: dict, session_dir: str = "workflow/sessions"):

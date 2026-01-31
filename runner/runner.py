@@ -53,8 +53,11 @@ class WorkflowRunner:
         return f"{timestamp}_{story}"
 
     def _resolve_story_input(
-        self, story: str, input_path: Optional[str] = None, interactive: bool = False,
-        run_dir: Optional[str] = None
+        self,
+        story: str,
+        input_path: Optional[str] = None,
+        interactive: bool = False,
+        run_dir: Optional[str] = None,
     ) -> str:
         """Resolve story to input file and copy to run-specific directory.
 
@@ -93,21 +96,21 @@ class WorkflowRunner:
             return self._prompt_for_content(dest_path, story)
 
         raise FileNotFoundError(
-            f"Story not found. Searched:\n" +
-            "\n".join(f"  - {p}" for p in search_paths) +
-            f"\n\nOptions:\n" +
-            f"  --input PATH   Provide explicit file path\n" +
-            f"  --interactive  Paste content directly"
+            "Story not found. Searched:\n"
+            + "\n".join(f"  - {p}" for p in search_paths)
+            + "\n\nOptions:\n"
+            + "  --input PATH   Provide explicit file path\n"
+            + "  --interactive  Paste content directly"
         )
 
     def _prompt_for_content(self, dest_path: str, story: str) -> str:
         """Prompt user to paste story content."""
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"PASTE STORY CONTENT FOR: {story}")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
         print("Paste your raw story content below.")
         print("When done, enter a blank line followed by 'END' on its own line.")
-        print(f"{'='*60}\n")
+        print(f"{'=' * 60}\n")
 
         lines = []
         blank_seen = False
@@ -232,7 +235,9 @@ class WorkflowRunner:
             elif event_type == "circuit_break":
                 state_logger.log_circuit_break(event["rule"], event["context"])
             elif event_type in ("error", "state_error"):
-                state_logger.log_error(event.get("state", "unknown"), event.get("error", ""))
+                state_logger.log_error(
+                    event.get("state", "unknown"), event.get("error", "")
+                )
 
             # Also call external callback if provided
             if external_log_callback:
@@ -294,7 +299,9 @@ class WorkflowRunner:
 
         summary_generator.generate(
             manifest,
-            token_summary=state_machine.token_tracker.get_summary() if state_machine.token_tracker else None,
+            token_summary=state_machine.token_tracker.get_summary()
+            if state_machine.token_tracker
+            else None,
             state_logger=state_logger,
         )
 
@@ -398,7 +405,9 @@ def main():
             print("-" * 80)
             for cfg in configs:
                 enabled = "Yes" if cfg["enabled"] else "No"
-                print(f"{cfg['name']:<20} {cfg['environment']:<12} {enabled:<8} {cfg['description'][:40]}")
+                print(
+                    f"{cfg['name']:<20} {cfg['environment']:<12} {enabled:<8} {cfg['description'][:40]}"
+                )
         return
 
     # Resolve config name or path

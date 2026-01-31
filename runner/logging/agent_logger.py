@@ -45,7 +45,9 @@ class AgentLogger:
             # Store full prompt for persona improvement analysis
             entry["prompt"] = prompt
             # Also keep preview for quick scanning
-            entry["prompt_preview"] = prompt[:200] + "..." if len(prompt) > 200 else prompt
+            entry["prompt_preview"] = (
+                prompt[:200] + "..." if len(prompt) > 200 else prompt
+            )
 
         if command:
             entry["command"] = command
@@ -83,7 +85,9 @@ class AgentLogger:
             # Store full output for persona improvement analysis
             entry["output"] = output
             # Also keep preview for quick scanning
-            entry["output_preview"] = output[:200] + "..." if len(output) > 200 else output
+            entry["output_preview"] = (
+                output[:200] + "..." if len(output) > 200 else output
+            )
 
         if tokens:
             entry["tokens"] = {

@@ -12,12 +12,14 @@ from runner.agents import create_agent
 
 class StrategyMessage(BaseModel):
     """A message in the strategy conversation."""
+
     role: str  # 'user' or 'assistant'
     content: str
 
 
 class ExtractedStrategyInfo(BaseModel):
     """Information extracted from the conversation."""
+
     strategy_type: Optional[str] = None  # series, daily, campaign
     positioning: Optional[str] = None
     signature_thesis: Optional[str] = None
@@ -36,6 +38,7 @@ class ExtractedStrategyInfo(BaseModel):
 
 class StrategyConversation(BaseModel):
     """Track AI strategy conversation state."""
+
     messages: list[StrategyMessage] = Field(default_factory=list)
     extracted_info: ExtractedStrategyInfo = Field(default_factory=ExtractedStrategyInfo)
     ready_to_create: bool = False
@@ -81,7 +84,9 @@ class StrategyChatService:
             or os.environ.get("STRATEGY_CHAT_AGENT")
             or "claude"
         )
-        self.agent_type = agent_type or os.environ.get("STRATEGY_CHAT_AGENT", default_agent)
+        self.agent_type = agent_type or os.environ.get(
+            "STRATEGY_CHAT_AGENT", default_agent
+        )
         agent_config = dict(config.get("agents", {}).get(self.agent_type, {}))
         timeout = int(os.environ.get("STRATEGY_CHAT_TIMEOUT", "120"))
         agent_config.setdefault("timeout", timeout)
@@ -119,10 +124,9 @@ Let's start simple: What do you do professionally, and what would you like to be
         state.turn_count += 1
 
         # Build conversation history for the AI
-        conversation_history = "\n\n".join([
-            f"{msg.role.upper()}: {msg.content}"
-            for msg in state.messages
-        ])
+        conversation_history = "\n\n".join(
+            [f"{msg.role.upper()}: {msg.content}" for msg in state.messages]
+        )
 
         # Build prompt
         prompt = f"""{self.system_prompt}
@@ -150,21 +154,28 @@ Respond as the ASSISTANT. Remember to be concise and conversational."""
             assistant_response = assistant_response[10:].strip()
 
         if "[READY_TO_CREATE]" in assistant_response:
-            assistant_response = assistant_response.replace("[READY_TO_CREATE]", "").strip()
+            assistant_response = assistant_response.replace(
+                "[READY_TO_CREATE]", ""
+            ).strip()
             state.ready_to_create = True
 
-        state.messages.append(StrategyMessage(role="assistant", content=assistant_response))
+        state.messages.append(
+            StrategyMessage(role="assistant", content=assistant_response)
+        )
 
         # Check if we have enough info to create a strategy
         # Look for strategy proposal patterns
         lower_response = assistant_response.lower()
-        if any(phrase in lower_response for phrase in [
-            "strategy type:",
-            "does this capture",
-            "here's what i'm thinking",
-            "based on what you've shared",
-            "i'd suggest",
-        ]):
+        if any(
+            phrase in lower_response
+            for phrase in [
+                "strategy type:",
+                "does this capture",
+                "here's what i'm thinking",
+                "based on what you've shared",
+                "i'd suggest",
+            ]
+        ):
             state.ready_to_create = True
 
         if not state.ready_to_create and state.turn_count >= 4:
@@ -201,10 +212,9 @@ Respond as the ASSISTANT. Remember to be concise and conversational."""
     def generate_strategy_summary(self, state: StrategyConversation) -> dict:
         """Generate a structured strategy summary from the conversation."""
         # Ask the AI to extract the strategy as JSON
-        conversation_history = "\n\n".join([
-            f"{msg.role.upper()}: {msg.content}"
-            for msg in state.messages
-        ])
+        conversation_history = "\n\n".join(
+            [f"{msg.role.upper()}: {msg.content}" for msg in state.messages]
+        )
 
         prompt = f"""Based on this conversation, extract the content strategy as JSON.
 
@@ -278,7 +288,8 @@ Return ONLY valid JSON in this exact format (no markdown, no explanation):
             "post_frequency": info.get("post_frequency") or "2x per week",
             "posts_per_week": info.get("posts_per_week") or 2,
             "post_length": info.get("post_length") or "250-400 words",
-            "voice_constraints": info.get("voice_constraints") or "Story-driven, no bullets.",
+            "voice_constraints": info.get("voice_constraints")
+            or "Story-driven, no bullets.",
             "series_length_weeks": info.get("series_length_weeks") or 6,
             "intellectual_enemies": info.get("intellectual_enemies") or [],
             "platforms": info.get("platforms") or ["LinkedIn"],

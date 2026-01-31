@@ -1,0 +1,34 @@
+#!/bin/bash
+# Pre-commit hook to reject AI self-attribution in commit messages and staged files
+
+# Check the commit message (if available via prepare-commit-msg)
+# This hook runs before the commit message is finalized
+
+# Patterns to reject
+PATTERNS=(
+    "Co-Authored-By:.*Claude"
+    "Co-Authored-By:.*Gemini"
+    "Co-Authored-By:.*Codex"
+    "Co-Authored-By:.*GPT"
+    "Co-Authored-By:.*OpenAI"
+    "Co-Authored-By:.*Anthropic"
+    "Co-Authored-By:.*noreply@anthropic"
+    "Co-Authored-By:.*noreply@openai"
+    "Generated (with|by).*Claude"
+    "Generated (with|by).*Gemini"
+    "Generated (with|by).*Codex"
+    "Written by AI"
+    "AI-generated"
+)
+
+# Check staged files for self-attribution (in comments/strings)
+# Exclude hooks directory (contains the patterns as definitions)
+for pattern in "${PATTERNS[@]}"; do
+    if git diff --cached --diff-filter=ACM -- ':!hooks/' | grep -iE "$pattern" > /dev/null 2>&1; then
+        echo "ERROR: Self-attribution pattern found in staged changes: $pattern"
+        echo "Remove AI attribution before committing."
+        exit 1
+    fi
+done
+
+exit 0
