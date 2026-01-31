@@ -93,8 +93,11 @@ export default function Settings() {
         cancel_url: window.location.href,
       }),
     onSuccess: (data) => {
-      if (data.url) {
+      // Validate URL is a Stripe checkout URL before redirecting
+      if (data.url && data.url.startsWith('https://checkout.stripe.com/')) {
         window.location.href = data.url
+      } else {
+        console.error('Invalid checkout URL received')
       }
     },
   })
