@@ -1,5 +1,5 @@
 /**
- * Voice Profiles page - Manage writing voice profiles with preview of composed prompts.
+ * Voice Profiles page - Manage writing voice profiles.
  */
 
 import { useState, useEffect } from 'react'
@@ -12,7 +12,6 @@ import {
   Loader2,
   Save,
   X,
-  Eye,
   Sparkles,
 } from 'lucide-react'
 import { clsx } from 'clsx'
@@ -36,13 +35,6 @@ interface VoiceProfile {
   avoid_patterns: string | null
   created_at: string
   updated_at: string
-}
-
-interface ComposedPromptPreview {
-  composed_prompt: string
-  voice_profile: string
-  universal_rules: string
-  persona_template: string | null
 }
 
 interface VoiceProfileFormData {
@@ -83,7 +75,6 @@ export default function VoiceProfiles() {
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState<string | null>(null)
-  const [showPreviewModal, setShowPreviewModal] = useState(false)
   const [formData, setFormData] = useState<VoiceProfileFormData>(emptyForm)
   const [autoSlug, setAutoSlug] = useState(true)
 
@@ -92,13 +83,6 @@ export default function VoiceProfiles() {
     queryKey: ['voice-profiles', workspaceId],
     queryFn: () => apiGet<VoiceProfile[]>(`/v1/w/${workspaceId}/voice-profiles`),
     enabled: !!workspaceId,
-  })
-
-  // Fetch composed prompt preview
-  const { data: previewData, isLoading: isLoadingPreview } = useQuery({
-    queryKey: ['voice-profile-preview', workspaceId, selectedProfile],
-    queryFn: () => apiGet<ComposedPromptPreview>(`/v1/w/${workspaceId}/voice-profiles/${selectedProfile}/preview`),
-    enabled: !!workspaceId && !!selectedProfile && showPreviewModal,
   })
 
   const selectedProfileData = profiles.find(p => p.id === selectedProfile)
@@ -342,13 +326,6 @@ export default function VoiceProfiles() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setShowPreviewModal(true)}
-                  className="px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 flex items-center gap-2"
-                >
-                  <Eye className="w-4 h-4" />
-                  Preview Prompt
-                </button>
                 {!selectedProfileData.is_preset && (
                   <button
                     onClick={() => openEditModal(selectedProfileData)}
@@ -738,87 +715,6 @@ export default function VoiceProfiles() {
                   <Trash2 className="w-4 h-4" />
                 )}
                 Delete
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Preview Modal */}
-      {showPreviewModal && selectedProfileData && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-                <Eye className="w-5 h-5" />
-                Composed Prompt Preview
-              </h2>
-              <button
-                onClick={() => setShowPreviewModal(false)}
-                className="p-2 text-zinc-400 hover:text-white"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6">
-              {isLoadingPreview ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className={clsx('w-8 h-8 animate-spin', theme.textPrimary)} />
-                </div>
-              ) : previewData ? (
-                <div className="space-y-6">
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <span className={clsx('text-xs uppercase tracking-wide font-medium', theme.textPrimary)}>
-                        Full Composed Prompt
-                      </span>
-                      <span className="text-xs text-zinc-500">
-                        (Universal Rules + Voice Profile + Persona Template)
-                      </span>
-                    </div>
-                    <pre className="text-white bg-zinc-800/50 rounded-lg p-4 text-sm whitespace-pre-wrap overflow-x-auto font-mono max-h-96 overflow-y-auto">
-                      {previewData.composed_prompt}
-                    </pre>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-zinc-400 mb-2">Universal Rules</div>
-                      <pre className="text-zinc-300 bg-zinc-800/30 rounded-lg p-3 text-xs whitespace-pre-wrap overflow-x-auto font-mono max-h-48 overflow-y-auto">
-                        {previewData.universal_rules || '(none)'}
-                      </pre>
-                    </div>
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-zinc-400 mb-2">Voice Profile Section</div>
-                      <pre className="text-zinc-300 bg-zinc-800/30 rounded-lg p-3 text-xs whitespace-pre-wrap overflow-x-auto font-mono max-h-48 overflow-y-auto">
-                        {previewData.voice_profile || '(none)'}
-                      </pre>
-                    </div>
-                  </div>
-
-                  {previewData.persona_template && (
-                    <div>
-                      <div className="text-xs uppercase tracking-wide text-zinc-400 mb-2">Persona Template</div>
-                      <pre className="text-zinc-300 bg-zinc-800/30 rounded-lg p-3 text-xs whitespace-pre-wrap overflow-x-auto font-mono max-h-48 overflow-y-auto">
-                        {previewData.persona_template}
-                      </pre>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="text-center py-12 text-zinc-500">
-                  <p>Failed to load preview</p>
-                </div>
-              )}
-            </div>
-
-            <div className="p-4 border-t border-zinc-800">
-              <button
-                onClick={() => setShowPreviewModal(false)}
-                className="w-full px-4 py-2 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700"
-              >
-                Close
               </button>
             </div>
           </div>
