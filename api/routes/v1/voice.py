@@ -84,6 +84,10 @@ class AnalysisData(BaseModel):
     tone: str
     sentence_patterns: dict
     vocabulary_level: str
+    punctuation_style: Optional[dict] = None
+    transition_style: Optional[str] = None
+    paragraph_rhythm: Optional[dict] = None
+    reader_address: Optional[dict] = None
     signature_phrases: list[str]
     storytelling_style: str
     emotional_register: str
@@ -248,6 +252,10 @@ async def analyze_voice(
                 tone=analysis["tone"],
                 sentence_patterns=analysis["sentence_patterns"],
                 vocabulary_level=analysis["vocabulary_level"],
+                punctuation_style=analysis.get("punctuation_style"),
+                transition_style=analysis.get("transition_style"),
+                paragraph_rhythm=analysis.get("paragraph_rhythm"),
+                reader_address=analysis.get("reader_address"),
                 signature_phrases=analysis["signature_phrases"],
                 storytelling_style=analysis["storytelling_style"],
                 emotional_register=analysis["emotional_register"],

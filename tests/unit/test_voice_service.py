@@ -36,6 +36,10 @@ class TestVoiceAnalysisPrompt:
             "tone",
             "sentence_patterns",
             "vocabulary_level",
+            "punctuation_style",
+            "transition_style",
+            "paragraph_rhythm",
+            "reader_address",
             "signature_phrases",
             "storytelling_style",
             "emotional_register",
@@ -44,3 +48,22 @@ class TestVoiceAnalysisPrompt:
 
         for field in required_fields:
             assert f'"{field}"' in VOICE_ANALYSIS_PROMPT, f"Missing field: {field}"
+
+    def test_system_prompt_emphasizes_transferable_patterns(self):
+        """System prompt should focus on reusable patterns, not content."""
+        from api.services.voice_service import VOICE_SYSTEM_PROMPT
+
+        # Should emphasize transferable patterns
+        assert "TRANSFERABLE" in VOICE_SYSTEM_PROMPT or "transferable" in VOICE_SYSTEM_PROMPT.lower()
+        assert "REUSABLE" in VOICE_SYSTEM_PROMPT or "reusable" in VOICE_SYSTEM_PROMPT.lower()
+
+        # Should warn against content-specific extraction
+        assert "product" in VOICE_SYSTEM_PROMPT.lower() or "brand" in VOICE_SYSTEM_PROMPT.lower()
+
+    def test_prompt_includes_punctuation_analysis(self):
+        """Prompt should analyze punctuation to avoid AI-tell patterns."""
+        from api.services.voice_service import VOICE_ANALYSIS_PROMPT
+
+        assert "em_dashes" in VOICE_ANALYSIS_PROMPT or "em-dash" in VOICE_ANALYSIS_PROMPT.lower()
+        assert "semicolons" in VOICE_ANALYSIS_PROMPT.lower()
+        assert "ellipses" in VOICE_ANALYSIS_PROMPT.lower()

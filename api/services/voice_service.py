@@ -42,6 +42,10 @@ class VoiceAnalysis(BaseModel):
     tone: str
     sentence_patterns: dict
     vocabulary_level: str
+    punctuation_style: Optional[dict] = None
+    transition_style: Optional[str] = None
+    paragraph_rhythm: Optional[dict] = None
+    reader_address: Optional[dict] = None
     signature_phrases: list[str]
     storytelling_style: str
     emotional_register: str
@@ -53,33 +57,68 @@ class VoiceAnalysis(BaseModel):
 # =============================================================================
 
 
-VOICE_ANALYSIS_PROMPT = """Analyze these writing samples from the same author and extract their natural voice characteristics.
+VOICE_SYSTEM_PROMPT = """You are an expert writing voice analyst. Your job is to extract REUSABLE voice characteristics that can guide AI to write NEW content in this author's authentic style.
+
+CRITICAL: Focus on TRANSFERABLE patterns, not content-specific details. The goal is to capture HOW they write, not WHAT they write about.
+
+AVOID extracting:
+- Product names, brand names, or specific topics
+- Quotes that only make sense in original context
+- Content-specific phrases that can't be reused
+
+FOCUS on extracting:
+- Syntactic patterns and sentence structures
+- Punctuation habits (especially: do they use em-dashes, semicolons, ellipses?)
+- Transition word preferences
+- How they open and close paragraphs
+- Their relationship with the reader (formal/casual, direct/indirect)
+
+Output valid JSON only. No markdown, no explanation."""
+
+VOICE_ANALYSIS_PROMPT = """Analyze these writing samples and extract the author's voice characteristics for use in generating NEW content.
 
 Writing samples:
 {samples}
 
-Analyze the following dimensions:
+Analyze these dimensions:
 
-1. **Tone** (2-3 adjectives): e.g., "reflective, warm, technically grounded"
+1. **Tone** (2-3 adjectives): The emotional quality of their writing
+
 2. **Sentence Patterns**:
-   - Average sentence length (short/medium/long)
-   - Length variation (consistent/varied/dramatic)
-   - Common structures (simple, compound, lists, fragments)
-3. **Vocabulary Level**:
-   - Technical depth (jargon-heavy, accessible, mixed)
-   - Register (formal, casual, conversational)
-4. **Signature Phrases**: Recurring SYNTACTIC patterns and expressions (NOT content-specific names/topics). Examples: "What I learned was...", "The key insight is...", "I always say..." - NOT product names or specific content
-5. **Storytelling Style**:
-   - Opening approach (chronological, in-media-res, thesis-first)
-   - Detail preference (concrete specifics, abstractions, metaphors)
-6. **Emotional Register**:
-   - How they handle vulnerability (open, guarded, analytical)
-   - How they express confidence (direct, humble, qualified)
-7. **Summary**: A 2-3 sentence description of their unique voice
+   - Average length (short/medium/long)
+   - Variation (consistent/varied/dramatic)
+   - Common structures (simple, compound, fragments, lists)
 
-Include specific examples from the samples to support each observation.
+3. **Vocabulary Level**: Technical depth and formality register
 
-Output ONLY valid JSON matching this structure:
+4. **Punctuation Style** (IMPORTANT - helps avoid AI-sounding patterns):
+   - Em-dash usage (none/rare/moderate/heavy)
+   - Semicolon usage (none/rare/moderate/heavy)
+   - Exclamation points (none/rare/moderate/heavy)
+   - Ellipses usage (none/rare/moderate/heavy)
+   - Parenthetical asides (none/rare/moderate/heavy)
+
+5. **Transition Style**: How they connect ideas
+   - Formal transitions ("However," "Furthermore,") vs casual ("But," "And,") vs minimal
+
+6. **Paragraph Rhythm**:
+   - Length preference (short punchy / medium / long flowing)
+   - Opening style (topic sentence / hook / question / statement)
+
+7. **Reader Address**:
+   - Point of view (first person "I" / inclusive "we" / direct "you" / third person)
+   - Relationship (peer/mentor/expert/friend)
+
+8. **Signature Phrases**: Recurring SYNTACTIC patterns only (e.g., "The thing is...", "What I've learned is...", "Here's the deal:")
+   - Must be reusable templates, NOT content-specific quotes
+
+9. **Storytelling Style**: Opening approach, detail preference, how they build arguments
+
+10. **Emotional Register**: How they handle vulnerability and express confidence
+
+11. **Summary**: 2-3 sentences capturing their unique voice DNA
+
+Output this JSON structure:
 {{
   "tone": "adjective1, adjective2, adjective3",
   "sentence_patterns": {{
@@ -87,11 +126,27 @@ Output ONLY valid JSON matching this structure:
     "variation": "consistent|varied|dramatic",
     "common_structures": ["structure1", "structure2"]
   }},
-  "vocabulary_level": "Description of vocabulary style",
-  "signature_phrases": ["What I realized was...", "The thing is...", "I always tell people..."],
-  "storytelling_style": "Description of storytelling approach",
-  "emotional_register": "Description of emotional expression",
-  "summary": "2-3 sentence summary of their unique voice"
+  "vocabulary_level": "description",
+  "punctuation_style": {{
+    "em_dashes": "none|rare|moderate|heavy",
+    "semicolons": "none|rare|moderate|heavy",
+    "exclamations": "none|rare|moderate|heavy",
+    "ellipses": "none|rare|moderate|heavy",
+    "parentheticals": "none|rare|moderate|heavy"
+  }},
+  "transition_style": "description of how they connect ideas",
+  "paragraph_rhythm": {{
+    "length": "short|medium|long",
+    "opening_style": "description"
+  }},
+  "reader_address": {{
+    "point_of_view": "first person|inclusive we|direct you|third person",
+    "relationship": "peer|mentor|expert|friend"
+  }},
+  "signature_phrases": ["reusable pattern 1...", "reusable pattern 2..."],
+  "storytelling_style": "description",
+  "emotional_register": "description",
+  "summary": "2-3 sentence voice DNA summary"
 }}
 """
 
@@ -125,19 +180,25 @@ class VoiceService:
             )
             self.groq_client = None
 
-    def _call_llm(self, prompt: str) -> str:
+    def _call_llm(self, prompt: str, system_prompt: str = None) -> str:
         """Call LLM based on configured provider."""
         if self.llm_provider == "groq" and self.groq_client:
-            return self._call_groq(prompt)
+            return self._call_groq(prompt, system_prompt)
         return self._call_ollama(prompt)
 
-    def _call_groq(self, prompt: str) -> str:
-        """Call Groq LLM."""
+    def _call_groq(self, prompt: str, system_prompt: str = None) -> str:
+        """Call Groq LLM with optional system prompt and JSON mode."""
         try:
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
             response = self.groq_client.chat.completions.create(
                 model=self.model,
-                messages=[{"role": "user", "content": prompt}],
+                messages=messages,
                 max_tokens=4096,
+                response_format={"type": "json_object"},
             )
             content = response.choices[0].message.content or ""
             logger.warning(f"GROQ response (first 500 chars): {content[:500]}")
@@ -287,14 +348,18 @@ class VoiceService:
         samples_text = "\n\n---\n\n".join(formatted_samples)
         prompt = VOICE_ANALYSIS_PROMPT.format(samples=samples_text)
 
-        # Call LLM
-        response = self._call_llm(prompt)
+        # Call LLM with system prompt
+        response = self._call_llm(prompt, system_prompt=VOICE_SYSTEM_PROMPT)
         data = self._parse_json_response(response)
 
         return VoiceAnalysis(
             tone=data.get("tone", ""),
             sentence_patterns=data.get("sentence_patterns", {}),
             vocabulary_level=data.get("vocabulary_level", ""),
+            punctuation_style=data.get("punctuation_style"),
+            transition_style=data.get("transition_style"),
+            paragraph_rhythm=data.get("paragraph_rhythm"),
+            reader_address=data.get("reader_address"),
             signature_phrases=data.get("signature_phrases", []),
             storytelling_style=data.get("storytelling_style", ""),
             emotional_register=data.get("emotional_register", ""),
@@ -483,14 +548,18 @@ class VoiceService:
         samples_text = "\n\n---\n\n".join(formatted_samples)
         prompt = VOICE_ANALYSIS_PROMPT.format(samples=samples_text)
 
-        # Call LLM
-        response = self._call_llm(prompt)
+        # Call LLM with system prompt
+        response = self._call_llm(prompt, system_prompt=VOICE_SYSTEM_PROMPT)
         data = self._parse_json_response(response)
 
         return VoiceAnalysis(
             tone=data.get("tone", ""),
             sentence_patterns=data.get("sentence_patterns", {}),
             vocabulary_level=data.get("vocabulary_level", ""),
+            punctuation_style=data.get("punctuation_style"),
+            transition_style=data.get("transition_style"),
+            paragraph_rhythm=data.get("paragraph_rhythm"),
+            reader_address=data.get("reader_address"),
             signature_phrases=data.get("signature_phrases", []),
             storytelling_style=data.get("storytelling_style", ""),
             emotional_register=data.get("emotional_register", ""),
