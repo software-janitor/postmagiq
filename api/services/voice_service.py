@@ -1,12 +1,16 @@
 """Service for voice learning and analysis."""
 
 import json
+import logging
 import os
+import sys
 from typing import Optional, Union
 from uuid import UUID
 from pydantic import BaseModel
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 try:
     from groq import Groq
@@ -76,19 +80,19 @@ Analyze the following dimensions:
 Include specific examples from the samples to support each observation.
 
 Output ONLY valid JSON matching this structure:
-{
+{{
   "tone": "adjective1, adjective2, adjective3",
-  "sentence_patterns": {
+  "sentence_patterns": {{
     "average_length": "short|medium|long",
     "variation": "consistent|varied|dramatic",
     "common_structures": ["structure1", "structure2"]
-  },
+  }},
   "vocabulary_level": "Description of vocabulary style",
   "signature_phrases": ["phrase1", "phrase2", "phrase3"],
   "storytelling_style": "Description of storytelling approach",
   "emotional_register": "Description of emotional expression",
   "summary": "2-3 sentence summary of their unique voice"
-}
+}}
 """
 
 
@@ -135,7 +139,9 @@ class VoiceService:
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=4096,
             )
-            return response.choices[0].message.content or ""
+            content = response.choices[0].message.content or ""
+            logger.warning(f"GROQ response (first 500 chars): {content[:500]}")
+            return content
         except Exception as e:
             raise RuntimeError(f"Groq LLM request failed: {e}")
 
@@ -159,21 +165,37 @@ class VoiceService:
 
     def _parse_json_response(self, response: str) -> dict:
         """Extract JSON from LLM response."""
+        logger.warning(f"PARSE: response length={len(response)}")
+
+        # Try direct parse
         try:
             return json.loads(response)
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            logger.warning(f"PARSE: direct failed: {e}")
 
         import re
 
+        # Try extracting JSON block
         json_match = re.search(r"\{[\s\S]*\}", response)
         if json_match:
+            matched = json_match.group()
+            logger.warning(f"PARSE: regex matched len={len(matched)}")
             try:
-                return json.loads(json_match.group())
-            except json.JSONDecodeError:
-                pass
+                return json.loads(matched)
+            except json.JSONDecodeError as e:
+                logger.warning(f"PARSE: regex failed: {e}")
 
-        raise ValueError(f"Could not parse JSON from response: {response[:200]}...")
+        # Try extracting from markdown code block
+        code_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", response)
+        if code_match:
+            code_content = code_match.group(1).strip()
+            logger.warning(f"PARSE: code block matched len={len(code_content)}")
+            try:
+                return json.loads(code_content)
+            except json.JSONDecodeError as e:
+                logger.warning(f"PARSE: code block failed: {e}")
+
+        raise ValueError(f"Could not parse JSON: {response[:300]}...")
 
     # =========================================================================
     # Voice Prompts
