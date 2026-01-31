@@ -71,7 +71,8 @@ def configure_structlog(
     if json_format:
         # JSON format for production
         structlog.configure(
-            processors=shared_processors + [
+            processors=shared_processors
+            + [
                 structlog.processors.format_exc_info,
                 structlog.processors.UnicodeDecoder(),
                 structlog.processors.JSONRenderer(),
@@ -84,7 +85,8 @@ def configure_structlog(
     else:
         # Human-readable format for development
         structlog.configure(
-            processors=shared_processors + [
+            processors=shared_processors
+            + [
                 structlog.processors.format_exc_info,
                 structlog.dev.ConsoleRenderer(colors=True),
             ],

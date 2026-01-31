@@ -1,0 +1,170 @@
+# CI Report Makefile
+# ==================
+# Drop this into any Python project for standardized CI reporting.
+# Usage: make -f Makefile.ci ci-report
+#
+# Or include in your existing Makefile:
+#   include Makefile.ci
+
+# Use bash for PIPESTATUS support
+SHELL := /bin/bash
+
+.PHONY: ci-report ci-test ci-lint ci-format ci-typecheck ci-build
+
+# Configuration - override these in your main Makefile or environment
+PYTHON ?= python3
+PYTEST ?= pytest
+RUFF ?= ruff
+MYPY ?= mypy
+SRC_DIRS ?= .
+TEST_DIRS ?= tests/
+CI_REPORT ?= ci-report.txt
+
+# Colors
+BLUE := \033[0;34m
+GREEN := \033[0;32m
+RED := \033[0;31m
+NC := \033[0m
+
+ci-report: ## Run full CI pipeline and generate detailed report for QA feedback
+	@echo "$(GREEN)Running CI pipeline with full report...$(NC)"
+	@echo "================================================" > $(CI_REPORT)
+	@echo "CI BUILD REPORT - $$(date)" >> $(CI_REPORT)
+	@echo "================================================" >> $(CI_REPORT)
+	@echo "" >> $(CI_REPORT)
+	@# Track overall status
+	@LINT_OK=0; FORMAT_OK=0; TYPE_OK=0; TEST_OK=0; BUILD_OK=0; \
+	\
+	echo "$(BLUE)[1/5] Running Linter...$(NC)"; \
+	echo "## LINT" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	if command -v $(RUFF) >/dev/null 2>&1; then \
+		$(RUFF) check $(SRC_DIRS) 2>&1 | tee -a $(CI_REPORT); \
+		if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+			LINT_OK=1; \
+			echo "✅ LINT: PASSED" >> $(CI_REPORT); \
+		else \
+			echo "❌ LINT: FAILED" >> $(CI_REPORT); \
+		fi; \
+	elif command -v flake8 >/dev/null 2>&1; then \
+		flake8 $(SRC_DIRS) 2>&1 | tee -a $(CI_REPORT); \
+		if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+			LINT_OK=1; \
+			echo "✅ LINT: PASSED" >> $(CI_REPORT); \
+		else \
+			echo "❌ LINT: FAILED" >> $(CI_REPORT); \
+		fi; \
+	else \
+		echo "⚠️  No linter found (ruff/flake8)" >> $(CI_REPORT); \
+		LINT_OK=1; \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	\
+	echo "$(BLUE)[2/5] Checking Code Format...$(NC)"; \
+	echo "## FORMAT CHECK" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	if command -v $(RUFF) >/dev/null 2>&1; then \
+		$(RUFF) format $(SRC_DIRS) --check 2>&1 | tee -a $(CI_REPORT); \
+		if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+			FORMAT_OK=1; \
+			echo "✅ FORMAT: PASSED" >> $(CI_REPORT); \
+		else \
+			echo "❌ FORMAT: FAILED" >> $(CI_REPORT); \
+		fi; \
+	elif command -v black >/dev/null 2>&1; then \
+		black $(SRC_DIRS) --check 2>&1 | tee -a $(CI_REPORT); \
+		if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+			FORMAT_OK=1; \
+			echo "✅ FORMAT: PASSED" >> $(CI_REPORT); \
+		else \
+			echo "❌ FORMAT: FAILED" >> $(CI_REPORT); \
+		fi; \
+	else \
+		echo "⚠️  No formatter found (ruff/black)" >> $(CI_REPORT); \
+		FORMAT_OK=1; \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	\
+	echo "$(BLUE)[3/5] Running Type Checker...$(NC)"; \
+	echo "## TYPE CHECK" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	if command -v $(MYPY) >/dev/null 2>&1; then \
+		$(MYPY) $(SRC_DIRS) --ignore-missing-imports 2>&1 | tee -a $(CI_REPORT); \
+		if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+			TYPE_OK=1; \
+			echo "✅ TYPE CHECK: PASSED" >> $(CI_REPORT); \
+		else \
+			echo "❌ TYPE CHECK: FAILED" >> $(CI_REPORT); \
+		fi; \
+	else \
+		echo "⚠️  mypy not found, skipping type check" >> $(CI_REPORT); \
+		TYPE_OK=1; \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	\
+	echo "$(BLUE)[4/5] Running Tests...$(NC)"; \
+	echo "## TESTS" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	if command -v $(PYTEST) >/dev/null 2>&1; then \
+		$(PYTEST) $(TEST_DIRS) -v --tb=short 2>&1 | tee -a $(CI_REPORT); \
+		if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+			TEST_OK=1; \
+			echo "✅ TESTS: PASSED" >> $(CI_REPORT); \
+		else \
+			echo "❌ TESTS: FAILED" >> $(CI_REPORT); \
+		fi; \
+	elif [ -d "$(TEST_DIRS)" ]; then \
+		$(PYTHON) -m unittest discover $(TEST_DIRS) 2>&1 | tee -a $(CI_REPORT); \
+		if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+			TEST_OK=1; \
+			echo "✅ TESTS: PASSED" >> $(CI_REPORT); \
+		else \
+			echo "❌ TESTS: FAILED" >> $(CI_REPORT); \
+		fi; \
+	else \
+		echo "⚠️  No test runner found" >> $(CI_REPORT); \
+		TEST_OK=1; \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	\
+	echo "$(BLUE)[5/5] Building Package...$(NC)"; \
+	echo "## BUILD" >> $(CI_REPORT); \
+	echo "----------------------------------------" >> $(CI_REPORT); \
+	if [ -f "pyproject.toml" ] || [ -f "setup.py" ]; then \
+		$(PYTHON) -m build 2>&1 | tee -a $(CI_REPORT); \
+		if [ $${PIPESTATUS[0]} -eq 0 ]; then \
+			BUILD_OK=1; \
+			echo "✅ BUILD: PASSED" >> $(CI_REPORT); \
+		else \
+			echo "❌ BUILD: FAILED" >> $(CI_REPORT); \
+		fi; \
+	else \
+		echo "⚠️  No pyproject.toml or setup.py found, skipping build" >> $(CI_REPORT); \
+		BUILD_OK=1; \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	\
+	echo "================================================" >> $(CI_REPORT); \
+	echo "SUMMARY" >> $(CI_REPORT); \
+	echo "================================================" >> $(CI_REPORT); \
+	TOTAL_PASS=$$((LINT_OK + FORMAT_OK + TYPE_OK + TEST_OK + BUILD_OK)); \
+	TOTAL_FAIL=$$((5 - TOTAL_PASS)); \
+	if [ $$LINT_OK -eq 1 ]; then echo "✅ Lint:        PASSED" >> $(CI_REPORT); else echo "❌ Lint:        FAILED" >> $(CI_REPORT); fi; \
+	if [ $$FORMAT_OK -eq 1 ]; then echo "✅ Format:      PASSED" >> $(CI_REPORT); else echo "❌ Format:      FAILED" >> $(CI_REPORT); fi; \
+	if [ $$TYPE_OK -eq 1 ]; then echo "✅ Type Check:  PASSED" >> $(CI_REPORT); else echo "❌ Type Check:  FAILED" >> $(CI_REPORT); fi; \
+	if [ $$TEST_OK -eq 1 ]; then echo "✅ Tests:       PASSED" >> $(CI_REPORT); else echo "❌ Tests:       FAILED" >> $(CI_REPORT); fi; \
+	if [ $$BUILD_OK -eq 1 ]; then echo "✅ Build:       PASSED" >> $(CI_REPORT); else echo "❌ Build:       FAILED" >> $(CI_REPORT); fi; \
+	echo "" >> $(CI_REPORT); \
+	if [ $$TOTAL_FAIL -eq 0 ]; then \
+		echo "🎉 ALL CHECKS PASSED ($$TOTAL_PASS/5)" >> $(CI_REPORT); \
+		echo "$(GREEN)🎉 ALL CHECKS PASSED$(NC)"; \
+	else \
+		echo "⚠️  $$TOTAL_FAIL/5 CHECKS FAILED" >> $(CI_REPORT); \
+		echo "$(RED)⚠️  $$TOTAL_FAIL/5 CHECKS FAILED$(NC)"; \
+	fi; \
+	echo "" >> $(CI_REPORT); \
+	echo "Full report saved to: $(CI_REPORT)" >> $(CI_REPORT); \
+	echo ""; \
+	echo "$(GREEN)Report saved to: $(CI_REPORT)$(NC)"; \
+	cat $(CI_REPORT) | tail -20; \
+	exit $$TOTAL_FAIL

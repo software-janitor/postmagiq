@@ -4,6 +4,13 @@ import pytest
 from datetime import datetime
 from uuid import uuid4, UUID
 
+from tests.db_utils import is_database_available
+
+pytestmark = pytest.mark.skipif(
+    not is_database_available(),
+    reason="Database not available"
+)
+
 from sqlmodel import Session, SQLModel, select
 from httpx import ASGITransport, AsyncClient
 import asyncio

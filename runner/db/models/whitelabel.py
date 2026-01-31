@@ -22,6 +22,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 
 class AssetType(str, Enum):
     """Types of white-label assets."""
+
     LOGO = "logo"
     FAVICON = "favicon"
     BANNER = "banner"
@@ -29,6 +30,7 @@ class AssetType(str, Enum):
 
 class DomainVerificationStatus(str, Enum):
     """Status of domain verification."""
+
     PENDING = "pending"
     VERIFIED = "verified"
     FAILED = "failed"
@@ -97,6 +99,7 @@ class WhitelabelConfig(UUIDModel, WhitelabelConfigBase, TimestampMixin, table=Tr
             str: A secure random token prefixed with 'postmatiq-verify-'
         """
         import secrets
+
         return f"postmatiq-verify-{secrets.token_urlsafe(32)}"
 
     @staticmethod
@@ -107,6 +110,7 @@ class WhitelabelConfig(UUIDModel, WhitelabelConfigBase, TimestampMixin, table=Tr
             str: A unique DKIM selector name
         """
         import secrets
+
         return f"pm{secrets.token_hex(4)}"
 
 

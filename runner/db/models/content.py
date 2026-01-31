@@ -13,6 +13,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 # Goal
 # =============================================================================
 
+
 class GoalBase(SQLModel):
     """Base goal fields shared across Create/Read/Update."""
 
@@ -31,9 +32,15 @@ class Goal(UUIDModel, GoalBase, TimestampMixin, table=True):
     __tablename__ = "goals"
 
     user_id: UUID = Field(foreign_key="users.id", index=True)
-    platform_id: Optional[UUID] = Field(default=None, foreign_key="platforms.id", index=True)
-    voice_profile_id: Optional[UUID] = Field(default=None, foreign_key="voice_profiles.id")
-    image_config_set_id: Optional[UUID] = Field(default=None, foreign_key="image_config_sets.id")
+    platform_id: Optional[UUID] = Field(
+        default=None, foreign_key="platforms.id", index=True
+    )
+    voice_profile_id: Optional[UUID] = Field(
+        default=None, foreign_key="voice_profiles.id"
+    )
+    image_config_set_id: Optional[UUID] = Field(
+        default=None, foreign_key="image_config_sets.id"
+    )
 
     # Multi-tenancy: workspace_id is nullable for migration compatibility
     workspace_id: Optional[UUID] = Field(
@@ -65,6 +72,7 @@ class GoalRead(GoalBase):
 # Chapter
 # =============================================================================
 
+
 class ChapterBase(SQLModel):
     """Base chapter fields shared across Create/Read/Update."""
 
@@ -83,7 +91,9 @@ class Chapter(UUIDModel, ChapterBase, table=True):
     __tablename__ = "chapters"
 
     user_id: UUID = Field(foreign_key="users.id", index=True)
-    platform_id: Optional[UUID] = Field(default=None, foreign_key="platforms.id", index=True)
+    platform_id: Optional[UUID] = Field(
+        default=None, foreign_key="platforms.id", index=True
+    )
 
     # Multi-tenancy: workspace_id is nullable for migration compatibility
     workspace_id: Optional[UUID] = Field(
@@ -118,6 +128,7 @@ class ChapterRead(ChapterBase):
 # =============================================================================
 # Post
 # =============================================================================
+
 
 class PostBase(SQLModel):
     """Base post fields shared across Create/Read/Update."""

@@ -181,7 +181,7 @@ class TestV1OnboardingNoUserIdRequired:
             posts_per_week=2,
         )
         # Should not have user_id attribute from model
-        assert "user_id" not in req.model_fields
+        assert "user_id" not in type(req).model_fields
 
     def test_approve_request_has_no_user_id(self):
         """ApprovePlanRequest doesn't have user_id field."""
@@ -194,7 +194,7 @@ class TestV1OnboardingNoUserIdRequired:
             content_style="mixed",
             onboarding_mode="quick",
         )
-        assert "user_id" not in req.model_fields
+        assert "user_id" not in type(req).model_fields
 
     def test_deep_message_request_has_no_user_id(self):
         """DeepModeMessageRequest doesn't have user_id field."""
@@ -203,7 +203,7 @@ class TestV1OnboardingNoUserIdRequired:
         req = DeepModeMessageRequest(
             message="Test message",
         )
-        assert "user_id" not in req.model_fields
+        assert "user_id" not in type(req).model_fields
 
 
 class TestV1OnboardingWorkspaceScoped:

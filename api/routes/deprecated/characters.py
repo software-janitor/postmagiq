@@ -34,6 +34,7 @@ LEGACY_META_KEY = "legacy"
 # Request/Response Models
 # =========================================================================
 
+
 class CreateCharacterRequest(BaseModel):
     name: str
     template_id: Optional[str] = None
@@ -269,6 +270,7 @@ def _decode_prop_category(record: PropCategory) -> dict:
 # Character Templates (read-only)
 # =========================================================================
 
+
 @router.get("/templates")
 def list_templates(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -277,7 +279,9 @@ def list_templates(
     uid = current_user.user_id
     with get_session() as session:
         templates = session.exec(
-            select(CharacterTemplate).where(CharacterTemplate.user_id == uid).order_by(CharacterTemplate.name)
+            select(CharacterTemplate)
+            .where(CharacterTemplate.user_id == uid)
+            .order_by(CharacterTemplate.name)
         ).all()
         return {"templates": [_decode_template(t) for t in templates]}
 
@@ -298,6 +302,7 @@ def get_template(template_id: str):
 # =========================================================================
 # Characters
 # =========================================================================
+
 
 @router.get("/users/{user_id}")
 def list_characters(user_id: str):
@@ -503,7 +508,8 @@ async def create_character_from_image(
                 f"Body: {physical.body_type or 'average'}. "
                 f"Posture: {physical.posture or 'natural'}. "
                 f"Height: {physical.height_impression or 'average'}."
-                if physical else None
+                if physical
+                else None
             ),
             "clothing_rules": result.clothing_rules,
             "visible_parts": result.style_notes,
@@ -532,6 +538,7 @@ async def create_character_from_image(
 # =========================================================================
 # Character-Outfit Links
 # =========================================================================
+
 
 @router.get("/{character_id}/outfits")
 def get_character_outfits(character_id: str):
@@ -634,6 +641,7 @@ def set_default_outfit(character_id: str, outfit_id: str):
 # Outfit Parts
 # =========================================================================
 
+
 @router.get("/outfit-parts/users/{user_id}")
 def list_outfit_parts(user_id: str, part_type: Optional[str] = None):
     """Get all outfit parts for a user."""
@@ -729,6 +737,7 @@ def suggest_outfit_part(request: SuggestPartRequest):
 # Outfits (Outfit Bank)
 # =========================================================================
 
+
 @router.get("/outfits/users/{user_id}")
 def list_outfits(user_id: str, template_id: Optional[str] = None):
     """Get all outfits for a user."""
@@ -784,7 +793,9 @@ def create_outfit(user_id: str, request: CreateOutfitRequest):
     record = Outfit(
         user_id=uid,
         name=request.name,
-        description=_encode_legacy(request.description, {"template_id": request.template_id}),
+        description=_encode_legacy(
+            request.description, {"template_id": request.template_id}
+        ),
         is_default=False,
     )
     with get_session() as session:
@@ -903,7 +914,9 @@ def generate_outfits(request: GenerateOutfitRequest):
             reference_outfits.append(
                 {
                     "name": outfit.name,
-                    "description": _decode_legacy(outfit.description).get("description"),
+                    "description": _decode_legacy(outfit.description).get(
+                        "description"
+                    ),
                     "parts": parts,
                 }
             )
@@ -923,6 +936,7 @@ def generate_outfits(request: GenerateOutfitRequest):
 # =========================================================================
 # Sentiments
 # =========================================================================
+
 
 @router.get("/sentiments/users/{user_id}")
 def list_sentiments(user_id: str):
@@ -1029,13 +1043,16 @@ def delete_sentiment(sentiment_id: str):
 # Prop Categories
 # =========================================================================
 
+
 @router.get("/prop-categories/users/{user_id}")
 def list_prop_categories(user_id: str):
     """Get all prop categories for a user (including system categories)."""
     uid = _resolve_user_id(user_id)
     with get_session() as session:
         categories = session.exec(
-            select(PropCategory).where(PropCategory.user_id == uid).order_by(PropCategory.name)
+            select(PropCategory)
+            .where(PropCategory.user_id == uid)
+            .order_by(PropCategory.name)
         ).all()
         return {"categories": [_decode_prop_category(c) for c in categories]}
 

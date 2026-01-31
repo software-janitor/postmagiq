@@ -16,7 +16,9 @@ class RunSummary(BaseModel):
     completed_at: Optional[datetime] = None
     total_tokens: int = 0
     total_cost_usd: float = 0.0
-    credits: Optional[int] = None  # Credits equivalent (for users with show_costs=False)
+    credits: Optional[int] = (
+        None  # Credits equivalent (for users with show_costs=False)
+    )
     final_state: Optional[str] = None
     config_hash: Optional[str] = None
 
@@ -43,8 +45,12 @@ class TokenBreakdown(BaseModel):
     total_input: int = 0
     total_output: int = 0
     total_cost_usd: float = 0.0
-    by_agent: dict[str, dict[str, Any]] = Field(default_factory=dict)  # {agent: {input, output, total, cost_usd}}
-    by_state: dict[str, dict[str, Any]] = Field(default_factory=dict)  # {state: {tokens, cost_usd}}
+    by_agent: dict[str, dict[str, Any]] = Field(
+        default_factory=dict
+    )  # {agent: {input, output, total, cost_usd}}
+    by_state: dict[str, dict[str, Any]] = Field(
+        default_factory=dict
+    )  # {state: {tokens, cost_usd}}
 
 
 class WorkflowExecuteRequest(BaseModel):

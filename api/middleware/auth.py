@@ -2,15 +2,20 @@
 
 Extracts JWT from Authorization header and injects user into request.state.
 Runs before WorkspaceMiddleware and route handlers.
+
+Uses the configured auth provider (local or external like Clerk) to verify
+tokens and load users.
 """
 
 from typing import Set
 
 from fastapi import Request
+from sqlmodel import Session
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
 
-from api.auth.jwt import verify_token
+from api.auth.providers import get_provider
+from runner.db.engine import engine
 from runner.db.models import User
 
 
@@ -40,9 +45,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     For authenticated requests, this middleware:
     1. Extracts JWT from Authorization: Bearer header
-    2. Verifies token validity
-    3. Loads user from database
-    4. Injects user and JWT claims into request.state
+    2. Verifies token using configured auth provider
+    3. Loads/creates user from database
+    4. Injects user, auth result, and provider name into request.state
 
     Public routes (login, register, health, etc.) are passed through
     without authentication.
@@ -58,6 +63,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Initialize request state
         request.state.user = None
         request.state.jwt_claims = None
+        request.state.auth_provider = None
         request.state.workspace = None
         request.state.membership = None
         request.state.workspace_id = None
@@ -73,20 +79,27 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # Individual routes will enforce auth as needed
             return await call_next(request)
 
-        # Verify token
-        payload = verify_token(token)
-        if not payload:
+        # Get the configured auth provider
+        provider = get_provider()
+
+        # Verify token using the provider
+        auth_result = await provider.verify_token(token)
+        if not auth_result.valid:
             # Invalid token - continue without user context
             # Routes requiring auth will reject the request
             return await call_next(request)
 
-        # Store JWT claims
-        request.state.jwt_claims = payload
+        # Store auth info
+        request.state.jwt_claims = auth_result.raw_claims
+        request.state.auth_provider = provider.name
 
-        # Load user from database
-        user = await self._load_user(payload)
-        if user:
-            request.state.user = user
+        # Load or create user using the provider
+        with Session(engine) as session:
+            user = await provider.get_or_create_user(auth_result, session)
+            if user:
+                # Detach from session for use outside
+                session.expunge(user)
+                request.state.user = user
 
         return await call_next(request)
 
@@ -129,32 +142,3 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return None
 
         return parts[1]
-
-    async def _load_user(self, payload: dict) -> User | None:
-        """Load user from database based on JWT payload.
-
-        Args:
-            payload: Decoded JWT payload
-
-        Returns:
-            User if found, None otherwise
-        """
-        from uuid import UUID
-        from runner.db.engine import engine
-        from sqlmodel import Session
-
-        user_id_str = payload.get("sub")
-        if not user_id_str:
-            return None
-
-        try:
-            user_id = UUID(user_id_str)
-        except ValueError:
-            return None
-
-        with Session(engine) as session:
-            user = session.get(User, user_id)
-            if user:
-                # Detach from session for use outside
-                session.expunge(user)
-            return user

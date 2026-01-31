@@ -18,12 +18,14 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 
 class BillingPeriod(str, Enum):
     """Billing period options."""
+
     monthly = "monthly"
     yearly = "yearly"
 
 
 class SubscriptionStatus(str, Enum):
     """Status of a subscription."""
+
     active = "active"
     canceled = "canceled"
     past_due = "past_due"
@@ -44,7 +46,9 @@ class SubscriptionTierBase(SQLModel):
     description: Optional[str] = None
 
     # Pricing
-    price_monthly: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
+    price_monthly: Decimal = Field(
+        default=Decimal("0"), max_digits=10, decimal_places=2
+    )
     price_yearly: Decimal = Field(default=Decimal("0"), max_digits=10, decimal_places=2)
 
     # Limits
@@ -103,7 +107,9 @@ class AccountSubscriptionBase(SQLModel):
     stripe_customer_id: Optional[str] = Field(default=None, index=True)
 
 
-class AccountSubscription(UUIDModel, AccountSubscriptionBase, TimestampMixin, table=True):
+class AccountSubscription(
+    UUIDModel, AccountSubscriptionBase, TimestampMixin, table=True
+):
     """Account subscription table.
 
     Links a workspace to a subscription tier with billing information.
@@ -178,6 +184,7 @@ class UsageTrackingRead(UsageTrackingBase):
 
 class ReservationStatus(str, Enum):
     """Status of a credit reservation."""
+
     pending = "pending"
     confirmed = "confirmed"
     released = "released"

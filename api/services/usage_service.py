@@ -14,10 +14,11 @@ from sqlmodel import Session, select
 from runner.db.engine import engine
 from runner.db.models import (
     SubscriptionTier,
-    AccountSubscription, SubscriptionStatus,
+    AccountSubscription,
+    SubscriptionStatus,
     UsageTracking,
-    CreditReservation, ReservationStatus,
-    Workspace,
+    CreditReservation,
+    ReservationStatus,
 )
 
 
@@ -28,9 +29,7 @@ class UsageLimitExceeded(Exception):
         self.resource_type = resource_type
         self.limit = limit
         self.current = current
-        super().__init__(
-            f"{resource_type} limit exceeded: {current}/{limit}"
-        )
+        super().__init__(f"{resource_type} limit exceeded: {current}/{limit}")
 
 
 class UsageService:
@@ -86,7 +85,7 @@ class UsageService:
         with Session(engine) as session:
             statement = select(SubscriptionTier).where(
                 SubscriptionTier.slug == slug,
-                SubscriptionTier.is_active == True,
+                SubscriptionTier.is_active,
             )
             tier = session.exec(statement).first()
             if tier:
@@ -107,15 +106,13 @@ class UsageService:
                 SubscriptionTier.display_order
             )
             if active_only:
-                statement = statement.where(SubscriptionTier.is_active == True)
+                statement = statement.where(SubscriptionTier.is_active)
             tiers = list(session.exec(statement).all())
             for t in tiers:
                 session.expunge(t)
             return tiers
 
-    def get_or_create_usage_period(
-        self, workspace_id: UUID
-    ) -> UsageTracking:
+    def get_or_create_usage_period(self, workspace_id: UUID) -> UsageTracking:
         """Get or create usage tracking for the current billing period.
 
         Args:
@@ -137,7 +134,9 @@ class UsageService:
             else:
                 # Default to current month for workspaces without subscription
                 now = datetime.utcnow()
-                period_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+                period_start = now.replace(
+                    day=1, hour=0, minute=0, second=0, microsecond=0
+                )
                 if now.month == 12:
                     period_end = period_start.replace(year=now.year + 1, month=1)
                 else:
@@ -156,14 +155,19 @@ class UsageService:
                 # Default to free tier limits (5 posts, 1GB storage) if no subscription
                 tier_limits = {
                     "posts_limit": 5,  # Free tier default
-                    "storage_limit_bytes": 1 * 1024 * 1024 * 1024,  # 1GB free tier default
-                    "api_calls_limit": 0
+                    "storage_limit_bytes": 1
+                    * 1024
+                    * 1024
+                    * 1024,  # 1GB free tier default
+                    "api_calls_limit": 0,
                 }
                 if subscription:
                     tier = session.get(SubscriptionTier, subscription.tier_id)
                     if tier:
                         tier_limits["posts_limit"] = tier.posts_per_month
-                        tier_limits["storage_limit_bytes"] = tier.storage_gb * 1024 * 1024 * 1024
+                        tier_limits["storage_limit_bytes"] = (
+                            tier.storage_gb * 1024 * 1024 * 1024
+                        )
                         tier_limits["api_calls_limit"] = 10000 if tier.api_access else 0
 
                 usage = UsageTracking(
@@ -349,7 +353,10 @@ class UsageService:
                 if reservation.resource_type == "post":
                     usage.posts_created += reservation.amount
                     # Check for overage
-                    if usage.posts_limit > 0 and usage.posts_created > usage.posts_limit:
+                    if (
+                        usage.posts_limit > 0
+                        and usage.posts_created > usage.posts_limit
+                    ):
                         usage.overage_posts = usage.posts_created - usage.posts_limit
                 elif reservation.resource_type == "storage":
                     usage.storage_used_bytes += reservation.amount
@@ -384,9 +391,7 @@ class UsageService:
             session.commit()
             return True
 
-    def get_usage_summary(
-        self, workspace_id: UUID
-    ) -> dict:
+    def get_usage_summary(self, workspace_id: UUID) -> dict:
         """Get a summary of current usage for a workspace.
 
         Args:
@@ -518,7 +523,7 @@ class UsageService:
             # Get tier
             tier_statement = select(SubscriptionTier).where(
                 SubscriptionTier.slug == tier_slug,
-                SubscriptionTier.is_active == True,
+                SubscriptionTier.is_active,
             )
             tier = session.exec(tier_statement).first()
             if not tier:

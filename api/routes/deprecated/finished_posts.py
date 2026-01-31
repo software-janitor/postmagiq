@@ -26,6 +26,7 @@ def _workflow_store(user_id: UUID) -> WorkflowStore:
     """Create a workflow store bound to the specified user."""
     return WorkflowStore(user_id)
 
+
 # Paths - adjust for Docker vs local
 POSTS_DIR = Path("/app/posts")
 IMAGES_DIR = Path("/app/images/prompts")
@@ -35,7 +36,9 @@ if not POSTS_DIR.exists():
     # Fallback for local development
     POSTS_DIR = Path(__file__).parent.parent.parent.parent / "posts"
     IMAGES_DIR = Path(__file__).parent.parent.parent.parent / "images" / "prompts"
-    PUBLISH_STATUS_FILE = Path(__file__).parent.parent.parent / "workflow" / "publish_status.json"
+    PUBLISH_STATUS_FILE = (
+        Path(__file__).parent.parent.parent / "workflow" / "publish_status.json"
+    )
 
 # Available platforms
 PLATFORMS = ["linkedin", "threads", "medium", "x"]
@@ -43,6 +46,7 @@ PLATFORMS = ["linkedin", "threads", "medium", "x"]
 
 class PublishInfo(BaseModel):
     """Publishing information for a post."""
+
     platform: str
     published_at: str
     url: Optional[str] = None
@@ -50,12 +54,14 @@ class PublishInfo(BaseModel):
 
 class PostPublishStatus(BaseModel):
     """Publish status for a post across platforms."""
+
     post_id: str
     platforms: list[PublishInfo] = []
 
 
 class FinishedPost(BaseModel):
     """A finished post with content and image prompt."""
+
     post_id: str  # e.g., "c1p1"
     post_number: int
     chapter: int
@@ -88,7 +94,7 @@ def _get_post_publish_status(post_id: str) -> list[PublishInfo]:
 
 def _extract_title(content: str) -> str:
     """Extract title from first line of post content."""
-    lines = content.strip().split('\n')
+    lines = content.strip().split("\n")
     if lines:
         return lines[0].strip()
     return "Untitled"
@@ -159,16 +165,18 @@ def list_finished_posts(
         # Use post topic as title, fall back to first line of content
         title = post.topic if post.topic else _extract_title(final_content)
 
-        posts.append(FinishedPost(
-            post_id=post_id,
-            post_number=post.post_number,
-            chapter=chapter_num,
-            title=title,
-            content=final_content,
-            image_prompt=image_prompt,
-            file_path=file_path,
-            publish_status=_get_post_publish_status(post_id),
-        ))
+        posts.append(
+            FinishedPost(
+                post_id=post_id,
+                post_number=post.post_number,
+                chapter=chapter_num,
+                title=title,
+                content=final_content,
+                image_prompt=image_prompt,
+                file_path=file_path,
+                publish_status=_get_post_publish_status(post_id),
+            )
+        )
         seen_posts.add(post.post_number)
 
     # Also check file system for any posts not in database (legacy support)
@@ -193,7 +201,11 @@ def list_finished_posts(
 
                 # Try to get topic from database, fall back to first line of content
                 post_record = content_service.get_post_by_number(user_id, post_num)
-                title = post_record.topic if post_record and post_record.topic else _extract_title(content)
+                title = (
+                    post_record.topic
+                    if post_record and post_record.topic
+                    else _extract_title(content)
+                )
 
                 image_prompt = None
                 image_path = _get_image_prompt_path(chapter_num, post_num)
@@ -201,16 +213,18 @@ def list_finished_posts(
                     image_prompt = image_path.read_text()
 
                 post_id = f"c{chapter_num}p{post_num}"
-                posts.append(FinishedPost(
-                    post_id=post_id,
-                    post_number=post_num,
-                    chapter=chapter_num,
-                    title=title,
-                    content=content,
-                    image_prompt=image_prompt,
-                    file_path=str(post_file),
-                    publish_status=_get_post_publish_status(post_id),
-                ))
+                posts.append(
+                    FinishedPost(
+                        post_id=post_id,
+                        post_number=post_num,
+                        chapter=chapter_num,
+                        title=title,
+                        content=content,
+                        image_prompt=image_prompt,
+                        file_path=str(post_file),
+                        publish_status=_get_post_publish_status(post_id),
+                    )
+                )
 
     # Sort by post number
     posts.sort(key=lambda p: p.post_number)
@@ -226,7 +240,9 @@ def get_finished_post(
     # Parse post_id (format: c1p1, c1p02, etc.)
     match = re.match(r"c(\d+)p(\d+)", post_id)
     if not match:
-        raise HTTPException(status_code=400, detail="Invalid post ID format. Use c1p1, c2p3, etc.")
+        raise HTTPException(
+            status_code=400, detail="Invalid post ID format. Use c1p1, c2p3, etc."
+        )
 
     chapter_num = int(match.group(1))
     post_num = int(match.group(2))
@@ -254,7 +270,11 @@ def get_finished_post(
                 image_prompt = image_path.read_text()
 
             # Use post topic as title, fall back to first line of content
-            title = post_record.topic if post_record and post_record.topic else _extract_title(final_content)
+            title = (
+                post_record.topic
+                if post_record and post_record.topic
+                else _extract_title(final_content)
+            )
 
             return FinishedPost(
                 post_id=post_id,
@@ -280,7 +300,10 @@ def get_finished_post(
             break
 
     if not post_file:
-        raise HTTPException(status_code=404, detail=f"Post {post_num} not found in chapter {chapter_num}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"Post {post_num} not found in chapter {chapter_num}",
+        )
 
     content = post_file.read_text()
     title = _extract_title(content)

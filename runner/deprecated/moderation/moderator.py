@@ -5,16 +5,14 @@ Coordinates multiple moderation checks and produces a final verdict.
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
 from enum import Enum
 from typing import Optional
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel
-
 
 class ModerationStatus(str, Enum):
     """Result status for moderation check."""
+
     PASSED = "passed"
     FLAGGED = "flagged"  # Needs human review
     BLOCKED = "blocked"  # Automatically rejected
@@ -22,6 +20,7 @@ class ModerationStatus(str, Enum):
 
 class ModerationType(str, Enum):
     """Types of moderation checks."""
+
     POLICY = "policy"  # Hate speech, harassment, etc.
     FACTUALITY = "factuality"  # Claim verification
     PLAGIARISM = "plagiarism"  # Too similar to sources
@@ -32,6 +31,7 @@ class ModerationType(str, Enum):
 @dataclass
 class ModerationConfig:
     """Configuration for moderation behavior."""
+
     # Confidence thresholds
     auto_pass_threshold: float = 0.95  # Above this, auto-pass
     review_threshold: float = 0.70  # Above this but below auto-pass, flag for review
@@ -54,6 +54,7 @@ class ModerationConfig:
 @dataclass
 class ModerationFlag:
     """A single moderation flag."""
+
     type: ModerationType
     code: str
     message: str
@@ -64,6 +65,7 @@ class ModerationFlag:
 @dataclass
 class ModerationResult:
     """Result of moderation check."""
+
     id: UUID = field(default_factory=uuid4)
     status: ModerationStatus = ModerationStatus.PASSED
     confidence: float = 1.0
@@ -151,9 +153,7 @@ class ContentModerator:
 
         # Run plagiarism check (similarity to sources)
         if self.config.check_plagiarism and context.get("sources"):
-            plagiarism_flags = await self._check_plagiarism(
-                content, context["sources"]
-            )
+            plagiarism_flags = await self._check_plagiarism(content, context["sources"])
             all_flags.extend(plagiarism_flags)
 
         # Run brand safety check
@@ -165,9 +165,7 @@ class ContentModerator:
 
         # Run platform ToS check
         if self.config.check_platform_tos and self.config.platform:
-            tos_flags = await self._check_platform_tos(
-                content, self.config.platform
-            )
+            tos_flags = await self._check_platform_tos(content, self.config.platform)
             all_flags.extend(tos_flags)
 
         # Determine final status based on flags
@@ -183,17 +181,20 @@ class ContentModerator:
 
         # Check for common policy violations
         from runner.moderation.policies import PolicyChecker
+
         checker = PolicyChecker()
         violations = checker.check(content)
 
         for violation in violations:
-            flags.append(ModerationFlag(
-                type=ModerationType.POLICY,
-                code=violation.code,
-                message=violation.message,
-                confidence=violation.confidence,
-                details=violation.details,
-            ))
+            flags.append(
+                ModerationFlag(
+                    type=ModerationType.POLICY,
+                    code=violation.code,
+                    message=violation.message,
+                    confidence=violation.confidence,
+                    details=violation.details,
+                )
+            )
 
         return flags
 
@@ -204,22 +205,25 @@ class ContentModerator:
         flags = []
 
         from runner.moderation.similarity import SimilarityChecker
+
         checker = SimilarityChecker()
 
         for i, source in enumerate(sources):
             result = checker.compute_similarity(content, source)
             if result.score > self.config.max_similarity_score:
-                flags.append(ModerationFlag(
-                    type=ModerationType.PLAGIARISM,
-                    code="high_similarity",
-                    message=f"Content is {result.score:.0%} similar to source {i+1}",
-                    confidence=result.score,
-                    details={
-                        "source_index": i,
-                        "similarity_score": result.score,
-                        "matching_phrases": result.matching_phrases,
-                    },
-                ))
+                flags.append(
+                    ModerationFlag(
+                        type=ModerationType.PLAGIARISM,
+                        code="high_similarity",
+                        message=f"Content is {result.score:.0%} similar to source {i + 1}",
+                        confidence=result.score,
+                        details={
+                            "source_index": i,
+                            "similarity_score": result.score,
+                            "matching_phrases": result.matching_phrases,
+                        },
+                    )
+                )
 
         return flags
 
@@ -235,25 +239,29 @@ class ContentModerator:
 
         for topic in forbidden_topics:
             if topic.lower() in content_lower:
-                flags.append(ModerationFlag(
-                    type=ModerationType.BRAND_SAFETY,
-                    code="forbidden_topic",
-                    message=f"Content mentions forbidden topic: {topic}",
-                    confidence=0.9,
-                    details={"topic": topic},
-                ))
+                flags.append(
+                    ModerationFlag(
+                        type=ModerationType.BRAND_SAFETY,
+                        code="forbidden_topic",
+                        message=f"Content mentions forbidden topic: {topic}",
+                        confidence=0.9,
+                        details={"topic": topic},
+                    )
+                )
 
         # Check for required disclaimers
         required_disclaimers = guidelines.get("required_disclaimers", [])
         for disclaimer in required_disclaimers:
             if disclaimer.lower() not in content_lower:
-                flags.append(ModerationFlag(
-                    type=ModerationType.BRAND_SAFETY,
-                    code="missing_disclaimer",
-                    message=f"Missing required disclaimer: {disclaimer}",
-                    confidence=0.95,
-                    details={"disclaimer": disclaimer},
-                ))
+                flags.append(
+                    ModerationFlag(
+                        type=ModerationType.BRAND_SAFETY,
+                        code="missing_disclaimer",
+                        message=f"Missing required disclaimer: {disclaimer}",
+                        confidence=0.95,
+                        details={"disclaimer": disclaimer},
+                    )
+                )
 
         return flags
 
@@ -269,30 +277,34 @@ class ContentModerator:
         # Check character limits
         max_chars = platform_rules.get("max_characters")
         if max_chars and len(content) > max_chars:
-            flags.append(ModerationFlag(
-                type=ModerationType.PLATFORM_TOS,
-                code="exceeds_length",
-                message=f"Content exceeds {platform} limit of {max_chars} characters",
-                confidence=1.0,
-                details={
-                    "platform": platform,
-                    "max_characters": max_chars,
-                    "actual_characters": len(content),
-                },
-            ))
+            flags.append(
+                ModerationFlag(
+                    type=ModerationType.PLATFORM_TOS,
+                    code="exceeds_length",
+                    message=f"Content exceeds {platform} limit of {max_chars} characters",
+                    confidence=1.0,
+                    details={
+                        "platform": platform,
+                        "max_characters": max_chars,
+                        "actual_characters": len(content),
+                    },
+                )
+            )
 
         # Check for forbidden content
         forbidden = platform_rules.get("forbidden_content", [])
         content_lower = content.lower()
         for item in forbidden:
             if item.lower() in content_lower:
-                flags.append(ModerationFlag(
-                    type=ModerationType.PLATFORM_TOS,
-                    code="forbidden_content",
-                    message=f"Content contains {platform} forbidden term: {item}",
-                    confidence=0.85,
-                    details={"platform": platform, "term": item},
-                ))
+                flags.append(
+                    ModerationFlag(
+                        type=ModerationType.PLATFORM_TOS,
+                        code="forbidden_content",
+                        message=f"Content contains {platform} forbidden term: {item}",
+                        confidence=0.85,
+                        details={"platform": platform, "term": item},
+                    )
+                )
 
         return flags
 

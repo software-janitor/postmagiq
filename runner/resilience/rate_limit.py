@@ -32,6 +32,7 @@ class RateLimitConfig:
         requests_per_day: Max requests per day (RPD)
         tokens_per_day: Max tokens per day (TPD)
     """
+
     requests_per_minute: Optional[int] = None
     tokens_per_minute: Optional[int] = None
     requests_per_day: Optional[int] = None

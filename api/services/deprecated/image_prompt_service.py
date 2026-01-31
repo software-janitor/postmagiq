@@ -39,6 +39,7 @@ ENGINEER_EXPRESSIONS = {
     "UNRESOLVED": "thoughtful expression, slight furrow, contemplative",
 }
 
+
 class ImagePromptService:
     """Service for generating and managing image prompts."""
 
@@ -77,7 +78,9 @@ class ImagePromptService:
             session.add(record)
             session.commit()
 
-    def _get_random_desk_props(self, user_id: Union[str, UUID], context: str = "software") -> list[str]:
+    def _get_random_desk_props(
+        self, user_id: Union[str, UUID], context: str = "software"
+    ) -> list[str]:
         """Select random desk props from database."""
         props = set()
 
@@ -101,7 +104,11 @@ class ImagePromptService:
                 props.add(random.choice(by_category[category]))
 
         # Add hardware props if hardware context
-        if context == "hardware" and "hardware" in by_category and by_category["hardware"]:
+        if (
+            context == "hardware"
+            and "hardware" in by_category
+            and by_category["hardware"]
+        ):
             props.add(random.choice(by_category["hardware"]))
 
         # Fallback to defaults from data/image_defaults.py if database is empty
@@ -109,7 +116,11 @@ class ImagePromptService:
             # Pick one from each category
             for category in ["notes", "drinks", "tech"]:
                 if category in DEFAULT_PROPS:
-                    cat_props = [p["desc"] for p in DEFAULT_PROPS[category] if p.get("context", "all") in ("all", context)]
+                    cat_props = [
+                        p["desc"]
+                        for p in DEFAULT_PROPS[category]
+                        if p.get("context", "all") in ("all", context)
+                    ]
                     if cat_props:
                         props.add(random.choice(cat_props))
             # Add hardware props if hardware context
@@ -142,11 +153,17 @@ class ImagePromptService:
         # Pick scene from database, fallback to defaults
         db_scenes = self.config_service.get_scenes(user_id, sentiment)
         if db_scenes:
-            scenes = [{"code": s["code"], "name": s["name"], "desc": s["description"]} for s in db_scenes]
+            scenes = [
+                {"code": s["code"], "name": s["name"], "desc": s["description"]}
+                for s in db_scenes
+            ]
         else:
             # Fallback to defaults from data/image_defaults.py
             default_scenes = DEFAULT_SCENES.get(sentiment, DEFAULT_SCENES["SUCCESS"])
-            scenes = [{"code": s["code"], "name": s["name"], "desc": s["desc"]} for s in default_scenes]
+            scenes = [
+                {"code": s["code"], "name": s["name"], "desc": s["desc"]}
+                for s in default_scenes
+            ]
 
         if not scene:
             scene = random.choice(scenes)
@@ -160,14 +177,21 @@ class ImagePromptService:
             else:
                 # Fallback to defaults from data/image_defaults.py
                 default_outfit = random.choice(DEFAULT_OUTFITS)
-                outfit = {"vest": default_outfit["vest"], "shirt": default_outfit["shirt"]}
+                outfit = {
+                    "vest": default_outfit["vest"],
+                    "shirt": default_outfit["shirt"],
+                }
 
         # Pick pose from database, fallback to defaults
         db_poses = self.config_service.get_poses(user_id, sentiment)
         pose_desc = "neutral standing pose"
         # Build fallback pose lookup from defaults
-        default_poses_for_sentiment = DEFAULT_POSES.get(sentiment, DEFAULT_POSES["SUCCESS"])
-        default_pose_lookup = {p["code"]: p["desc"] for p in default_poses_for_sentiment}
+        default_poses_for_sentiment = DEFAULT_POSES.get(
+            sentiment, DEFAULT_POSES["SUCCESS"]
+        )
+        default_pose_lookup = {
+            p["code"]: p["desc"] for p in default_poses_for_sentiment
+        }
 
         if not pose_code:
             if db_poses:
@@ -214,12 +238,12 @@ class ImagePromptService:
 
 {layout_section}
 
-**Scene:** {scene['name']}
-{scene['desc']}
+**Scene:** {scene["name"]}
+{scene["desc"]}
 {desk_props_section}
 **The Engineer (IMPORTANT - follow exactly):**
 - POSE: {pose_desc} ({pose_code})
-- CLOTHING: {outfit['vest']} (buttoned up) over {outfit['shirt']} shirt. Open collar (NO TIE). Sleeves rolled up to forearms. Dark pants.
+- CLOTHING: {outfit["vest"]} (buttoned up) over {outfit["shirt"]} shirt. Open collar (NO TIE). Sleeves rolled up to forearms. Dark pants.
 - Male, mid-30s, youthful.
 
 **FACE (CRITICAL - follow exactly):**
@@ -320,7 +344,9 @@ Generate the image now.
 
         return self._record_to_response(record)
 
-    def get_prompts(self, user_id: Union[str, UUID], post_id: Optional[str] = None) -> list[ImagePromptResponse]:
+    def get_prompts(
+        self, user_id: Union[str, UUID], post_id: Optional[str] = None
+    ) -> list[ImagePromptResponse]:
         """Get image prompts for a user."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -333,7 +359,9 @@ Generate the image now.
             records = session.exec(statement).all()
             return [self._record_to_response(r) for r in records]
 
-    def get_latest_prompt(self, user_id: Union[str, UUID], post_id: str) -> Optional[ImagePromptResponse]:
+    def get_latest_prompt(
+        self, user_id: Union[str, UUID], post_id: str
+    ) -> Optional[ImagePromptResponse]:
         """Get the latest prompt for a post."""
         uid = normalize_user_id(user_id)
         if not uid:
@@ -386,8 +414,7 @@ Generate the image now.
         for sentiment in ["SUCCESS", "FAILURE", "UNRESOLVED"]:
             db_poses = self.config_service.get_poses(user_id, sentiment)
             result[sentiment] = [
-                {"code": p["code"], "description": p["description"]}
-                for p in db_poses
+                {"code": p["code"], "description": p["description"]} for p in db_poses
             ]
         return result
 

@@ -20,8 +20,6 @@ Usage:
     print(f"Cost: ${span.cost:.4f}")
 """
 
-import json
-import logging
 import time
 import uuid
 from contextlib import contextmanager
@@ -67,6 +65,7 @@ MODEL_PRICING = {
 @dataclass
 class SpanContext:
     """Context for a trace span."""
+
     trace_id: str
     span_id: str
     parent_span_id: Optional[str] = None
@@ -81,6 +80,7 @@ class Span:
     Captures timing, input/output, token usage, and cost
     for an agent call.
     """
+
     span_id: str = field(default_factory=lambda: str(uuid.uuid4())[:8])
     trace_id: str = field(default_factory=lambda: str(uuid.uuid4())[:16])
     model: str = ""
@@ -399,12 +399,10 @@ class AgentTracer:
         # Calculate averages
         for model, stats in by_model.items():
             stats["avg_latency_ms"] = (
-                stats["total_latency"] / stats["calls"]
-                if stats["calls"] > 0 else 0
+                stats["total_latency"] / stats["calls"] if stats["calls"] > 0 else 0
             )
             stats["error_rate"] = (
-                stats["errors"] / stats["calls"]
-                if stats["calls"] > 0 else 0
+                stats["errors"] / stats["calls"] if stats["calls"] > 0 else 0
             )
             del stats["total_latency"]
 

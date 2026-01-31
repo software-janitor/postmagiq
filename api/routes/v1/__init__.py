@@ -25,6 +25,8 @@ from api.routes.v1.voice import router as voice_router
 from api.routes.v1.onboarding import router as onboarding_router
 from api.routes.v1.finished_posts import router as finished_posts_router
 from api.routes.v1.transcription import router as transcription_router
+from api.routes.v1.social_auth import router as social_auth_router
+from api.routes.v1.publishing import router as publishing_router
 
 __all__ = [
     "workspaces_router",
@@ -44,4 +46,6 @@ __all__ = [
     "onboarding_router",
     "finished_posts_router",
     "transcription_router",
+    "social_auth_router",
+    "publishing_router",
 ]

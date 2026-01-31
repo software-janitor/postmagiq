@@ -23,7 +23,9 @@ router = APIRouter(prefix="/posts", tags=["posts"])
 TRACKER_PATH = Path("/app/linkedin_content_tracker.md")
 if not TRACKER_PATH.exists():
     # Fallback for local development
-    TRACKER_PATH = Path(__file__).parent.parent.parent.parent / "linkedin_content_tracker.md"
+    TRACKER_PATH = (
+        Path(__file__).parent.parent.parent.parent / "linkedin_content_tracker.md"
+    )
 
 
 @router.get("/available", response_model=list[PostMetadata])

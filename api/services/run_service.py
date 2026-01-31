@@ -6,14 +6,11 @@ Fallback: Filesystem (workflow/runs/) for legacy runs
 
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
 import yaml
-
-logger = logging.getLogger(__name__)
 
 from api.models.api_models import (
     RunSummary,
@@ -25,6 +22,8 @@ from api.utils.credits import cost_to_credits
 from runner.content.ids import normalize_user_id
 from runner.content.workflow_store import WorkflowStore
 from runner.db.models import WorkflowRun, WorkflowOutput
+
+logger = logging.getLogger(__name__)
 
 
 class RunService:
@@ -132,7 +131,9 @@ class RunService:
         """Get all outputs for a run from database."""
         return self.store.get_workflow_outputs(run_id)
 
-    def get_outputs_by_type(self, run_id: str, output_type: str) -> list[WorkflowOutput]:
+    def get_outputs_by_type(
+        self, run_id: str, output_type: str
+    ) -> list[WorkflowOutput]:
         """Get outputs of a specific type from database."""
         return self.store.get_workflow_outputs_by_type(run_id, output_type)
 
@@ -349,7 +350,9 @@ class RunService:
 
             completed_at = data.get("completed_at")
             if isinstance(completed_at, str):
-                completed_at = datetime.fromisoformat(completed_at.replace("Z", "+00:00"))
+                completed_at = datetime.fromisoformat(
+                    completed_at.replace("Z", "+00:00")
+                )
 
             cost_usd = data.get("total_cost_usd", 0.0)
             return RunSummary(

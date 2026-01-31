@@ -175,7 +175,9 @@ class DevLogger:
             entry["context_remaining"] = remaining
 
             if usage_percent > 90:
-                entry["context_warning"] = f"Critical: {usage_percent:.1f}% context used, {remaining:,} tokens remaining"
+                entry["context_warning"] = (
+                    f"Critical: {usage_percent:.1f}% context used, {remaining:,} tokens remaining"
+                )
             elif usage_percent > 80:
                 entry["context_warning"] = f"Warning: {usage_percent:.1f}% context used"
 

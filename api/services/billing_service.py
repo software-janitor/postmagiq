@@ -8,7 +8,6 @@ import json
 import os
 import uuid
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 
 import stripe
@@ -16,11 +15,12 @@ from sqlmodel import Session, select
 
 from runner.db.engine import engine
 from runner.db.models import (
-    AccountSubscription, SubscriptionStatus,
+    AccountSubscription,
+    SubscriptionStatus,
     SubscriptionTier,
-    UsageTracking,
     BillingEvent,
-    Invoice, InvoiceStatus, InvoiceCreate,
+    Invoice,
+    InvoiceStatus,
     PaymentMethod,
     Workspace,
 )
@@ -70,7 +70,7 @@ class BillingService:
             # Get tier
             tier_statement = select(SubscriptionTier).where(
                 SubscriptionTier.slug == tier_slug,
-                SubscriptionTier.is_active == True,
+                SubscriptionTier.is_active,
             )
             tier = session.exec(tier_statement).first()
             if not tier:
@@ -93,7 +93,9 @@ class BillingService:
 
             # Determine price (use Stripe price IDs in production)
             # For now, create a price on the fly (not recommended for production)
-            price = tier.price_yearly if billing_period == "yearly" else tier.price_monthly
+            price = (
+                tier.price_yearly if billing_period == "yearly" else tier.price_monthly
+            )
             interval = "year" if billing_period == "yearly" else "month"
 
             # Create checkout session
@@ -107,7 +109,8 @@ class BillingService:
                             "currency": "usd",
                             "product_data": {
                                 "name": f"{tier.name} Plan",
-                                "description": tier.description or f"Postmatiq {tier.name} subscription",
+                                "description": tier.description
+                                or f"Postmatiq {tier.name} subscription",
                             },
                             "unit_amount": int(price * 100),  # Convert to cents
                             "recurring": {"interval": interval},
@@ -224,7 +227,9 @@ class BillingService:
                 workspace_id=workspace_id,
                 event_type=event.type,
                 stripe_event_id=event.id,
-                payload=json.dumps(event.data.object.to_dict()) if event.data.object else None,
+                payload=json.dumps(event.data.object.to_dict())
+                if event.data.object
+                else None,
                 processed=False,
             )
             session.add(billing_event)
@@ -375,8 +380,12 @@ class BillingService:
             amount_due=invoice_obj.amount_due,
             invoice_date=datetime.fromtimestamp(invoice_obj.created),
             paid_at=datetime.utcnow(),
-            period_start=datetime.fromtimestamp(invoice_obj.period_start) if invoice_obj.period_start else None,
-            period_end=datetime.fromtimestamp(invoice_obj.period_end) if invoice_obj.period_end else None,
+            period_start=datetime.fromtimestamp(invoice_obj.period_start)
+            if invoice_obj.period_start
+            else None,
+            period_end=datetime.fromtimestamp(invoice_obj.period_end)
+            if invoice_obj.period_end
+            else None,
             hosted_invoice_url=invoice_obj.hosted_invoice_url,
             invoice_pdf=invoice_obj.invoice_pdf,
         )
@@ -507,9 +516,11 @@ class BillingService:
             List of Invoice objects ordered by date descending
         """
         with Session(engine) as session:
-            statement = select(Invoice).where(
-                Invoice.workspace_id == workspace_id
-            ).order_by(Invoice.invoice_date.desc())
+            statement = (
+                select(Invoice)
+                .where(Invoice.workspace_id == workspace_id)
+                .order_by(Invoice.invoice_date.desc())
+            )
             invoices = list(session.exec(statement).all())
             for inv in invoices:
                 session.expunge(inv)

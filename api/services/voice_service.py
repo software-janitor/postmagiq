@@ -1,14 +1,16 @@
 """Service for voice learning and analysis."""
 
 import json
+import logging
 import os
 from typing import Optional, Union
 from uuid import UUID
 from pydantic import BaseModel
 
-import requests
+logger = logging.getLogger(__name__)
 
 from api.services.content_service import ContentService
+from runner.agents.factory import create_agent
 from runner.content.models import VOICE_PROMPTS
 
 
@@ -19,6 +21,7 @@ from runner.content.models import VOICE_PROMPTS
 
 class WritingSample(BaseModel):
     """A writing sample for voice analysis."""
+
     source_type: str  # "prompt" or "upload"
     prompt_id: Optional[str] = None
     prompt_text: Optional[str] = None
@@ -28,9 +31,14 @@ class WritingSample(BaseModel):
 
 class VoiceAnalysis(BaseModel):
     """Extracted voice characteristics."""
+
     tone: str
     sentence_patterns: dict
     vocabulary_level: str
+    punctuation_style: Optional[dict] = None
+    transition_style: Optional[str] = None
+    paragraph_rhythm: Optional[dict] = None
+    reader_address: Optional[dict] = None
     signature_phrases: list[str]
     storytelling_style: str
     emotional_register: str
@@ -42,46 +50,97 @@ class VoiceAnalysis(BaseModel):
 # =============================================================================
 
 
-VOICE_ANALYSIS_PROMPT = """Analyze these writing samples from the same author and extract their natural voice characteristics.
+VOICE_SYSTEM_PROMPT = """You are an expert writing voice analyst. Your job is to extract REUSABLE voice characteristics that can guide AI to write NEW content in this author's authentic style.
+
+CRITICAL: Focus on TRANSFERABLE patterns, not content-specific details. The goal is to capture HOW they write, not WHAT they write about.
+
+AVOID extracting:
+- Product names, brand names, or specific topics
+- Quotes that only make sense in original context
+- Content-specific phrases that can't be reused
+
+FOCUS on extracting:
+- Syntactic patterns and sentence structures
+- Punctuation habits (especially: do they use em-dashes, semicolons, ellipses?)
+- Transition word preferences
+- How they open and close paragraphs
+- Their relationship with the reader (formal/casual, direct/indirect)
+
+Output valid JSON only. No markdown, no explanation."""
+
+VOICE_ANALYSIS_PROMPT = """Analyze these writing samples and extract the author's voice characteristics for use in generating NEW content.
 
 Writing samples:
 {samples}
 
-Analyze the following dimensions:
+Analyze these dimensions:
 
-1. **Tone** (2-3 adjectives): e.g., "reflective, warm, technically grounded"
+1. **Tone** (2-3 adjectives): The emotional quality of their writing
+
 2. **Sentence Patterns**:
-   - Average sentence length (short/medium/long)
-   - Length variation (consistent/varied/dramatic)
-   - Common structures (simple, compound, lists, fragments)
-3. **Vocabulary Level**:
-   - Technical depth (jargon-heavy, accessible, mixed)
-   - Register (formal, casual, conversational)
-4. **Signature Phrases**: Phrases or constructions that recur across samples
-5. **Storytelling Style**:
-   - Opening approach (chronological, in-media-res, thesis-first)
-   - Detail preference (concrete specifics, abstractions, metaphors)
-6. **Emotional Register**:
-   - How they handle vulnerability (open, guarded, analytical)
-   - How they express confidence (direct, humble, qualified)
-7. **Summary**: A 2-3 sentence description of their unique voice
+   - Average length (short/medium/long)
+   - Variation (consistent/varied/dramatic)
+   - Common structures (simple, compound, fragments, lists)
 
-Include specific examples from the samples to support each observation.
+3. **Vocabulary Level**: Technical depth and formality register
 
-Output ONLY valid JSON matching this structure:
-{
+4. **Punctuation Style** (IMPORTANT - helps avoid AI-sounding patterns):
+   - Em-dash usage (none/rare/moderate/heavy)
+   - Semicolon usage (none/rare/moderate/heavy)
+   - Exclamation points (none/rare/moderate/heavy)
+   - Ellipses usage (none/rare/moderate/heavy)
+   - Parenthetical asides (none/rare/moderate/heavy)
+
+5. **Transition Style**: How they connect ideas
+   - Formal transitions ("However," "Furthermore,") vs casual ("But," "And,") vs minimal
+
+6. **Paragraph Rhythm**:
+   - Length preference (short punchy / medium / long flowing)
+   - Opening style (topic sentence / hook / question / statement)
+
+7. **Reader Address**:
+   - Point of view (first person "I" / inclusive "we" / direct "you" / third person)
+   - Relationship (peer/mentor/expert/friend)
+
+8. **Signature Phrases**: Recurring SYNTACTIC patterns only (e.g., "The thing is...", "What I've learned is...", "Here's the deal:")
+   - Must be reusable templates, NOT content-specific quotes
+
+9. **Storytelling Style**: Opening approach, detail preference, how they build arguments
+
+10. **Emotional Register**: How they handle vulnerability and express confidence
+
+11. **Summary**: 2-3 sentences capturing their unique voice DNA
+
+Output this JSON structure:
+{{
   "tone": "adjective1, adjective2, adjective3",
-  "sentence_patterns": {
+  "sentence_patterns": {{
     "average_length": "short|medium|long",
     "variation": "consistent|varied|dramatic",
     "common_structures": ["structure1", "structure2"]
-  },
-  "vocabulary_level": "Description of vocabulary style",
-  "signature_phrases": ["phrase1", "phrase2", "phrase3"],
-  "storytelling_style": "Description of storytelling approach",
-  "emotional_register": "Description of emotional expression",
-  "summary": "2-3 sentence summary of their unique voice"
-}
+  }},
+  "vocabulary_level": "description",
+  "punctuation_style": {{
+    "em_dashes": "none|rare|moderate|heavy",
+    "semicolons": "none|rare|moderate|heavy",
+    "exclamations": "none|rare|moderate|heavy",
+    "ellipses": "none|rare|moderate|heavy",
+    "parentheticals": "none|rare|moderate|heavy"
+  }},
+  "transition_style": "description of how they connect ideas",
+  "paragraph_rhythm": {{
+    "length": "short|medium|long",
+    "opening_style": "description"
+  }},
+  "reader_address": {{
+    "point_of_view": "first person|inclusive we|direct you|third person",
+    "relationship": "peer|mentor|expert|friend"
+  }},
+  "signature_phrases": ["reusable pattern 1...", "reusable pattern 2..."],
+  "storytelling_style": "description",
+  "emotional_register": "description",
+  "summary": "2-3 sentence voice DNA summary"
+}}
 """
 
 
@@ -95,44 +154,93 @@ class VoiceService:
 
     def __init__(self, content_service: Optional[ContentService] = None):
         self.content_service = content_service or ContentService()
-        self.ollama_host = os.environ.get("OLLAMA_HOST", "http://localhost:11434")
-        self.model = os.environ.get("VOICE_MODEL", "llama3.2")
+        self.llm_provider = os.environ.get("LLM_PROVIDER", "ollama")
         self.timeout = 180  # Voice analysis can take longer
 
-    def _call_llm(self, prompt: str) -> str:
-        """Call Ollama LLM."""
-        try:
-            response = requests.post(
-                f"{self.ollama_host}/api/generate",
-                json={
-                    "model": self.model,
-                    "prompt": prompt,
-                    "stream": False,
-                },
-                timeout=self.timeout,
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data.get("response", "")
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"LLM request failed: {e}")
+        # Track last result for token/cost info
+        self.last_result = None
+
+        # Use agent factory - same as workflows
+        # Provider-specific env vars: {PROVIDER}_VOICE_MODEL
+        model_defaults = {
+            "groq": "gpt-oss-120b",
+            "ollama": "llama3.2",
+            "claude": "sonnet",
+            "gemini": "gemini-2.0-flash",
+            "openai": "gpt-5.2",
+        }
+        env_var = f"{self.llm_provider.upper()}_VOICE_MODEL"
+        default_model = model_defaults.get(self.llm_provider, "llama3.2")
+        self.model = os.environ.get(env_var, default_model)
+
+        self.agent = create_agent(
+            self.llm_provider,
+            {
+                "name": "voice-analyzer",
+                "model": self.model,
+                "max_tokens": 4096,
+                "timeout": self.timeout,
+                "type": "api",  # Prefer API mode for direct SDK calls
+            },
+        )
+
+    def _call_llm(self, prompt: str, system_prompt: str = None) -> str:
+        """Call LLM using the configured agent."""
+        # Prepend system prompt if provided
+        full_prompt = prompt
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\n{prompt}"
+
+        # Use invoke_json if available (Groq), otherwise regular invoke
+        if hasattr(self.agent, 'invoke_json'):
+            result = self.agent.invoke_json(prompt, system_prompt=system_prompt)
+        else:
+            result = self.agent.invoke(full_prompt)
+
+        self.last_result = result  # Store for token tracking
+
+        if not result.success:
+            raise RuntimeError(f"LLM request failed: {result.error}")
+
+        logger.warning(
+            f"LLM response ({self.llm_provider}): {result.tokens.input_tokens} in / "
+            f"{result.tokens.output_tokens} out, ${result.cost_usd:.4f}"
+        )
+        return result.content
 
     def _parse_json_response(self, response: str) -> dict:
         """Extract JSON from LLM response."""
+        logger.warning(f"PARSE: response length={len(response)}")
+
+        # Try direct parse
         try:
             return json.loads(response)
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            logger.warning(f"PARSE: direct failed: {e}")
 
         import re
+
+        # Try extracting JSON block
         json_match = re.search(r"\{[\s\S]*\}", response)
         if json_match:
+            matched = json_match.group()
+            logger.warning(f"PARSE: regex matched len={len(matched)}")
             try:
-                return json.loads(json_match.group())
-            except json.JSONDecodeError:
-                pass
+                return json.loads(matched)
+            except json.JSONDecodeError as e:
+                logger.warning(f"PARSE: regex failed: {e}")
 
-        raise ValueError(f"Could not parse JSON from response: {response[:200]}...")
+        # Try extracting from markdown code block
+        code_match = re.search(r"```(?:json)?\s*([\s\S]*?)```", response)
+        if code_match:
+            code_content = code_match.group(1).strip()
+            logger.warning(f"PARSE: code block matched len={len(code_content)}")
+            try:
+                return json.loads(code_content)
+            except json.JSONDecodeError as e:
+                logger.warning(f"PARSE: code block failed: {e}")
+
+        raise ValueError(f"Could not parse JSON: {response[:300]}...")
 
     # =========================================================================
     # Voice Prompts
@@ -159,8 +267,9 @@ class VoiceService:
         self,
         user_id: Union[str, UUID],
         sample: WritingSample,
-    ) -> int:
-        """Save a writing sample."""
+        workspace_id: Optional[UUID] = None,
+    ) -> str:
+        """Save a writing sample, optionally with workspace scope."""
         return self.content_service.save_writing_sample(
             user_id=user_id,
             source_type=sample.source_type,
@@ -168,6 +277,7 @@ class VoiceService:
             prompt_id=sample.prompt_id,
             prompt_text=sample.prompt_text,
             title=sample.title,
+            workspace_id=workspace_id,
         )
 
     def get_samples(self, user_id: Union[str, UUID]) -> list[dict]:
@@ -205,7 +315,9 @@ class VoiceService:
 
         total_words = sum(s.word_count or 0 for s in samples)
         if total_words < 500:
-            raise ValueError(f"Need at least 500 words for analysis (have {total_words})")
+            raise ValueError(
+                f"Need at least 500 words for analysis (have {total_words})"
+            )
 
         # Format samples for prompt
         formatted_samples = []
@@ -220,14 +332,18 @@ class VoiceService:
         samples_text = "\n\n---\n\n".join(formatted_samples)
         prompt = VOICE_ANALYSIS_PROMPT.format(samples=samples_text)
 
-        # Call LLM
-        response = self._call_llm(prompt)
+        # Call LLM with system prompt
+        response = self._call_llm(prompt, system_prompt=VOICE_SYSTEM_PROMPT)
         data = self._parse_json_response(response)
 
         return VoiceAnalysis(
             tone=data.get("tone", ""),
             sentence_patterns=data.get("sentence_patterns", {}),
             vocabulary_level=data.get("vocabulary_level", ""),
+            punctuation_style=data.get("punctuation_style"),
+            transition_style=data.get("transition_style"),
+            paragraph_rhythm=data.get("paragraph_rhythm"),
+            reader_address=data.get("reader_address"),
             signature_phrases=data.get("signature_phrases", []),
             storytelling_style=data.get("storytelling_style", ""),
             emotional_register=data.get("emotional_register", ""),
@@ -319,7 +435,9 @@ class VoiceService:
         """Clone a voice profile with a new name."""
         return self.content_service.clone_voice_profile(profile_id, new_name)
 
-    def set_default_profile(self, user_id: Union[str, UUID], profile_id: Union[str, UUID]) -> None:
+    def set_default_profile(
+        self, user_id: Union[str, UUID], profile_id: Union[str, UUID]
+    ) -> None:
         """Set a voice profile as the default."""
         self.content_service.set_default_voice_profile(user_id, profile_id)
 
@@ -336,7 +454,9 @@ class VoiceService:
     # =========================================================================
 
     @staticmethod
-    def validate_sample_word_count(content: str, max_words: int = 500) -> tuple[bool, int]:
+    def validate_sample_word_count(
+        content: str, max_words: int = 500
+    ) -> tuple[bool, int]:
         """Validate sample word count.
 
         Returns:
@@ -345,7 +465,9 @@ class VoiceService:
         word_count = len(content.split())
         return word_count <= max_words, word_count
 
-    def can_analyze(self, user_id: Union[str, UUID], min_words: int = 500) -> tuple[bool, int]:
+    def can_analyze(
+        self, user_id: Union[str, UUID], min_words: int = 500
+    ) -> tuple[bool, int]:
         """Check if user has enough samples for analysis.
 
         Returns:
@@ -357,23 +479,6 @@ class VoiceService:
     # =========================================================================
     # Workspace-Scoped Methods (for v1 API)
     # =========================================================================
-
-    def save_sample(
-        self,
-        user_id: Union[str, UUID],
-        sample: WritingSample,
-        workspace_id: Optional[UUID] = None,
-    ) -> str:
-        """Save a writing sample, optionally with workspace scope."""
-        return self.content_service.save_writing_sample(
-            user_id=user_id,
-            source_type=sample.source_type,
-            content=sample.content,
-            prompt_id=sample.prompt_id,
-            prompt_text=sample.prompt_text,
-            title=sample.title,
-            workspace_id=workspace_id,
-        )
 
     def get_samples_for_workspace(self, workspace_id: UUID) -> list[dict]:
         """Get all writing samples for a workspace."""
@@ -387,7 +492,11 @@ class VoiceService:
                 "title": s.title,
                 "content": s.content,
                 "word_count": s.word_count,
-                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "created_at": (
+                    s.created_at if isinstance(s.created_at, str)
+                    else s.created_at.isoformat() if s.created_at
+                    else None
+                ),
             }
             for s in samples
         ]
@@ -406,7 +515,9 @@ class VoiceService:
 
         total_words = sum(s.word_count or 0 for s in samples)
         if total_words < 500:
-            raise ValueError(f"Need at least 500 words for analysis (have {total_words})")
+            raise ValueError(
+                f"Need at least 500 words for analysis (have {total_words})"
+            )
 
         # Format samples for prompt
         formatted_samples = []
@@ -421,14 +532,18 @@ class VoiceService:
         samples_text = "\n\n---\n\n".join(formatted_samples)
         prompt = VOICE_ANALYSIS_PROMPT.format(samples=samples_text)
 
-        # Call LLM
-        response = self._call_llm(prompt)
+        # Call LLM with system prompt
+        response = self._call_llm(prompt, system_prompt=VOICE_SYSTEM_PROMPT)
         data = self._parse_json_response(response)
 
         return VoiceAnalysis(
             tone=data.get("tone", ""),
             sentence_patterns=data.get("sentence_patterns", {}),
             vocabulary_level=data.get("vocabulary_level", ""),
+            punctuation_style=data.get("punctuation_style"),
+            transition_style=data.get("transition_style"),
+            paragraph_rhythm=data.get("paragraph_rhythm"),
+            reader_address=data.get("reader_address"),
             signature_phrases=data.get("signature_phrases", []),
             storytelling_style=data.get("storytelling_style", ""),
             emotional_register=data.get("emotional_register", ""),

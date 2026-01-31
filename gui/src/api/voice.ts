@@ -55,6 +55,22 @@ export interface AnalysisResult {
     tone: string
     sentence_patterns: Record<string, unknown>
     vocabulary_level: string
+    punctuation_style?: {
+      em_dashes: string
+      semicolons: string
+      exclamations: string
+      ellipses: string
+      parentheticals: string
+    }
+    transition_style?: string
+    paragraph_rhythm?: {
+      length: string
+      opening_style: string
+    }
+    reader_address?: {
+      point_of_view: string
+      relationship: string
+    }
     signature_phrases: string[]
     storytelling_style: string
     emotional_register: string

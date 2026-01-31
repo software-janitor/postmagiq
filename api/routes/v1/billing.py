@@ -9,7 +9,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from pydantic import BaseModel
 
-from api.auth.dependencies import get_current_user, require_scope
+from api.auth.dependencies import require_scope
 from api.auth.scopes import Scope
 from api.services.billing_service import BillingService
 from runner.db.models import User

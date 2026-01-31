@@ -19,6 +19,7 @@ from runner.content.models import CONTENT_STYLES
 
 class QuickOnboardingAnswers(BaseModel):
     """User answers from quick onboarding mode."""
+
     professional_role: str
     known_for: str
     target_audience: str
@@ -28,18 +29,21 @@ class QuickOnboardingAnswers(BaseModel):
 
 class GeneratedPlan(BaseModel):
     """LLM-generated content plan."""
+
     signature_thesis: str
     chapters: list[dict]  # [{chapter_number, title, theme, description, posts: [...]}]
 
 
 class DeepModeMessage(BaseModel):
     """A message in the deep discovery conversation."""
+
     role: str  # "user" or "assistant"
     content: str
 
 
 class DeepModeState(BaseModel):
     """State for deep discovery conversation."""
+
     messages: list[DeepModeMessage] = Field(default_factory=list)
     turn_count: int = 0
     ready_to_generate: bool = False
@@ -344,6 +348,7 @@ class OnboardingService:
 
         # Try to find JSON block
         import re
+
         json_match = re.search(r"\{[\s\S]*\}", response)
         if json_match:
             try:
@@ -431,13 +436,14 @@ Posts per Week: {answers.posts_per_week}
 
         # Build messages for LLM
         llm_messages = [
-            {"role": msg.role, "content": msg.content}
-            for msg in new_messages
+            {"role": msg.role, "content": msg.content} for msg in new_messages
         ]
 
         # Get LLM response
         try:
-            response = self._call_llm(llm_messages, system_prompt=DEEP_MODE_SYSTEM_PROMPT)
+            response = self._call_llm(
+                llm_messages, system_prompt=DEEP_MODE_SYSTEM_PROMPT
+            )
         except Exception:
             response = (
                 "Thanks, that helps. Would you like me to synthesize this into a "
@@ -469,10 +475,9 @@ Posts per Week: {answers.posts_per_week}
     ) -> GeneratedPlan:
         """Generate plan from deep discovery conversation."""
         # Format conversation
-        conversation = "\n".join([
-            f"{msg.role.upper()}: {msg.content}"
-            for msg in state.messages
-        ])
+        conversation = "\n".join(
+            [f"{msg.role.upper()}: {msg.content}" for msg in state.messages]
+        )
 
         prompt = SYNTHESIS_PROMPT.format(
             conversation=conversation,
@@ -503,7 +508,11 @@ Posts per Week: {answers.posts_per_week}
             data = self._parse_json_response(response)
             return GeneratedPlan(**data)
         except Exception:
-            base_topic = strategy.get("positioning") or strategy.get("signature_thesis") or "your work"
+            base_topic = (
+                strategy.get("positioning")
+                or strategy.get("signature_thesis")
+                or "your work"
+            )
             content_style = strategy.get("content_style", "mixed")
             target_audience = strategy.get("target_audience")
             return self._build_fallback_plan(
@@ -609,7 +618,11 @@ Posts per Week: {answers.posts_per_week}
                 "question": "How many posts per week can you commit to?",
                 "type": "select",
                 "options": [
-                    {"id": "1", "name": "1 post", "description": "Sustainable, low pressure"},
+                    {
+                        "id": "1",
+                        "name": "1 post",
+                        "description": "Sustainable, low pressure",
+                    },
                     {"id": "2", "name": "2 posts", "description": "Good momentum"},
                     {"id": "3", "name": "3 posts", "description": "Active presence"},
                 ],

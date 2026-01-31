@@ -52,58 +52,66 @@ class Scope(str, Enum):
 
 
 # Define scope sets for each role
-_OWNER_SCOPES: FrozenSet[Scope] = frozenset([
-    Scope.CONTENT_READ,
-    Scope.CONTENT_WRITE,
-    Scope.CONTENT_APPROVE,
-    Scope.STRATEGY_READ,
-    Scope.STRATEGY_WRITE,
-    Scope.WORKFLOW_READ,
-    Scope.WORKFLOW_EXECUTE,
-    Scope.TEAM_READ,
-    Scope.TEAM_MANAGE,
-    Scope.BILLING_READ,
-    Scope.BILLING_MANAGE,
-    Scope.WORKSPACE_SETTINGS,
-    Scope.WORKSPACE_DELETE,
-    Scope.WORKSPACE_USERS,
-    Scope.ADMIN,
-])
+_OWNER_SCOPES: FrozenSet[Scope] = frozenset(
+    [
+        Scope.CONTENT_READ,
+        Scope.CONTENT_WRITE,
+        Scope.CONTENT_APPROVE,
+        Scope.STRATEGY_READ,
+        Scope.STRATEGY_WRITE,
+        Scope.WORKFLOW_READ,
+        Scope.WORKFLOW_EXECUTE,
+        Scope.TEAM_READ,
+        Scope.TEAM_MANAGE,
+        Scope.BILLING_READ,
+        Scope.BILLING_MANAGE,
+        Scope.WORKSPACE_SETTINGS,
+        Scope.WORKSPACE_DELETE,
+        Scope.WORKSPACE_USERS,
+        Scope.ADMIN,
+    ]
+)
 
-_ADMIN_SCOPES: FrozenSet[Scope] = frozenset([
-    Scope.CONTENT_READ,
-    Scope.CONTENT_WRITE,
-    Scope.CONTENT_APPROVE,
-    Scope.STRATEGY_READ,
-    Scope.STRATEGY_WRITE,
-    Scope.WORKFLOW_READ,
-    Scope.WORKFLOW_EXECUTE,
-    Scope.TEAM_READ,
-    Scope.TEAM_MANAGE,
-    Scope.BILLING_READ,
-    Scope.WORKSPACE_SETTINGS,
-    Scope.WORKSPACE_USERS,
-    # Note: admins cannot manage billing or delete workspace
-])
+_ADMIN_SCOPES: FrozenSet[Scope] = frozenset(
+    [
+        Scope.CONTENT_READ,
+        Scope.CONTENT_WRITE,
+        Scope.CONTENT_APPROVE,
+        Scope.STRATEGY_READ,
+        Scope.STRATEGY_WRITE,
+        Scope.WORKFLOW_READ,
+        Scope.WORKFLOW_EXECUTE,
+        Scope.TEAM_READ,
+        Scope.TEAM_MANAGE,
+        Scope.BILLING_READ,
+        Scope.WORKSPACE_SETTINGS,
+        Scope.WORKSPACE_USERS,
+        # Note: admins cannot manage billing or delete workspace
+    ]
+)
 
-_EDITOR_SCOPES: FrozenSet[Scope] = frozenset([
-    Scope.CONTENT_READ,
-    Scope.CONTENT_WRITE,
-    Scope.CONTENT_APPROVE,
-    Scope.WORKFLOW_READ,
-    Scope.WORKFLOW_EXECUTE,
-    Scope.TEAM_READ,
-    # Note: editors can view strategy but not edit it
-    Scope.STRATEGY_READ,
-])
+_EDITOR_SCOPES: FrozenSet[Scope] = frozenset(
+    [
+        Scope.CONTENT_READ,
+        Scope.CONTENT_WRITE,
+        Scope.CONTENT_APPROVE,
+        Scope.WORKFLOW_READ,
+        Scope.WORKFLOW_EXECUTE,
+        Scope.TEAM_READ,
+        # Note: editors can view strategy but not edit it
+        Scope.STRATEGY_READ,
+    ]
+)
 
-_VIEWER_SCOPES: FrozenSet[Scope] = frozenset([
-    Scope.CONTENT_READ,
-    Scope.STRATEGY_READ,
-    Scope.WORKFLOW_READ,
-    Scope.TEAM_READ,
-    Scope.BILLING_READ,
-])
+_VIEWER_SCOPES: FrozenSet[Scope] = frozenset(
+    [
+        Scope.CONTENT_READ,
+        Scope.STRATEGY_READ,
+        Scope.WORKFLOW_READ,
+        Scope.TEAM_READ,
+        Scope.BILLING_READ,
+    ]
+)
 
 
 ROLE_SCOPES: dict[WorkspaceRole, FrozenSet[Scope]] = {

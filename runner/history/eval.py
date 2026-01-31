@@ -137,7 +137,9 @@ def main() -> int:
     parser.add_argument("--story", help="Story name for post_iterations query")
     parser.add_argument("--state", help="State name for best_agent query")
     parser.add_argument("--days", type=int, default=30, help="Days to look back")
-    parser.add_argument("--weeks", type=int, default=12, help="Weeks for weekly_summary")
+    parser.add_argument(
+        "--weeks", type=int, default=12, help="Weeks for weekly_summary"
+    )
     parser.add_argument("--export", help="Export results to CSV file")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
     parser.add_argument(
@@ -161,7 +163,14 @@ def main() -> int:
             export_to_csv(
                 results,
                 Path(args.export),
-                ["agent", "avg_score", "avg_hook", "avg_specifics", "avg_voice", "sample_size"],
+                [
+                    "agent",
+                    "avg_score",
+                    "avg_hook",
+                    "avg_specifics",
+                    "avg_voice",
+                    "sample_size",
+                ],
             )
         else:
             print_agent_comparison(results, args.days)
@@ -213,7 +222,9 @@ def main() -> int:
         if args.json:
             print(json.dumps(results, indent=2))
         elif args.export:
-            export_to_csv(results, Path(args.export), ["day", "runs", "avg_score", "total_cost"])
+            export_to_csv(
+                results, Path(args.export), ["day", "runs", "avg_score", "total_cost"]
+            )
         else:
             print("\nQuality Trend (daily)")
             print("=" * 50)
@@ -221,7 +232,9 @@ def main() -> int:
             print("-" * 50)
             for r in results:
                 score = f"{r['avg_score']:.1f}" if r["avg_score"] else "-"
-                print(f"{r['day']:<12} {r['runs']:>6} {score:>10} ${r['total_cost']:>9.2f}")
+                print(
+                    f"{r['day']:<12} {r['runs']:>6} {score:>10} ${r['total_cost']:>9.2f}"
+                )
 
     elif args.query == "best_agent":
         if not args.state:

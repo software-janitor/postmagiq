@@ -13,6 +13,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 # ImagePrompt
 # =============================================================================
 
+
 class ImagePromptBase(SQLModel):
     """Base image prompt fields."""
 
@@ -64,6 +65,7 @@ class ImagePromptRead(ImagePromptBase):
 # ImageConfigSet
 # =============================================================================
 
+
 class ImageConfigSetBase(SQLModel):
     """Base image config set fields."""
 
@@ -97,6 +99,7 @@ class ImageConfigSetCreate(ImageConfigSetBase):
 # =============================================================================
 # ImageScene
 # =============================================================================
+
 
 class ImageSceneBase(SQLModel):
     """Base image scene fields."""
@@ -136,6 +139,7 @@ class ImageSceneCreate(ImageSceneBase):
 # ImagePose
 # =============================================================================
 
+
 class ImagePoseBase(SQLModel):
     """Base image pose fields."""
 
@@ -171,6 +175,7 @@ class ImagePoseCreate(ImagePoseBase):
 # ImageOutfit
 # =============================================================================
 
+
 class ImageOutfitBase(SQLModel):
     """Base image outfit fields."""
 
@@ -205,6 +210,7 @@ class ImageOutfitCreate(ImageOutfitBase):
 # ImageProp
 # =============================================================================
 
+
 class ImagePropBase(SQLModel):
     """Base image prop fields."""
 
@@ -238,6 +244,7 @@ class ImagePropCreate(ImagePropBase):
 # =============================================================================
 # ImageCharacter
 # =============================================================================
+
 
 class ImageCharacterBase(SQLModel):
     """Base image character fields."""

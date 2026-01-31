@@ -1,6 +1,5 @@
 """Base class for CLI-based agents."""
 
-import json
 import os
 import re
 import subprocess
@@ -48,7 +47,9 @@ class CLIAgent(BaseAgent):
         self._current_process: Optional[subprocess.Popen] = None
         self._process_lock = threading.Lock()
 
-    def invoke(self, prompt: str, input_files: Optional[list[str]] = None) -> AgentResult:
+    def invoke(
+        self, prompt: str, input_files: Optional[list[str]] = None
+    ) -> AgentResult:
         """One-shot invocation without session."""
         full_prompt = self._build_prompt(prompt, input_files)
         return self._execute(full_prompt, use_session=False)
@@ -66,7 +67,9 @@ class CLIAgent(BaseAgent):
         full_prompt = self._build_prompt(prompt, input_files)
         return self._execute(full_prompt, use_session=True)
 
-    def _build_prompt(self, prompt: str, input_files: Optional[list[str]] = None) -> str:
+    def _build_prompt(
+        self, prompt: str, input_files: Optional[list[str]] = None
+    ) -> str:
         """Build full prompt including file contents if provided."""
         if not input_files:
             return prompt
@@ -104,8 +107,10 @@ class CLIAgent(BaseAgent):
             # Rate limit hit - retry with backoff
             last_error = result.error
             if attempt < self.MAX_RATE_LIMIT_RETRIES:
-                backoff = self.RATE_LIMIT_BACKOFF_BASE * (2 ** attempt)
-                print(f"[{self.name}] Rate limited, waiting {backoff}s before retry {attempt + 2}/{self.MAX_RATE_LIMIT_RETRIES + 1}...")
+                backoff = self.RATE_LIMIT_BACKOFF_BASE * (2**attempt)
+                print(
+                    f"[{self.name}] Rate limited, waiting {backoff}s before retry {attempt + 2}/{self.MAX_RATE_LIMIT_RETRIES + 1}..."
+                )
                 time.sleep(backoff)
 
         # All retries exhausted
@@ -117,7 +122,9 @@ class CLIAgent(BaseAgent):
             error=last_error or "Rate limit retries exhausted",
         )
 
-    def _execute_once(self, prompt: str, use_session: bool, start_time: float) -> AgentResult:
+    def _execute_once(
+        self, prompt: str, use_session: bool, start_time: float
+    ) -> AgentResult:
         """Execute a single CLI invocation."""
         try:
             args = self._get_command_args(prompt, use_session)
@@ -144,7 +151,9 @@ class CLIAgent(BaseAgent):
 
                 # Detect rate limiting and provide cleaner error message
                 if _detect_rate_limit(error_text):
-                    error_text = f"model '{self.name}' is rate limited (out of capacity)"
+                    error_text = (
+                        f"model '{self.name}' is rate limited (out of capacity)"
+                    )
 
                 return AgentResult(
                     success=False,

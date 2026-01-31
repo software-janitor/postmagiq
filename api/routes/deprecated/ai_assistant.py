@@ -11,7 +11,6 @@ from api.services.onboarding_service import OnboardingService, GeneratedPlan
 from api.services.strategy_chat_service import (
     StrategyChatService,
     StrategyConversation,
-    StrategyMessage,
 )
 
 router = APIRouter(prefix="/ai-assistant", tags=["ai-assistant"])
@@ -47,7 +46,6 @@ Each scene has:
 
 Keep descriptions visual and specific. Include what's on monitors, how people are positioned, robot actions.
 When suggesting scenes, provide complete JSON that can be added to the database.""",
-
     "poses": """You are helping create pose descriptions for a professional content creator.
 Poses describe how the Engineer is positioned/gesturing in images.
 Each pose has:
@@ -59,7 +57,6 @@ Each pose has:
 Match poses to their sentiment. SUCCESS poses show confidence, satisfaction.
 FAILURE poses show frustration, defeat. UNRESOLVED poses show thinking, uncertainty.
 When suggesting poses, provide complete JSON that can be added to the database.""",
-
     "outfits": """You are helping create outfit descriptions for a professional content creator.
 Outfits describe what the Engineer wears (professional casual style).
 Each outfit has:
@@ -69,7 +66,6 @@ Each outfit has:
 
 The style is always professional but approachable: vest buttoned, shirt collar open (no tie), sleeves rolled up.
 When suggesting outfits, provide complete JSON that can be added to the database.""",
-
     "props": """You are helping create prop descriptions for a professional content creator.
 Props are items on the desk in images.
 Each prop has:
@@ -79,7 +75,6 @@ Each prop has:
 
 Props add realism and personality to scenes.
 When suggesting props, provide complete JSON that can be added to the database.""",
-
     "characters": """You are helping refine character descriptions for image generation.
 There are two characters:
 1. The Engineer - a male professional in his mid-30s with specific appearance details
@@ -87,7 +82,6 @@ There are two characters:
 
 Help refine appearance details, facial features, clothing rules, or robot design.
 Be specific and visual in descriptions.""",
-
     "strategy": """You are helping refine a LinkedIn content strategy.
 The strategy includes:
 - A signature thesis (core message)
@@ -104,7 +98,6 @@ Help improve:
 - Improving enemy definitions (what the posts argue against)
 
 Be strategic and specific. Good content strategy is opinionated.""",
-
     "voice": """You are helping refine a voice profile for content creation.
 A voice profile captures:
 - Tone (how the writing feels)
@@ -121,7 +114,6 @@ Help improve:
 - Recommending storytelling techniques to emphasize
 
 Be specific about linguistic patterns.""",
-
     "personas": """You are helping improve AI workflow persona instructions.
 Personas are instructions for AI agents in a content workflow:
 - Writer: Drafts content in the user's voice
@@ -162,23 +154,16 @@ Respond helpfully and concisely. If suggesting new items to add, format them as 
         result = agent.invoke(full_prompt)
 
         if result.success:
-            return ChatResponse(
-                response=result.content,
-                success=True
-            )
+            return ChatResponse(response=result.content, success=True)
         else:
             return ChatResponse(
                 response="",
                 success=False,
-                error=result.error or "Agent invocation failed"
+                error=result.error or "Agent invocation failed",
             )
 
     except Exception as e:
-        return ChatResponse(
-            response="",
-            success=False,
-            error=str(e)
-        )
+        return ChatResponse(response="", success=False, error=str(e))
 
 
 @router.get("/available-agents")
@@ -188,7 +173,11 @@ async def available_agents(
     """List available AI agents."""
     return {
         "agents": [
-            {"id": "ollama", "name": "Ollama (Local)", "description": "Fast local model"},
+            {
+                "id": "ollama",
+                "name": "Ollama (Local)",
+                "description": "Fast local model",
+            },
             {"id": "claude", "name": "Claude", "description": "Anthropic Claude"},
             {"id": "gemini", "name": "Gemini", "description": "Google Gemini"},
         ]
@@ -202,12 +191,14 @@ async def available_agents(
 
 class StrategyChatMessageRequest(BaseModel):
     """Request to send a message in strategy chat."""
+
     message: str
     state: Optional[dict] = None  # StrategyConversation as dict
 
 
 class StrategyChatResponse(BaseModel):
     """Response from strategy chat."""
+
     assistant_message: str
     state: dict  # StrategyConversation as dict
     ready_to_create: bool
@@ -217,11 +208,13 @@ class StrategyChatResponse(BaseModel):
 
 class StrategyCreateRequest(BaseModel):
     """Request to create strategy from chat."""
+
     state: dict  # StrategyConversation as dict
 
 
 class StrategyCreateResponse(BaseModel):
     """Response with extracted strategy."""
+
     strategy: dict
     success: bool
     error: Optional[str] = None
@@ -229,11 +222,13 @@ class StrategyCreateResponse(BaseModel):
 
 class StrategyPlanRequest(BaseModel):
     """Request to generate a plan from strategy summary."""
+
     strategy: dict
 
 
 class StrategyPlanResponse(BaseModel):
     """Response with generated plan."""
+
     plan: GeneratedPlan
     success: bool
     error: Optional[str] = None

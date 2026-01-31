@@ -1,7 +1,6 @@
 """API routes for workflow execution."""
 
-from typing import Annotated, Optional
-from uuid import UUID
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -13,7 +12,6 @@ from api.models.api_models import (
     WorkflowStatus,
 )
 from api.services.workflow_service import workflow_service
-from runner.content.ids import normalize_user_id
 from runner.content.workflow_store import WorkflowStore
 
 router = APIRouter()
@@ -201,7 +199,9 @@ async def finalize_story(
     # Get the latest run and final post content
     run = store.get_latest_workflow_run_for_story(uid, story)
     if not run:
-        raise HTTPException(status_code=404, detail="No workflow run found for this story")
+        raise HTTPException(
+            status_code=404, detail="No workflow run found for this story"
+        )
 
     outputs = store.get_workflow_outputs(run.run_id)
     final_content = None

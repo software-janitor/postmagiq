@@ -23,6 +23,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 
 class NotificationChannelType(str, Enum):
     """Types of notification delivery channels."""
+
     IN_APP = "in_app"
     EMAIL = "email"
     # Future: SLACK = "slack", WEBHOOK = "webhook"
@@ -30,6 +31,7 @@ class NotificationChannelType(str, Enum):
 
 class NotificationType(str, Enum):
     """Types of notifications that can be sent."""
+
     # Approval-related
     APPROVAL_REQUESTED = "approval_requested"
     APPROVAL_APPROVED = "approval_approved"
@@ -58,6 +60,7 @@ class NotificationType(str, Enum):
 
 class NotificationPriority(str, Enum):
     """Priority levels for notifications."""
+
     LOW = "low"
     NORMAL = "normal"
     HIGH = "high"
@@ -79,7 +82,9 @@ class NotificationChannelBase(SQLModel):
     config: Optional[str] = None  # JSON config for channel-specific settings
 
 
-class NotificationChannel(UUIDModel, NotificationChannelBase, TimestampMixin, table=True):
+class NotificationChannel(
+    UUIDModel, NotificationChannelBase, TimestampMixin, table=True
+):
     """Available notification delivery channels.
 
     System-level definition of channels. Users can then configure preferences
@@ -91,11 +96,13 @@ class NotificationChannel(UUIDModel, NotificationChannelBase, TimestampMixin, ta
 
 class NotificationChannelCreate(NotificationChannelBase):
     """Schema for creating a notification channel."""
+
     pass
 
 
 class NotificationChannelRead(NotificationChannelBase):
     """Schema for reading a notification channel."""
+
     id: UUID
     created_at: datetime
 
@@ -112,7 +119,9 @@ class NotificationPreferenceBase(SQLModel):
     is_enabled: bool = Field(default=True)
 
 
-class NotificationPreference(UUIDModel, NotificationPreferenceBase, TimestampMixin, table=True):
+class NotificationPreference(
+    UUIDModel, NotificationPreferenceBase, TimestampMixin, table=True
+):
     """User notification preferences per channel and type.
 
     Users can enable/disable specific notification types for each channel.

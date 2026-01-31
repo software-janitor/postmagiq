@@ -18,7 +18,7 @@ from uuid import UUID
 from pydantic import BaseModel
 from sqlalchemy import Column, JSON, Text
 from sqlalchemy.dialects import postgresql
-from sqlmodel import Field, Relationship, SQLModel
+from sqlmodel import Field, Relationship
 
 from runner.db.models.base import UUIDModel, TimestampMixin
 from runner.db.custom_types import JsonOrArray, JsonOrVector
@@ -27,6 +27,7 @@ from runner.db.custom_types import JsonOrArray, JsonOrVector
 # =============================================================================
 # Enums
 # =============================================================================
+
 
 class EmbeddingSourceType(str, Enum):
     VOICE_SAMPLE = "voice_sample"
@@ -66,16 +67,16 @@ class ModerationType(str, Enum):
 # Embedding Model (pgvector)
 # =============================================================================
 
+
 class Embedding(UUIDModel, table=True):
     """Embedding table for semantic search."""
+
     __tablename__ = "embeddings"
 
     workspace_id: UUID = Field(foreign_key="workspaces.id", index=True)
     source_type: str = Field(max_length=50)
     source_id: UUID
-    embedding: list[float] = Field(
-        sa_column=Column(JsonOrVector(1536), nullable=False)
-    )
+    embedding: list[float] = Field(sa_column=Column(JsonOrVector(1536), nullable=False))
     chunk_text: str
     chunk_index: int = Field(default=0)
     # "metadata" is reserved on SQLAlchemy models, so map via metadata_json.
@@ -88,6 +89,7 @@ class Embedding(UUIDModel, table=True):
 
 class EmbeddingCreate(BaseModel):
     """Schema for creating an embedding."""
+
     workspace_id: UUID
     source_type: str
     source_id: UUID
@@ -101,8 +103,10 @@ class EmbeddingCreate(BaseModel):
 # Audience Segment Model
 # =============================================================================
 
+
 class AudienceSegment(UUIDModel, TimestampMixin, table=True):
     """Audience segment table."""
+
     __tablename__ = "audience_segments"
 
     workspace_id: UUID = Field(foreign_key="workspaces.id", index=True)
@@ -110,7 +114,9 @@ class AudienceSegment(UUIDModel, TimestampMixin, table=True):
     description: Optional[str] = None
     # profile stored as JSON: demographics, psychographics, language_profile, visual_preferences
     profile: dict = Field(sa_column=Column(JSON, nullable=False))
-    confidence_score: Optional[Decimal] = Field(default=None, max_digits=3, decimal_places=2)
+    confidence_score: Optional[Decimal] = Field(
+        default=None, max_digits=3, decimal_places=2
+    )
     is_primary: bool = Field(default=False)
     is_validated: bool = Field(default=False)
 
@@ -120,6 +126,7 @@ class AudienceSegment(UUIDModel, TimestampMixin, table=True):
 
 class AudienceSegmentCreate(BaseModel):
     """Schema for creating an audience segment."""
+
     workspace_id: UUID
     name: str
     description: Optional[str] = None
@@ -131,6 +138,7 @@ class AudienceSegmentCreate(BaseModel):
 
 class AudienceSegmentRead(BaseModel):
     """Schema for reading audience segment data."""
+
     id: UUID
     workspace_id: UUID
     name: str
@@ -147,8 +155,10 @@ class AudienceSegmentRead(BaseModel):
 # Calibrated Voice Model
 # =============================================================================
 
+
 class CalibratedVoice(UUIDModel, TimestampMixin, table=True):
     """Calibrated voice table - voice + audience fusion."""
+
     __tablename__ = "calibrated_voices"
 
     workspace_id: UUID = Field(foreign_key="workspaces.id", index=True)
@@ -158,14 +168,19 @@ class CalibratedVoice(UUIDModel, TimestampMixin, table=True):
     # voice_spec stored as JSON: preservation, adaptations, synthesis_rules, examples, anti_patterns
     voice_spec: dict = Field(sa_column=Column(JSON, nullable=False))
     usage_count: int = Field(default=0)
-    avg_engagement_score: Optional[Decimal] = Field(default=None, max_digits=5, decimal_places=2)
+    avg_engagement_score: Optional[Decimal] = Field(
+        default=None, max_digits=5, decimal_places=2
+    )
 
     # Relationships
-    segment: Optional[AudienceSegment] = Relationship(back_populates="calibrated_voices")
+    segment: Optional[AudienceSegment] = Relationship(
+        back_populates="calibrated_voices"
+    )
 
 
 class CalibratedVoiceCreate(BaseModel):
     """Schema for creating a calibrated voice."""
+
     workspace_id: UUID
     voice_profile_id: UUID
     segment_id: UUID
@@ -177,6 +192,7 @@ class CalibratedVoiceCreate(BaseModel):
 
 class CalibratedVoiceRead(BaseModel):
     """Schema for reading calibrated voice data."""
+
     id: UUID
     workspace_id: UUID
     voice_profile_id: UUID
@@ -193,8 +209,10 @@ class CalibratedVoiceRead(BaseModel):
 # Niche Vocabulary Model
 # =============================================================================
 
+
 class NicheVocabulary(UUIDModel, table=True):
     """Niche vocabulary table."""
+
     __tablename__ = "niche_vocabulary"
 
     workspace_id: UUID = Field(foreign_key="workspaces.id", index=True)
@@ -209,13 +227,16 @@ class NicheVocabulary(UUIDModel, table=True):
         sa_column=Column(JsonOrArray(postgresql.UUID(as_uuid=True)), nullable=True),
     )
     sentiment: Optional[str] = Field(default=None, max_length=20)
-    formality_level: Optional[Decimal] = Field(default=None, max_digits=3, decimal_places=2)
+    formality_level: Optional[Decimal] = Field(
+        default=None, max_digits=3, decimal_places=2
+    )
     source: Optional[str] = Field(default=None, max_length=100)
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class NicheVocabularyCreate(BaseModel):
     """Schema for creating niche vocabulary."""
+
     workspace_id: UUID
     term: str
     definition: Optional[str] = None
@@ -228,6 +249,7 @@ class NicheVocabularyCreate(BaseModel):
 
 class NicheVocabularyRead(BaseModel):
     """Schema for reading niche vocabulary data."""
+
     id: UUID
     workspace_id: UUID
     term: str
@@ -244,8 +266,10 @@ class NicheVocabularyRead(BaseModel):
 # Research Source Model
 # =============================================================================
 
+
 class ResearchSource(UUIDModel, table=True):
     """Research source table - LLM-generated insights."""
+
     __tablename__ = "research_sources"
 
     workspace_id: UUID = Field(foreign_key="workspaces.id", index=True)
@@ -260,6 +284,7 @@ class ResearchSource(UUIDModel, table=True):
 
 class ResearchSourceCreate(BaseModel):
     """Schema for creating a research source."""
+
     workspace_id: UUID
     source_type: str
     source_identifier: str
@@ -272,6 +297,7 @@ class ResearchSourceCreate(BaseModel):
 
 class ResearchSourceRead(BaseModel):
     """Schema for reading research source data."""
+
     id: UUID
     workspace_id: UUID
     source_type: str
@@ -287,8 +313,10 @@ class ResearchSourceRead(BaseModel):
 # Generated Content Model
 # =============================================================================
 
+
 class GeneratedContent(UUIDModel, TimestampMixin, table=True):
     """Generated content table."""
+
     __tablename__ = "generated_content"
 
     workspace_id: UUID = Field(foreign_key="workspaces.id", index=True)
@@ -300,7 +328,9 @@ class GeneratedContent(UUIDModel, TimestampMixin, table=True):
         default=None,
         sa_column=Column(JsonOrArray(Text()), nullable=True),
     )
-    calibrated_voice_id: Optional[UUID] = Field(default=None, foreign_key="calibrated_voices.id")
+    calibrated_voice_id: Optional[UUID] = Field(
+        default=None, foreign_key="calibrated_voices.id"
+    )
     segment_id: Optional[UUID] = Field(default=None, foreign_key="audience_segments.id")
     generation_prompts: Optional[dict] = Field(default=None, sa_column=Column(JSON))
     status: str = Field(default="draft", max_length=50)
@@ -312,6 +342,7 @@ class GeneratedContent(UUIDModel, TimestampMixin, table=True):
 
 class GeneratedContentCreate(BaseModel):
     """Schema for creating generated content."""
+
     workspace_id: UUID
     post_id: Optional[UUID] = None
     content_type: str
@@ -330,6 +361,7 @@ class GeneratedContentCreate(BaseModel):
 
 class GeneratedContentRead(BaseModel):
     """Schema for reading generated content data."""
+
     id: UUID
     workspace_id: UUID
     post_id: Optional[UUID]
@@ -353,8 +385,10 @@ class GeneratedContentRead(BaseModel):
 # Content Moderation Model
 # =============================================================================
 
+
 class ContentModeration(UUIDModel, table=True):
     """Content moderation table - safety checks."""
+
     __tablename__ = "content_moderation"
 
     workspace_id: UUID = Field(foreign_key="workspaces.id", index=True)
@@ -375,6 +409,7 @@ class ContentModeration(UUIDModel, table=True):
 
 class ContentModerationCreate(BaseModel):
     """Schema for creating content moderation."""
+
     workspace_id: UUID
     content_id: UUID
     content_type: str
@@ -389,6 +424,7 @@ class ContentModerationCreate(BaseModel):
 
 class ContentModerationRead(BaseModel):
     """Schema for reading content moderation data."""
+
     id: UUID
     workspace_id: UUID
     content_id: UUID

@@ -40,6 +40,7 @@ webhook_service = WebhookService()
 
 class CreateWebhookRequest(BaseModel):
     """Request to create a webhook."""
+
     name: str = Field(min_length=1, max_length=100)
     description: Optional[str] = None
     url: str = Field(min_length=1)
@@ -52,6 +53,7 @@ class CreateWebhookRequest(BaseModel):
 
 class UpdateWebhookRequest(BaseModel):
     """Request to update a webhook."""
+
     name: Optional[str] = Field(default=None, min_length=1, max_length=100)
     description: Optional[str] = None
     url: Optional[str] = Field(default=None, min_length=1)
@@ -65,6 +67,7 @@ class UpdateWebhookRequest(BaseModel):
 
 class WebhookResponse(BaseModel):
     """Response model for webhooks."""
+
     id: UUID
     workspace_id: UUID
     created_by_id: UUID
@@ -88,11 +91,13 @@ class WebhookResponse(BaseModel):
 
 class WebhookCreatedResponse(WebhookResponse):
     """Response when creating a webhook (includes the signing secret)."""
+
     secret: str  # The full secret - only shown once at creation
 
 
 class WebhookDeliveryResponse(BaseModel):
     """Response model for webhook deliveries."""
+
     id: UUID
     webhook_id: UUID
     workspace_id: UUID
@@ -151,7 +156,9 @@ async def list_webhooks(
     ]
 
 
-@router.post("", response_model=WebhookCreatedResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "", response_model=WebhookCreatedResponse, status_code=status.HTTP_201_CREATED
+)
 async def create_webhook(
     request: CreateWebhookRequest,
     ctx: Annotated[WorkspaceContext, Depends(require_workspace_scope(Scope.ADMIN))],
@@ -229,7 +236,9 @@ async def get_webhook(
             created_at=webhook.created_at,
         )
     except WebhookNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found"
+        )
 
 
 @router.patch("/{webhook_id}", response_model=WebhookResponse)
@@ -269,7 +278,9 @@ async def update_webhook(
             created_at=webhook.created_at,
         )
     except WebhookNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found"
+        )
 
 
 @router.delete("/{webhook_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -282,7 +293,9 @@ async def delete_webhook(
     try:
         webhook_service.delete_webhook(session, webhook_id, ctx.workspace_id)
     except WebhookNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found"
+        )
 
 
 @router.post("/{webhook_id}/rotate-secret", response_model=WebhookCreatedResponse)
@@ -322,7 +335,9 @@ async def rotate_webhook_secret(
             created_at=webhook.created_at,
         )
     except WebhookNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Webhook not found"
+        )
 
 
 # =============================================================================
@@ -433,6 +448,8 @@ async def retry_delivery(
             created_at=delivery.created_at,
         )
     except DeliveryNotFoundError:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Delivery not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Delivery not found"
+        )
     except WebhookServiceError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

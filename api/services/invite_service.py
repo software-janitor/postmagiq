@@ -4,14 +4,14 @@ Handles inviting members, accepting invites, and managing member roles.
 """
 
 import logging
-from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
 from runner.db.engine import engine
 from runner.db.models import (
-    WorkspaceMembership, WorkspaceMembershipCreate,
-    WorkspaceRole, InviteStatus,
+    WorkspaceMembership,
+    WorkspaceRole,
+    InviteStatus,
     User,
 )
 from runner.content.workspace_repository import (
@@ -27,26 +27,31 @@ logger = logging.getLogger(__name__)
 
 class InviteError(Exception):
     """Base exception for invite-related errors."""
+
     pass
 
 
 class InviteExistsError(InviteError):
     """Raised when trying to invite someone who already has an invite."""
+
     pass
 
 
 class InviteNotFoundError(InviteError):
     """Raised when invite is not found."""
+
     pass
 
 
 class InviteExpiredError(InviteError):
     """Raised when invite has expired."""
+
     pass
 
 
 class InviteAlreadyAcceptedError(InviteError):
     """Raised when invite was already accepted."""
+
     pass
 
 
@@ -364,7 +369,9 @@ class InviteService:
                 session.expunge(membership)
             return membership
 
-    def get_membership_by_token(self, invite_token: str) -> Optional[WorkspaceMembership]:
+    def get_membership_by_token(
+        self, invite_token: str
+    ) -> Optional[WorkspaceMembership]:
         """Get a membership by invite token.
 
         Useful to show invite details before accepting.

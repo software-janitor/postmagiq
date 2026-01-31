@@ -230,9 +230,7 @@ def portal_login(
     access_token = create_access_token(token_data, token_type="portal_access")
 
     # Get branding for response
-    branding = portal_service.get_workspace_branding(
-        session, request.workspace_id
-    )
+    branding = portal_service.get_workspace_branding(session, request.workspace_id)
 
     return PortalLoginResponse(
         access_token=access_token,
@@ -260,9 +258,7 @@ def list_posts_for_review(
     """
     workspace_id = current_user["workspace_id"]
 
-    posts = portal_service.get_posts_for_review(
-        session, workspace_id, status_filter
-    )
+    posts = portal_service.get_posts_for_review(session, workspace_id, status_filter)
 
     return PostListResponse(posts=posts, total=len(posts))
 

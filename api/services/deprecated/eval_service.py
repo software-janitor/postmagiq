@@ -28,7 +28,9 @@ class EvalService:
     def _list_runs(self, limit: int = 1000) -> list[RunRecord]:
         """List recent runs for summary stats."""
         with get_session() as session:
-            statement = select(RunRecord).order_by(RunRecord.started_at.desc()).limit(limit)
+            statement = (
+                select(RunRecord).order_by(RunRecord.started_at.desc()).limit(limit)
+            )
             if self.user_id:
                 statement = statement.where(RunRecord.user_id == self.user_id)
             return list(session.exec(statement).all())

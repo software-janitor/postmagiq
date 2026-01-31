@@ -13,6 +13,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 # WorkflowRun
 # =============================================================================
 
+
 class WorkflowRunBase(SQLModel):
     """Base workflow run fields."""
 
@@ -64,6 +65,7 @@ class WorkflowRunRead(WorkflowRunBase):
 # WorkflowOutput
 # =============================================================================
 
+
 class WorkflowOutputBase(SQLModel):
     """Base workflow output fields."""
 
@@ -91,6 +93,7 @@ class WorkflowOutputCreate(WorkflowOutputBase):
 # WorkflowSession
 # =============================================================================
 
+
 class WorkflowSessionBase(SQLModel):
     """Base workflow session fields."""
 
@@ -104,7 +107,9 @@ class WorkflowSession(UUIDModel, WorkflowSessionBase, TimestampMixin, table=True
     __tablename__ = "workflow_sessions"
 
     user_id: UUID = Field(foreign_key="users.id", index=True)
-    run_id: Optional[str] = Field(default=None, foreign_key="workflow_runs.run_id", index=True)
+    run_id: Optional[str] = Field(
+        default=None, foreign_key="workflow_runs.run_id", index=True
+    )
 
 
 class WorkflowSessionCreate(WorkflowSessionBase):
@@ -118,6 +123,7 @@ class WorkflowSessionCreate(WorkflowSessionBase):
 # WorkflowStateMetric
 # =============================================================================
 
+
 class WorkflowStateMetricBase(SQLModel):
     """Base workflow state metric fields."""
 
@@ -129,7 +135,9 @@ class WorkflowStateMetricBase(SQLModel):
     duration_s: float = Field(default=0.0)
 
 
-class WorkflowStateMetric(UUIDModel, WorkflowStateMetricBase, TimestampMixin, table=True):
+class WorkflowStateMetric(
+    UUIDModel, WorkflowStateMetricBase, TimestampMixin, table=True
+):
     """WorkflowStateMetric table - per-state, per-agent token/cost tracking."""
 
     __tablename__ = "workflow_state_metrics"
@@ -146,6 +154,7 @@ class WorkflowStateMetricCreate(WorkflowStateMetricBase):
 # =============================================================================
 # WorkflowPersona
 # =============================================================================
+
 
 class WorkflowPersonaBase(SQLModel):
     """Base workflow persona fields."""

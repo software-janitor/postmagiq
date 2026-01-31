@@ -21,7 +21,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional, TypeVar
 
-from runner.resilience.retry import RetryPolicy, with_retry
+from runner.resilience.retry import RetryPolicy
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,7 @@ T = TypeVar("T")
 @dataclass
 class FallbackResult:
     """Result from fallback chain execution."""
+
     success: bool
     result: Any
     model_used: str
@@ -106,10 +107,12 @@ class FallbackChain:
                     agent, prompt, model_name, **kwargs
                 )
 
-                attempts.append({
-                    "model": model_name,
-                    "success": True,
-                })
+                attempts.append(
+                    {
+                        "model": model_name,
+                        "success": True,
+                    }
+                )
                 return FallbackResult(
                     success=True,
                     result=result,
@@ -120,12 +123,14 @@ class FallbackChain:
 
             except Exception as e:
                 last_error = e
-                attempts.append({
-                    "model": model_name,
-                    "error": str(e),
-                    "error_type": type(e).__name__,
-                    "success": False,
-                })
+                attempts.append(
+                    {
+                        "model": model_name,
+                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "success": False,
+                    }
+                )
 
                 logger.warning(f"Model {model_name} failed: {e}")
 
@@ -171,9 +176,7 @@ class FallbackChain:
                 if not self.retry_policy.should_retry(e, attempt.number):
                     raise
 
-                logger.debug(
-                    f"Retry {attempt.number + 1} for {model_name}: {e}"
-                )
+                logger.debug(f"Retry {attempt.number + 1} for {model_name}: {e}")
                 await attempt.wait(e)
 
         if last_error:

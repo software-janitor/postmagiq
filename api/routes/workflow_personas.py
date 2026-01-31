@@ -21,6 +21,7 @@ router = APIRouter()
 
 class WorkflowPersonaUpdate(BaseModel):
     """Request to update a workflow persona."""
+
     name: Optional[str] = None
     description: Optional[str] = None
     content: Optional[str] = None
@@ -31,8 +32,10 @@ class WorkflowPersonaUpdate(BaseModel):
 # Frontend-compatible endpoints (match old /personas API format)
 # =============================================================================
 
+
 class PersonaListItem(BaseModel):
     """Persona list item for frontend compatibility."""
+
     id: str  # slug as ID
     name: str
     description: str
@@ -43,6 +46,7 @@ class PersonaListItem(BaseModel):
 
 class PersonaDetail(BaseModel):
     """Persona detail for frontend compatibility."""
+
     id: str  # slug
     name: str
     description: str
@@ -52,13 +56,16 @@ class PersonaDetail(BaseModel):
 
 class PersonaCreateRequest(BaseModel):
     """Frontend request to create persona."""
+
     id: str  # slug
     name: str
     description: str = ""
     model_tier: str = "writer"  # Default to writer tier
 
 
-def _get_persona_by_slug(session, user_id: UUID, slug: str) -> Optional[WorkflowPersona]:
+def _get_persona_by_slug(
+    session, user_id: UUID, slug: str
+) -> Optional[WorkflowPersona]:
     """Fetch persona by slug, checking user-specific then system."""
     repo = WorkflowPersonaRepository(session)
     persona = repo.get_by_slug(user_id, slug)
@@ -66,7 +73,7 @@ def _get_persona_by_slug(session, user_id: UUID, slug: str) -> Optional[Workflow
         return persona
     return session.exec(
         select(WorkflowPersona).where(
-            WorkflowPersona.is_system == True,
+            WorkflowPersona.is_system,
             WorkflowPersona.slug == slug,
         )
     ).first()
@@ -196,7 +203,9 @@ def create_persona(
     with get_session() as session:
         existing = _get_persona_by_slug(session, uid, request.id)
         if existing:
-            raise HTTPException(status_code=400, detail="Persona with this ID already exists")
+            raise HTTPException(
+                status_code=400, detail="Persona with this ID already exists"
+            )
 
         record = WorkflowPersona(
             user_id=uid,
@@ -251,5 +260,3 @@ def delete_persona_by_slug(
 # - GET /workflow-personas (list all)
 # - GET /workflow-personas/{slug} (get by slug)
 # - PUT /workflow-personas/{slug} (update by slug)
-
-

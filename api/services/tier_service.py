@@ -43,22 +43,22 @@ class TierService:
     """
 
     # Feature to minimum tier mapping for upgrade CTAs
+    # Free/Base: basic generation + direct publishing
+    # Pro/Max: + voice transcription, youtube transcription
     FEATURE_MIN_TIER = {
-        "basic_workflow": "free",
-        "premium_workflow": "starter",
-        "voice_transcription": "starter",
+        "premium_workflow": "free",
+        "direct_publishing": "free",
+        "voice_transcription": "pro",
         "youtube_transcription": "pro",
         "priority_support": "pro",
-        "api_access": "business",
-        "team_workspaces": "business",
     }
 
     # Default text limits per tier
     DEFAULT_TEXT_LIMITS = {
         "free": 50000,
-        "starter": 50000,
+        "base": 50000,
         "pro": 100000,
-        "business": 100000,
+        "max": 100000,
     }
 
     def get_tier_for_workspace(self, workspace_id: UUID) -> Optional[SubscriptionTier]:
@@ -191,18 +191,15 @@ class TierService:
     def get_workflow_config(self, workspace_id: UUID) -> str:
         """Get the workflow config file to use for a workspace.
 
-        Free tier uses basic workflow (groq-free.yaml).
-        Paid tiers use premium workflow (groq-premium.yaml).
+        All tiers use premium workflow (groq-premium.yaml) for best quality.
 
         Args:
             workspace_id: Workspace UUID
 
         Returns:
-            Workflow config filename (e.g., 'groq-free.yaml')
+            Workflow config filename (always 'groq-premium.yaml')
         """
-        if self.has_feature(workspace_id, "premium_workflow"):
-            return "groq-premium.yaml"
-        return "groq-free.yaml"
+        return "groq-premium.yaml"
 
     def get_all_features(self, workspace_id: UUID) -> dict:
         """Get all features and their status for a workspace.
@@ -229,7 +226,9 @@ class TierService:
             # Free tier without DB record - set basic_workflow
             features["basic_workflow"] = {
                 "enabled": True,
-                "config": {"text_limit": self.DEFAULT_TEXT_LIMITS.get(tier_slug, 50000)},
+                "config": {
+                    "text_limit": self.DEFAULT_TEXT_LIMITS.get(tier_slug, 50000)
+                },
             }
             return features
 
@@ -258,12 +257,21 @@ class TierService:
         text_limit = self.get_text_limit(workspace_id)
 
         return {
-            "premium_workflow": features.get("premium_workflow", {}).get("enabled", False),
-            "voice_transcription": features.get("voice_transcription", {}).get("enabled", False),
-            "youtube_transcription": features.get("youtube_transcription", {}).get("enabled", False),
-            "priority_support": features.get("priority_support", {}).get("enabled", False),
-            "api_access": features.get("api_access", {}).get("enabled", False),
-            "team_workspaces": features.get("team_workspaces", {}).get("enabled", False),
+            "premium_workflow": features.get("premium_workflow", {}).get(
+                "enabled", False
+            ),
+            "voice_transcription": features.get("voice_transcription", {}).get(
+                "enabled", False
+            ),
+            "direct_publishing": features.get("direct_publishing", {}).get(
+                "enabled", False
+            ),
+            "youtube_transcription": features.get("youtube_transcription", {}).get(
+                "enabled", False
+            ),
+            "priority_support": features.get("priority_support", {}).get(
+                "enabled", False
+            ),
             "text_limit": text_limit,
         }
 

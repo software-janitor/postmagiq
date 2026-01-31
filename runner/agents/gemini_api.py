@@ -57,17 +57,12 @@ class GeminiAPIAgent(APIAgent):
                 role = msg["role"]
                 if role == "assistant":
                     role = "model"
-                gemini_messages.append({
-                    "role": role,
-                    "parts": [msg["content"]]
-                })
+                gemini_messages.append({"role": role, "parts": [msg["content"]]})
 
             # Start chat with history (all but last message)
             # Then send the last message
             if len(gemini_messages) > 1:
-                chat = self.model_instance.start_chat(
-                    history=gemini_messages[:-1]
-                )
+                chat = self.model_instance.start_chat(history=gemini_messages[:-1])
                 response = chat.send_message(
                     gemini_messages[-1]["parts"][0],
                     generation_config=self.generation_config,

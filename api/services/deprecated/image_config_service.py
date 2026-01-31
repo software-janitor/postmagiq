@@ -67,7 +67,9 @@ class ImageConfigService:
                 data[key] = value.isoformat()
         return data
 
-    def _encode_prop_category(self, description: Optional[str], context: str, is_system: bool) -> str:
+    def _encode_prop_category(
+        self, description: Optional[str], context: str, is_system: bool
+    ) -> str:
         """Encode prop category metadata into description field."""
         return json.dumps(
             {
@@ -190,7 +192,13 @@ class ImageConfigService:
         """Delete all config for a user and re-seed with defaults."""
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
-            for model in (ImageScene, ImagePose, ImageOutfit, ImageProp, ImageCharacter):
+            for model in (
+                ImageScene,
+                ImagePose,
+                ImageOutfit,
+                ImageProp,
+                ImageCharacter,
+            ):
                 rows = session.exec(select(model).where(model.user_id == uid)).all()
                 for row in rows:
                     session.delete(row)
@@ -202,13 +210,17 @@ class ImageConfigService:
     # Scene CRUD
     # =========================================================================
 
-    def get_scenes(self, user_id: Union[str, UUID], sentiment: Optional[str] = None) -> list[dict]:
+    def get_scenes(
+        self, user_id: Union[str, UUID], sentiment: Optional[str] = None
+    ) -> list[dict]:
         """Get all scenes for a user, optionally filtered by sentiment."""
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
             statement = select(ImageScene).where(ImageScene.user_id == uid)
             if sentiment:
-                statement = statement.where(ImageScene.sentiment == sentiment).order_by(ImageScene.code)
+                statement = statement.where(ImageScene.sentiment == sentiment).order_by(
+                    ImageScene.code
+                )
             else:
                 statement = statement.order_by(ImageScene.sentiment, ImageScene.code)
             return [self._serialize(s) for s in session.exec(statement).all()]
@@ -276,13 +288,17 @@ class ImageConfigService:
     # Pose CRUD
     # =========================================================================
 
-    def get_poses(self, user_id: Union[str, UUID], sentiment: Optional[str] = None) -> list[dict]:
+    def get_poses(
+        self, user_id: Union[str, UUID], sentiment: Optional[str] = None
+    ) -> list[dict]:
         """Get all poses for a user."""
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
             statement = select(ImagePose).where(ImagePose.user_id == uid)
             if sentiment:
-                statement = statement.where(ImagePose.sentiment == sentiment).order_by(ImagePose.code)
+                statement = statement.where(ImagePose.sentiment == sentiment).order_by(
+                    ImagePose.code
+                )
             else:
                 statement = statement.order_by(ImagePose.sentiment, ImagePose.code)
             return [self._serialize(p) for p in session.exec(statement).all()]
@@ -341,7 +357,11 @@ class ImageConfigService:
         """Get all outfits for a user."""
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
-            statement = select(ImageOutfit).where(ImageOutfit.user_id == uid).order_by(ImageOutfit.created_at)
+            statement = (
+                select(ImageOutfit)
+                .where(ImageOutfit.user_id == uid)
+                .order_by(ImageOutfit.created_at)
+            )
             return [self._serialize(o) for o in session.exec(statement).all()]
 
     def update_outfit(self, outfit_id: Union[str, UUID], **kwargs) -> None:
@@ -383,7 +403,9 @@ class ImageConfigService:
             session.delete(record)
             session.commit()
 
-    def bulk_import_outfits(self, user_id: Union[str, UUID], outfits: list[dict]) -> dict:
+    def bulk_import_outfits(
+        self, user_id: Union[str, UUID], outfits: list[dict]
+    ) -> dict:
         """Bulk import outfits from a list of dicts.
 
         Each dict should have: vest, shirt, pants (optional, defaults to 'Dark pants')
@@ -410,7 +432,7 @@ class ImageConfigService:
                     pants = outfit.get("pants", "Dark pants").strip()
 
                     if not vest or not shirt:
-                        errors.append(f"Row {i+1}: Missing vest or shirt")
+                        errors.append(f"Row {i + 1}: Missing vest or shirt")
                         continue
 
                     # Check for duplicate
@@ -420,12 +442,14 @@ class ImageConfigService:
                         continue
 
                     # Insert
-                    session.add(ImageOutfit(user_id=uid, vest=vest, shirt=shirt, pants=pants))
+                    session.add(
+                        ImageOutfit(user_id=uid, vest=vest, shirt=shirt, pants=pants)
+                    )
                     existing.add(key)
                     imported += 1
 
                 except Exception as e:
-                    errors.append(f"Row {i+1}: {str(e)}")
+                    errors.append(f"Row {i + 1}: {str(e)}")
 
             session.commit()
         return {"imported": imported, "skipped": skipped, "errors": errors}
@@ -434,7 +458,9 @@ class ImageConfigService:
     # Props CRUD
     # =========================================================================
 
-    def get_props(self, user_id: Union[str, UUID], category: Optional[str] = None) -> list[dict]:
+    def get_props(
+        self, user_id: Union[str, UUID], category: Optional[str] = None
+    ) -> list[dict]:
         """Get all props for a user."""
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
@@ -467,7 +493,9 @@ class ImageConfigService:
     ) -> str:
         """Create a new prop."""
         uid = self._resolve_user_id(user_id)
-        record = ImageProp(user_id=uid, category=category, description=description, context=context)
+        record = ImageProp(
+            user_id=uid, category=category, description=description, context=context
+        )
         with get_session() as session:
             session.add(record)
             session.commit()
@@ -492,12 +520,16 @@ class ImageConfigService:
         """Get all character definitions for a user."""
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
-            statement = select(ImageCharacter).where(
-                ImageCharacter.user_id == uid
-            ).order_by(ImageCharacter.character_type)
+            statement = (
+                select(ImageCharacter)
+                .where(ImageCharacter.user_id == uid)
+                .order_by(ImageCharacter.character_type)
+            )
             return [self._serialize(c) for c in session.exec(statement).all()]
 
-    def get_character(self, user_id: Union[str, UUID], character_type: str) -> Optional[dict]:
+    def get_character(
+        self, user_id: Union[str, UUID], character_type: str
+    ) -> Optional[dict]:
         """Get a specific character definition."""
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
@@ -529,9 +561,11 @@ class ImageConfigService:
         """Get all config sets for a user."""
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
-            statement = select(ImageConfigSet).where(
-                ImageConfigSet.user_id == uid
-            ).order_by(desc(ImageConfigSet.is_default), ImageConfigSet.created_at)
+            statement = (
+                select(ImageConfigSet)
+                .where(ImageConfigSet.user_id == uid)
+                .order_by(desc(ImageConfigSet.is_default), ImageConfigSet.created_at)
+            )
             return [self._serialize(cs) for cs in session.exec(statement).all()]
 
     def get_config_set(self, config_set_id: Union[str, UUID]) -> Optional[dict]:
@@ -582,7 +616,9 @@ class ImageConfigService:
             session.add(record)
             session.commit()
 
-    def set_default_config_set(self, user_id: Union[str, UUID], config_set_id: Union[str, UUID]) -> None:
+    def set_default_config_set(
+        self, user_id: Union[str, UUID], config_set_id: Union[str, UUID]
+    ) -> None:
         """Set a config set as the default."""
         uid = self._resolve_user_id(user_id)
         cid = self._resolve_id(config_set_id)
@@ -631,7 +667,11 @@ class ImageConfigService:
         """Get all characters linked to a scene."""
         sid = self._resolve_id(scene_id)
         with get_session() as session:
-            statement = select(SceneCharacter).where(SceneCharacter.scene_id == sid).order_by(SceneCharacter.position)
+            statement = (
+                select(SceneCharacter)
+                .where(SceneCharacter.scene_id == sid)
+                .order_by(SceneCharacter.position)
+            )
             records = session.exec(statement).all()
             return [
                 {
@@ -672,7 +712,9 @@ class ImageConfigService:
             session.refresh(record)
             return str(record.id)
 
-    def remove_scene_character(self, scene_id: Union[str, UUID], character_id: Union[str, UUID]) -> None:
+    def remove_scene_character(
+        self, scene_id: Union[str, UUID], character_id: Union[str, UUID]
+    ) -> None:
         """Remove a character from a scene."""
         sid = self._resolve_id(scene_id)
         cid = self._resolve_id(character_id)
@@ -720,7 +762,9 @@ class ImageConfigService:
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
             records = session.exec(
-                select(PropCategory).where(PropCategory.user_id == uid).order_by(PropCategory.name)
+                select(PropCategory)
+                .where(PropCategory.user_id == uid)
+                .order_by(PropCategory.name)
             ).all()
             results = []
             for record in records:
@@ -786,7 +830,9 @@ class ImageConfigService:
                 description = kwargs.pop("description", meta["description"])
                 context = kwargs.pop("context", meta["context"])
                 is_system = kwargs.pop("is_system", meta["is_system"])
-                record.description = self._encode_prop_category(description, context, is_system)
+                record.description = self._encode_prop_category(
+                    description, context, is_system
+                )
             for key, value in kwargs.items():
                 if hasattr(record, key):
                     setattr(record, key, value)
@@ -869,7 +915,9 @@ class ImageConfigService:
     # Context Prop Rules
     # =========================================================================
 
-    def get_context_prop_rules(self, user_id: Union[str, UUID], context: Optional[str] = None) -> list[dict]:
+    def get_context_prop_rules(
+        self, user_id: Union[str, UUID], context: Optional[str] = None
+    ) -> list[dict]:
         """Get context-based prop rules."""
         uid = self._resolve_user_id(user_id)
         with get_session() as session:
@@ -901,7 +949,7 @@ class ImageConfigService:
         weight: int = 1,
     ) -> str:
         """Set a context-based prop rule."""
-        uid = self._resolve_user_id(user_id)
+        self._resolve_user_id(user_id)
         pcid = self._resolve_id(prop_category_id)
         is_required = weight > 0
         with get_session() as session:

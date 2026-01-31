@@ -18,8 +18,7 @@ Usage:
 
 import logging
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
-from decimal import Decimal
+from datetime import datetime
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -51,6 +50,7 @@ class BudgetConfig:
         per_request_limit: Maximum cost per single request (USD)
         warning_threshold: Percentage of limit to trigger warning (0.0-1.0)
     """
+
     daily_limit: Optional[float] = None
     monthly_limit: Optional[float] = None
     per_request_limit: Optional[float] = None
@@ -60,6 +60,7 @@ class BudgetConfig:
 @dataclass
 class SpendRecord:
     """Record of a single API spend."""
+
     amount: float
     model: str
     timestamp: datetime
@@ -275,13 +276,15 @@ class BudgetEnforcer:
             "daily_limit": self.config.daily_limit,
             "daily_remaining": (
                 self.config.daily_limit - self._daily_spend
-                if self.config.daily_limit else None
+                if self.config.daily_limit
+                else None
             ),
             "monthly_spend": self._monthly_spend,
             "monthly_limit": self.config.monthly_limit,
             "monthly_remaining": (
                 self.config.monthly_limit - self._monthly_spend
-                if self.config.monthly_limit else None
+                if self.config.monthly_limit
+                else None
             ),
             "total_records": len(self._records),
         }
@@ -310,7 +313,10 @@ class BudgetEnforcer:
             self._last_reset_daily = now
 
         # Reset monthly spend
-        if now.month != self._last_reset_monthly.month or now.year != self._last_reset_monthly.year:
+        if (
+            now.month != self._last_reset_monthly.month
+            or now.year != self._last_reset_monthly.year
+        ):
             logger.info(f"Resetting monthly spend (was ${self._monthly_spend:.2f})")
             self._monthly_spend = 0.0
             self._last_reset_monthly = now

@@ -16,6 +16,7 @@ from runner.db.models.base import UUIDModel, TimestampMixin
 
 class WorkflowEnvironment(str, Enum):
     """Deployment environment for workflow configs."""
+
     production = "production"
     development = "development"
     staging = "staging"
@@ -35,7 +36,9 @@ class WorkflowConfigBase(SQLModel):
     description: Optional[str] = None
 
     # Configuration
-    config_file: str  # Path relative to workflows/configs/, e.g., "groq-production.yaml"
+    config_file: (
+        str  # Path relative to workflows/configs/, e.g., "groq-production.yaml"
+    )
     environment: WorkflowEnvironment = Field(default=WorkflowEnvironment.production)
 
     # Features (stored as JSON for flexibility)
@@ -65,6 +68,7 @@ class WorkflowConfig(UUIDModel, WorkflowConfigBase, TimestampMixin, table=True):
 
 class WorkflowConfigCreate(WorkflowConfigBase):
     """Schema for creating a workflow configuration."""
+
     pass
 
 

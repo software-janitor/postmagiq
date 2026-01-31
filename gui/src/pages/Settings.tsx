@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { CreditCard, Check, Zap, Settings2, Mic, Youtube, Crown, Code, Users, X } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { CreditCard, Check, Zap, Settings2, Mic, Youtube, Crown, X, Send } from 'lucide-react'
 import { clsx } from 'clsx'
-import { apiGet, apiPost } from '../api/client'
+import { apiGet } from '../api/client'
 import { useWorkspaceStore } from '../stores/workspaceStore'
 import { useThemeClasses } from '../hooks/useThemeClasses'
 import { useEffectiveFlags } from '../stores/flagsStore'
@@ -10,6 +10,7 @@ import UsageBar from '../components/UsageBar'
 import BillingSection from '../components/BillingSection'
 import NotificationSettings from '../components/NotificationSettings'
 import WorkflowConfigSelector from '../components/WorkflowConfigSelector'
+import SocialConnections from '../components/SocialConnections'
 
 interface UsageSummary {
   period_start: string
@@ -18,10 +19,9 @@ interface UsageSummary {
   features: {
     premium_workflow: boolean
     voice_transcription: boolean
+    direct_publishing: boolean
     youtube_transcription: boolean
     priority_support: boolean
-    api_access: boolean
-    team_workspaces: boolean
     text_limit: number
   }
   tier: { name: string; slug: string }
@@ -51,10 +51,11 @@ interface Tier {
 export default function Settings() {
   const theme = useThemeClasses()
   const flags = useEffectiveFlags()
-  const { currentWorkspaceId, currentRole } = useWorkspaceStore()
+  const { currentWorkspaceId } = useWorkspaceStore()
   const [selectedWorkflowConfig, setSelectedWorkflowConfig] = useState<string | null>(null)
 
-  const canChangeWorkflowConfig = currentRole === 'owner' || currentRole === 'admin'
+  // All users can change workflow config (no team permissions)
+  const canChangeWorkflowConfig = true
 
   const { data: usage, isLoading: usageLoading } = useQuery({
     queryKey: ['usage', currentWorkspaceId],
@@ -71,11 +72,13 @@ export default function Settings() {
   const { data: agents } = useQuery({
     queryKey: ['agents'],
     queryFn: () => apiGet<{ agents: Array<{ name: string; enabled: boolean; context_window: number; cost_per_1k: { input: number; output: number } }> }>('/config/agents'),
+    enabled: flags.show_internal_workflow,
   })
 
   const { data: personas } = useQuery({
     queryKey: ['personas'],
     queryFn: () => apiGet<{ personas: Array<{ name: string; path: string }> }>('/config/personas'),
+    enabled: flags.show_ai_personas,
   })
 
   return (
@@ -152,6 +155,17 @@ export default function Settings() {
                     </div>
                     <div className={clsx(
                       'flex items-center gap-2 text-sm',
+                      usage.features.direct_publishing ? 'text-green-400' : 'text-zinc-500'
+                    )}>
+                      {usage.features.direct_publishing ? (
+                        <Send className="w-4 h-4" />
+                      ) : (
+                        <X className="w-4 h-4" />
+                      )}
+                      Direct Publishing
+                    </div>
+                    <div className={clsx(
+                      'flex items-center gap-2 text-sm',
                       usage.features.youtube_transcription ? 'text-green-400' : 'text-zinc-500'
                     )}>
                       {usage.features.youtube_transcription ? (
@@ -172,28 +186,6 @@ export default function Settings() {
                       )}
                       Priority Support
                     </div>
-                    <div className={clsx(
-                      'flex items-center gap-2 text-sm',
-                      usage.features.api_access ? 'text-green-400' : 'text-zinc-500'
-                    )}>
-                      {usage.features.api_access ? (
-                        <Code className="w-4 h-4" />
-                      ) : (
-                        <X className="w-4 h-4" />
-                      )}
-                      API Access
-                    </div>
-                    <div className={clsx(
-                      'flex items-center gap-2 text-sm',
-                      usage.features.team_workspaces ? 'text-green-400' : 'text-zinc-500'
-                    )}>
-                      {usage.features.team_workspaces ? (
-                        <Users className="w-4 h-4" />
-                      ) : (
-                        <X className="w-4 h-4" />
-                      )}
-                      Team Workspaces
-                    </div>
                   </div>
                   <div className="mt-3 text-sm text-zinc-400">
                     Text limit: {usage.features.text_limit.toLocaleString()} characters
@@ -212,7 +204,7 @@ export default function Settings() {
               )}
             </>
           ) : (
-            <div className="text-zinc-400">No workspace selected</div>
+            <div className="text-zinc-400">No account data available</div>
           )}
         </div>
       </div>
@@ -257,20 +249,23 @@ export default function Settings() {
                           ? 'Unlimited credits'
                           : `${tier.posts_per_month} credits/month`}
                       </li>
-                      {/* Show features based on tier slug */}
-                      {tier.slug !== 'free' && (
-                        <li className="flex items-center gap-2 text-zinc-300">
-                          <Check className="w-4 h-4 text-green-400" />
-                          Premium AI models
-                        </li>
-                      )}
-                      {(tier.slug === 'starter' || tier.slug === 'pro' || tier.slug === 'business') && (
+                      {/* All tiers get AI generation + direct publishing */}
+                      <li className="flex items-center gap-2 text-zinc-300">
+                        <Check className="w-4 h-4 text-green-400" />
+                        AI content generation
+                      </li>
+                      <li className="flex items-center gap-2 text-zinc-300">
+                        <Send className="w-4 h-4 text-green-400" />
+                        Direct publishing
+                      </li>
+                      {/* Pro+ features: voice & youtube transcription */}
+                      {(tier.slug === 'pro' || tier.slug === 'max') && (
                         <li className="flex items-center gap-2 text-zinc-300">
                           <Mic className="w-4 h-4 text-green-400" />
                           Voice transcription
                         </li>
                       )}
-                      {(tier.slug === 'pro' || tier.slug === 'business') && (
+                      {(tier.slug === 'pro' || tier.slug === 'max') && (
                         <li className="flex items-center gap-2 text-zinc-300">
                           <Youtube className="w-4 h-4 text-green-400" />
                           YouTube transcription
@@ -280,18 +275,6 @@ export default function Settings() {
                         <li className="flex items-center gap-2 text-zinc-300">
                           <Zap className={clsx('w-4 h-4', theme.iconPrimary)} />
                           Priority support
-                        </li>
-                      )}
-                      {tier.api_access && (
-                        <li className="flex items-center gap-2 text-zinc-300">
-                          <Code className="w-4 h-4 text-green-400" />
-                          API access
-                        </li>
-                      )}
-                      {tier.slug === 'business' && (
-                        <li className="flex items-center gap-2 text-zinc-300">
-                          <Users className="w-4 h-4 text-green-400" />
-                          Team workspaces
                         </li>
                       )}
                     </ul>
@@ -308,83 +291,90 @@ export default function Settings() {
         </div>
       )}
 
+      {/* Connected Accounts for Direct Publishing */}
+      <SocialConnections />
+
       {/* Payment Methods & Invoices */}
       <BillingSection />
 
       {/* Notification Preferences */}
       <NotificationSettings />
 
-      {/* Workflow Configuration */}
-      <div className="bg-zinc-900 rounded-lg border border-zinc-800">
-        <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
-          <Settings2 className={clsx('w-5 h-5', theme.iconPrimary)} />
-          <h2 className="text-lg font-semibold text-white">Workflow Configuration</h2>
-        </div>
-        <div className="p-4 space-y-4">
-          <div>
-            <label className="block text-sm text-zinc-400 mb-2">
-              Default Workflow Config
-            </label>
-            <p className="text-sm text-zinc-500 mb-3">
-              Select the default workflow configuration for this workspace. This determines which AI models and settings are used when running workflows.
-            </p>
-            {canChangeWorkflowConfig ? (
-              <WorkflowConfigSelector
-                value={selectedWorkflowConfig}
-                onChange={setSelectedWorkflowConfig}
-                className="w-full max-w-md"
-              />
-            ) : (
-              <div className="text-sm text-zinc-500">
-                Only workspace owners and admins can change the workflow configuration.
-              </div>
-            )}
+      {/* Workflow Configuration - internal only */}
+      {flags.show_internal_workflow && (
+        <div className="bg-zinc-900 rounded-lg border border-zinc-800">
+          <div className="p-4 border-b border-zinc-800 flex items-center gap-2">
+            <Settings2 className={clsx('w-5 h-5', theme.iconPrimary)} />
+            <h2 className="text-lg font-semibold text-white">Workflow Configuration</h2>
+          </div>
+          <div className="p-4 space-y-4">
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">
+                Default Workflow Config
+              </label>
+              <p className="text-sm text-zinc-500 mb-3">
+                Select the default workflow configuration. This determines which AI models and settings are used when running workflows.
+              </p>
+              {canChangeWorkflowConfig ? (
+                <WorkflowConfigSelector
+                  value={selectedWorkflowConfig}
+                  onChange={setSelectedWorkflowConfig}
+                  className="w-full max-w-md"
+                />
+              ) : (
+                <div className="text-sm text-zinc-500">
+                  Only owners and admins can change the workflow configuration.
+                </div>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Agents */}
-      <div className="bg-slate-800 rounded-lg border border-slate-700">
-        <div className="p-4 border-b border-slate-700">
-          <h2 className="text-lg font-semibold text-white">Agents</h2>
-        </div>
-        <div className="p-4">
-          <table className="w-full">
-            <thead>
-              <tr className="text-left text-sm text-slate-400">
-                <th className="pb-2">Agent</th>
-                <th className="pb-2">Status</th>
-                <th className="pb-2">Context Window</th>
-                <th className="pb-2">Cost (Input)</th>
-                <th className="pb-2">Cost (Output)</th>
-              </tr>
-            </thead>
-            <tbody className="text-white">
-              {agents?.agents.map((agent) => (
-                <tr key={agent.name}>
-                  <td className="py-2 font-medium">{agent.name}</td>
-                  <td className="py-2">
-                    <span className={`px-2 py-1 rounded text-xs ${
-                      agent.enabled ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
-                    }`}>
-                      {agent.enabled ? 'Enabled' : 'Disabled'}
-                    </span>
-                  </td>
-                  <td className="py-2 text-slate-300">
-                    {agent.context_window?.toLocaleString() || '-'}
-                  </td>
-                  <td className="py-2 text-slate-300">
-                    ${agent.cost_per_1k?.input?.toFixed(5) || '-'}/1k
-                  </td>
-                  <td className="py-2 text-slate-300">
-                    ${agent.cost_per_1k?.output?.toFixed(5) || '-'}/1k
-                  </td>
+      {/* Agents - internal only */}
+      {flags.show_internal_workflow && (
+        <div className="bg-slate-800 rounded-lg border border-slate-700">
+          <div className="p-4 border-b border-slate-700">
+            <h2 className="text-lg font-semibold text-white">Agents</h2>
+          </div>
+          <div className="p-4">
+            <table className="w-full">
+              <thead>
+                <tr className="text-left text-sm text-slate-400">
+                  <th className="pb-2">Agent</th>
+                  <th className="pb-2">Status</th>
+                  <th className="pb-2">Context Window</th>
+                  <th className="pb-2">Cost (Input)</th>
+                  <th className="pb-2">Cost (Output)</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="text-white">
+                {agents?.agents.map((agent) => (
+                  <tr key={agent.name}>
+                    <td className="py-2 font-medium">{agent.name}</td>
+                    <td className="py-2">
+                      <span className={`px-2 py-1 rounded text-xs ${
+                        agent.enabled ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
+                      }`}>
+                        {agent.enabled ? 'Enabled' : 'Disabled'}
+                      </span>
+                    </td>
+                    <td className="py-2 text-slate-300">
+                      {agent.context_window?.toLocaleString() || '-'}
+                    </td>
+                    <td className="py-2 text-slate-300">
+                      ${agent.cost_per_1k?.input?.toFixed(5) || '-'}/1k
+                    </td>
+                    <td className="py-2 text-slate-300">
+                      ${agent.cost_per_1k?.output?.toFixed(5) || '-'}/1k
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Personas */}
       {flags.show_ai_personas && (
@@ -413,47 +403,49 @@ export default function Settings() {
         </div>
       )}
 
-      {/* Circuit Breaker */}
-      <div className="bg-slate-800 rounded-lg border border-slate-700">
-        <div className="p-4 border-b border-slate-700">
-          <h2 className="text-lg font-semibold text-white">Circuit Breaker Limits</h2>
+      {/* Circuit Breaker - internal only */}
+      {flags.show_internal_workflow && (
+        <div className="bg-slate-800 rounded-lg border border-slate-700">
+          <div className="p-4 border-b border-slate-700">
+            <h2 className="text-lg font-semibold text-white">Circuit Breaker Limits</h2>
+          </div>
+          <div className="p-4 grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">State Visit Limit</label>
+              <input
+                type="number"
+                defaultValue={3}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Transition Limit</label>
+              <input
+                type="number"
+                defaultValue={20}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Timeout (seconds)</label>
+              <input
+                type="number"
+                defaultValue={1800}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Cost Limit ($)</label>
+              <input
+                type="number"
+                step="0.01"
+                defaultValue={5.00}
+                className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
+              />
+            </div>
+          </div>
         </div>
-        <div className="p-4 grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">State Visit Limit</label>
-            <input
-              type="number"
-              defaultValue={3}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">Transition Limit</label>
-            <input
-              type="number"
-              defaultValue={20}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">Timeout (seconds)</label>
-            <input
-              type="number"
-              defaultValue={1800}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
-            />
-          </div>
-          <div>
-            <label className="block text-sm text-slate-400 mb-1">Cost Limit ($)</label>
-            <input
-              type="number"
-              step="0.01"
-              defaultValue={5.00}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-600 rounded-lg text-white"
-            />
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   )
 }

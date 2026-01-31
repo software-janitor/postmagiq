@@ -22,6 +22,7 @@ from typing import Optional
 @dataclass
 class SimilarityResult:
     """Result of similarity comparison."""
+
     score: float  # 0.0 to 1.0
     matching_phrases: list[str] = field(default_factory=list)
     details: dict = field(default_factory=dict)
@@ -56,9 +57,7 @@ class SimilarityChecker:
         self.ngram_size = ngram_size
         self.min_phrase_length = min_phrase_length
 
-    def compute_similarity(
-        self, content: str, source: str
-    ) -> SimilarityResult:
+    def compute_similarity(self, content: str, source: str) -> SimilarityResult:
         """Compute similarity between content and source.
 
         Args:
@@ -91,9 +90,7 @@ class SimilarityChecker:
         score = overlap_count / total_content if total_content > 0 else 0.0
 
         # Find matching phrases
-        matching_phrases = self._find_matching_phrases(
-            content_words, source_words
-        )
+        matching_phrases = self._find_matching_phrases(content_words, source_words)
 
         return SimilarityResult(
             score=min(score, 1.0),
@@ -119,7 +116,7 @@ class SimilarityChecker:
             return Counter()
 
         ngrams = [
-            tuple(words[i:i + self.ngram_size])
+            tuple(words[i : i + self.ngram_size])
             for i in range(len(words) - self.ngram_size + 1)
         ]
         return Counter(ngrams)
@@ -129,19 +126,21 @@ class SimilarityChecker:
     ) -> list[str]:
         """Find matching phrases between content and source."""
         matches = []
-        source_set = set(" ".join(source_words[i:i+self.min_phrase_length])
-                        for i in range(len(source_words) - self.min_phrase_length + 1))
+        source_set = set(
+            " ".join(source_words[i : i + self.min_phrase_length])
+            for i in range(len(source_words) - self.min_phrase_length + 1)
+        )
 
         # Slide window over content
         for i in range(len(content_words) - self.min_phrase_length + 1):
-            phrase = " ".join(content_words[i:i+self.min_phrase_length])
+            phrase = " ".join(content_words[i : i + self.min_phrase_length])
             if phrase in source_set:
                 # Extend the match as far as possible
                 end = i + self.min_phrase_length
                 while end < len(content_words):
-                    extended = " ".join(content_words[i:end+1])
+                    extended = " ".join(content_words[i : end + 1])
                     if extended in source_set or self._is_in_source(
-                        content_words[i:end+1], source_words
+                        content_words[i : end + 1], source_words
                     ):
                         end += 1
                     else:
@@ -159,7 +158,7 @@ class SimilarityChecker:
         """Check if phrase exists in source."""
         phrase_len = len(phrase_words)
         for i in range(len(source_words) - phrase_len + 1):
-            if source_words[i:i+phrase_len] == phrase_words:
+            if source_words[i : i + phrase_len] == phrase_words:
                 return True
         return False
 
@@ -175,14 +174,14 @@ class SemanticSimilarityChecker:
         result = await checker.compute_similarity(content, source)
     """
 
-    def __init__(self, api_key: Optional[str] = None, model: str = "text-embedding-3-small"):
+    def __init__(
+        self, api_key: Optional[str] = None, model: str = "text-embedding-3-small"
+    ):
         """Initialize with OpenAI API key."""
         self.api_key = api_key
         self.model = model
 
-    async def compute_similarity(
-        self, content: str, source: str
-    ) -> SimilarityResult:
+    async def compute_similarity(self, content: str, source: str) -> SimilarityResult:
         """Compute semantic similarity using embeddings.
 
         Args:

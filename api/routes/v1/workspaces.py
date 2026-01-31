@@ -8,14 +8,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
-from sqlmodel import Session
 
 from api.auth.dependencies import CurrentUser, get_current_user
 from api.auth.scopes import Scope
 from api.routes.v1.dependencies import WorkspaceCtx, require_workspace_scope
 from api.services.workspace_service import WorkspaceService
 from api.services.invite_service import InviteService
-from runner.db.engine import get_session_dependency
 from runner.db.models import (
     WorkspaceRead,
     WorkspaceMembershipRead,
@@ -105,14 +103,18 @@ async def list_my_workspaces(
                 slug=workspace.slug,
                 description=workspace.description,
                 role=membership.role if membership else WorkspaceRole.viewer,
-                member_count=len([m for m in members if m.invite_status.value == "accepted"]),
+                member_count=len(
+                    [m for m in members if m.invite_status.value == "accepted"]
+                ),
             )
         )
 
     return result
 
 
-@router.post("/workspaces", response_model=WorkspaceRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/workspaces", response_model=WorkspaceRead, status_code=status.HTTP_201_CREATED
+)
 async def create_workspace(
     request: CreateWorkspaceRequest,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -167,7 +169,9 @@ async def get_workspace(ctx: WorkspaceCtx):
 @router.patch("/w/{workspace_id}", response_model=WorkspaceRead)
 async def update_workspace(
     request: UpdateWorkspaceRequest,
-    ctx: Annotated[WorkspaceCtx, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))],
+    ctx: Annotated[
+        WorkspaceCtx, Depends(require_workspace_scope(Scope.WORKSPACE_SETTINGS))
+    ],
 ):
     """Update workspace settings.
 
@@ -208,7 +212,9 @@ async def update_workspace(
 
 @router.delete("/w/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_workspace(
-    ctx: Annotated[WorkspaceCtx, Depends(require_workspace_scope(Scope.WORKSPACE_DELETE))],
+    ctx: Annotated[
+        WorkspaceCtx, Depends(require_workspace_scope(Scope.WORKSPACE_DELETE))
+    ],
 ):
     """Delete workspace and all associated data.
 
@@ -251,16 +257,23 @@ async def list_members(ctx: WorkspaceCtx):
     ]
 
 
-@router.post("/w/{workspace_id}/members", response_model=InviteResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/w/{workspace_id}/members",
+    response_model=InviteResponse,
+    status_code=status.HTTP_201_CREATED,
+)
 async def invite_member(
     request: InviteMemberRequest,
-    ctx: Annotated[WorkspaceCtx, Depends(require_workspace_scope(Scope.WORKSPACE_USERS))],
+    ctx: Annotated[
+        WorkspaceCtx, Depends(require_workspace_scope(Scope.WORKSPACE_USERS))
+    ],
 ):
     """Invite a new member to the workspace.
 
     Requires workspace:users scope (admin or owner).
     """
     from api.services.invite_service import InviteExistsError, InviteError
+
     service = InviteService()
 
     try:
@@ -289,11 +302,15 @@ async def invite_member(
     )
 
 
-@router.patch("/w/{workspace_id}/members/{member_id}", response_model=WorkspaceMembershipRead)
+@router.patch(
+    "/w/{workspace_id}/members/{member_id}", response_model=WorkspaceMembershipRead
+)
 async def update_member_role(
     member_id: UUID,
     request: UpdateMemberRoleRequest,
-    ctx: Annotated[WorkspaceCtx, Depends(require_workspace_scope(Scope.WORKSPACE_USERS))],
+    ctx: Annotated[
+        WorkspaceCtx, Depends(require_workspace_scope(Scope.WORKSPACE_USERS))
+    ],
 ):
     """Update a member's role.
 
@@ -301,6 +318,7 @@ async def update_member_role(
     Cannot change the owner's role (use transfer_ownership instead).
     """
     from api.services.invite_service import InviteNotFoundError
+
     service = InviteService()
 
     try:
@@ -332,10 +350,14 @@ async def update_member_role(
     )
 
 
-@router.delete("/w/{workspace_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/w/{workspace_id}/members/{member_id}", status_code=status.HTTP_204_NO_CONTENT
+)
 async def remove_member(
     member_id: UUID,
-    ctx: Annotated[WorkspaceCtx, Depends(require_workspace_scope(Scope.WORKSPACE_USERS))],
+    ctx: Annotated[
+        WorkspaceCtx, Depends(require_workspace_scope(Scope.WORKSPACE_USERS))
+    ],
 ):
     """Remove a member from the workspace.
 
@@ -376,7 +398,13 @@ async def accept_invite(
 
     The logged-in user accepts the invite associated with the token.
     """
-    from api.services.invite_service import InviteNotFoundError, InviteExpiredError, InviteAlreadyAcceptedError, InviteError
+    from api.services.invite_service import (
+        InviteNotFoundError,
+        InviteExpiredError,
+        InviteAlreadyAcceptedError,
+        InviteError,
+    )
+
     service = InviteService()
 
     try:
