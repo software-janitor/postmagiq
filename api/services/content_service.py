@@ -104,6 +104,9 @@ def _format_sentence_patterns(value: Optional[str]) -> Optional[str]:
         return value
     try:
         patterns = json.loads(value)
+        # Handle double-encoded JSON (string containing JSON)
+        if isinstance(patterns, str) and patterns.startswith("{"):
+            patterns = json.loads(patterns)
         if not isinstance(patterns, dict):
             return value
         parts = []
@@ -129,6 +132,9 @@ def _format_signature_phrases(value: Optional[str]) -> Optional[str]:
         return value
     try:
         phrases = json.loads(value)
+        # Handle double-encoded JSON (string containing JSON array)
+        if isinstance(phrases, str) and phrases.startswith("["):
+            phrases = json.loads(phrases)
         if isinstance(phrases, list):
             return ", ".join(str(p) for p in phrases)
         return value
