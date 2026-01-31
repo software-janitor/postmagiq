@@ -46,7 +46,6 @@ from runner.db.models import (
 )
 
 
-LEGACY_VOICE_KEY = "legacy"
 
 
 def _uuid_to_str(val: Union[UUID, str, None]) -> Optional[str]:
@@ -76,23 +75,6 @@ def _generate_slug(name: str) -> str:
     return slug or "voice-profile"
 
 
-def _encode_legacy_voice_profile(payload: dict) -> str:
-    """Encode legacy voice profile fields into JSON for storage."""
-    return json.dumps({LEGACY_VOICE_KEY: payload})
-
-
-def _decode_legacy_voice_profile(description: Optional[str]) -> dict:
-    """Decode legacy voice profile fields from JSON storage."""
-    if not description:
-        return {}
-    try:
-        data = json.loads(description)
-    except json.JSONDecodeError:
-        return {}
-    if isinstance(data, dict) and LEGACY_VOICE_KEY in data:
-        legacy = data.get(LEGACY_VOICE_KEY)
-        return legacy if isinstance(legacy, dict) else {}
-    return {}
 
 
 def _format_sentence_patterns(value: Optional[str]) -> Optional[str]:
@@ -935,24 +917,17 @@ class ContentService:
         self, profile: VoiceProfile, default_id: Optional[UUID]
     ) -> VoiceProfileResponse:
         """Convert a VoiceProfile to VoiceProfileResponse."""
-        legacy = _decode_legacy_voice_profile(profile.description)
-
-        # Get raw values (prefer legacy, fallback to native fields)
-        raw_sentence_patterns = legacy.get("sentence_patterns") or profile.example_excerpts
-        raw_signature_phrases = legacy.get("signature_phrases") or profile.signature_phrases
-
         return VoiceProfileResponse(
             id=str(profile.id),
             name=profile.name,
-            description=None if legacy else profile.description,
+            description=profile.description,
             is_default=default_id == profile.id,
-            tone=legacy.get("tone") or profile.tone_description,
-            sentence_patterns=_format_sentence_patterns(raw_sentence_patterns),
-            vocabulary_level=legacy.get("vocabulary_level") or profile.word_choices,
-            signature_phrases=_format_signature_phrases(raw_signature_phrases),
-            storytelling_style=legacy.get("storytelling_style")
-            or profile.avoid_patterns,
-            emotional_register=legacy.get("emotional_register"),
+            tone=profile.tone_description,
+            sentence_patterns=_format_sentence_patterns(profile.example_excerpts),
+            vocabulary_level=profile.word_choices,
+            signature_phrases=_format_signature_phrases(profile.signature_phrases),
+            storytelling_style=profile.avoid_patterns,
+            emotional_register=None,
             created_at=_datetime_to_str(profile.created_at),
         )
 
@@ -983,19 +958,10 @@ class ContentService:
                 counter += 1
                 slug = f"{_generate_slug(name)}-{counter}"
 
-            legacy_payload = {
-                "tone": tone,
-                "sentence_patterns": sentence_patterns,
-                "vocabulary_level": vocabulary_level,
-                "signature_phrases": signature_phrases,
-                "storytelling_style": storytelling_style,
-                "emotional_register": emotional_register,
-                "raw_analysis": raw_analysis,
-            }
             record = VoiceProfileCreate(
                 name=name,
                 slug=slug,
-                description=_encode_legacy_voice_profile(legacy_payload),
+                description=None,
                 is_preset=False,
                 tone_description=tone,
                 signature_phrases=signature_phrases,
@@ -1030,19 +996,10 @@ class ContentService:
                 counter += 1
                 slug = f"{_generate_slug(name)}-{counter}"
 
-            legacy_payload = {
-                "tone": tone,
-                "sentence_patterns": sentence_patterns,
-                "vocabulary_level": vocabulary_level,
-                "signature_phrases": signature_phrases,
-                "storytelling_style": storytelling_style,
-                "emotional_register": emotional_register,
-                "raw_analysis": raw_analysis,
-            }
             record = VoiceProfileCreate(
                 name=name,
                 slug=slug,
-                description=_encode_legacy_voice_profile(legacy_payload),
+                description=None,
                 is_preset=False,
                 tone_description=tone,
                 signature_phrases=signature_phrases,
@@ -1113,20 +1070,7 @@ class ContentService:
             profile = session.get(VoiceProfile, pid)
             if not profile:
                 return
-            legacy = _decode_legacy_voice_profile(profile.description)
-            for key in (
-                "tone",
-                "sentence_patterns",
-                "vocabulary_level",
-                "signature_phrases",
-                "storytelling_style",
-                "emotional_register",
-                "raw_analysis",
-            ):
-                if key in kwargs:
-                    legacy[key] = kwargs[key]
 
-            profile.description = _encode_legacy_voice_profile(legacy)
             if "tone" in kwargs:
                 profile.tone_description = kwargs["tone"]
             if "signature_phrases" in kwargs:

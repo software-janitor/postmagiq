@@ -86,17 +86,12 @@ class UpdateVoiceProfileRequest(BaseModel):
 
 def _to_response(profile: VoiceProfile) -> VoiceProfileResponse:
     """Convert a VoiceProfile model to response."""
-    # Hide description if it contains legacy JSON storage
-    description = profile.description
-    if description and description.startswith('{"legacy":'):
-        description = None
-
     return VoiceProfileResponse(
         id=profile.id,
         workspace_id=profile.workspace_id,
         name=profile.name,
         slug=profile.slug,
-        description=description,
+        description=profile.description,
         is_preset=profile.is_preset,
         tone_description=profile.tone_description,
         signature_phrases=_format_signature_phrases(profile.signature_phrases),
