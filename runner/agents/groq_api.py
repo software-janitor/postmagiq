@@ -74,20 +74,36 @@ class GroqAPIAgent(APIAgent):
         """Convert model alias to actual model ID."""
         return self.MODEL_MAP.get(self.model, self.model)
 
-    def _call_api(self, messages: list[dict]) -> tuple[str, TokenUsage]:
-        """Make API call to Groq and return (content, tokens)."""
+    def _call_api(
+        self,
+        messages: list[dict],
+        system_prompt: Optional[str] = None,
+        json_mode: bool = False,
+    ) -> tuple[str, TokenUsage]:
+        """Make API call to Groq and return (content, tokens).
+
+        Args:
+            messages: List of message dicts
+            system_prompt: Override system prompt for this call
+            json_mode: If True, use response_format=json_object
+        """
         try:
             api_messages = messages.copy()
-            if self.system_prompt:
+            effective_system = system_prompt or self.system_prompt
+            if effective_system:
                 api_messages = [
-                    {"role": "system", "content": self.system_prompt}
+                    {"role": "system", "content": effective_system}
                 ] + api_messages
 
-            response = self.client.chat.completions.create(
-                model=self.model_id,
-                messages=api_messages,
-                max_tokens=self.max_tokens,
-            )
+            kwargs = {
+                "model": self.model_id,
+                "messages": api_messages,
+                "max_tokens": self.max_tokens,
+            }
+            if json_mode:
+                kwargs["response_format"] = {"type": "json_object"}
+
+            response = self.client.chat.completions.create(**kwargs)
 
             content = response.choices[0].message.content or ""
             tokens = TokenUsage(
@@ -98,6 +114,44 @@ class GroqAPIAgent(APIAgent):
 
         except GroqRateLimitError as e:
             raise RateLimitError(str(e))
+
+    def invoke_json(
+        self,
+        prompt: str,
+        system_prompt: Optional[str] = None,
+        input_files: Optional[list[str]] = None,
+    ) -> "AgentResult":
+        """One-shot invocation with JSON mode enabled."""
+        from runner.models import AgentResult
+        import time
+
+        full_prompt = self._build_prompt(prompt, input_files)
+        messages = [{"role": "user", "content": full_prompt}]
+
+        start_time = time.time()
+        try:
+            content, tokens = self._call_api(
+                messages, system_prompt=system_prompt, json_mode=True
+            )
+            duration = time.time() - start_time
+            return AgentResult(
+                success=True,
+                content=content,
+                tokens=tokens,
+                duration_s=duration,
+                session_id=None,
+                cost_usd=self.calculate_cost(tokens),
+            )
+        except Exception as e:
+            duration = time.time() - start_time
+            from runner.models import TokenUsage as TU
+            return AgentResult(
+                success=False,
+                content="",
+                tokens=TU(input_tokens=0, output_tokens=0),
+                duration_s=duration,
+                error=str(e),
+            )
 
     def transcribe(
         self,
