@@ -14,7 +14,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = "admin_analytics"
-down_revision = "fix_writing_samples_schema"
+down_revision = "add_external_auth_fields"
 branch_labels = None
 depends_on = None
 

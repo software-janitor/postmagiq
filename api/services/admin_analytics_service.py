@@ -9,7 +9,7 @@ from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlmodel import Session, select
 
 from runner.db.engine import engine
@@ -82,10 +82,10 @@ class AdminAnalyticsService:
                 func.sum(WorkflowRun.total_tokens).label("total_tokens"),
                 func.count(WorkflowRun.id).label("run_count"),
                 func.sum(
-                    func.cast(WorkflowRun.status == "completed", type_=func.INT)
+                    case((WorkflowRun.status == "completed", 1), else_=0)
                 ).label("successful"),
                 func.sum(
-                    func.cast(WorkflowRun.status == "failed", type_=func.INT)
+                    case((WorkflowRun.status == "failed", 1), else_=0)
                 ).label("failed"),
             )
             .where(WorkflowRun.workspace_id.is_not(None))
@@ -277,7 +277,7 @@ class AdminAnalyticsService:
                 ).label("total_tokens"),
                 func.count(WorkflowStateMetric.id).label("invocation_count"),
             )
-            .join(WorkflowRun, WorkflowStateMetric.run_id == WorkflowRun.run_id)
+            .join(WorkflowRun, WorkflowStateMetric.run_id == WorkflowRun.id)
             .where(WorkflowStateMetric.created_at >= start_date)
             .group_by(WorkflowStateMetric.agent)
             .order_by(func.sum(WorkflowStateMetric.cost_usd).desc())
