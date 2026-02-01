@@ -493,6 +493,45 @@ class UsageService:
         """
         return self.check_limit(workspace_id, "post", credits)
 
+    def apply_tier_simulation(self, summary: dict, tier_id: UUID) -> dict:
+        """Apply tier simulation to a usage summary.
+
+        Used by owners to preview how usage would look on a different tier.
+        Only affects the display - does not change actual limits.
+
+        Args:
+            summary: Usage summary dict from get_usage_summary()
+            tier_id: Tier UUID to simulate
+
+        Returns:
+            Modified summary dict with simulated tier info
+        """
+        simulated_tier = self.get_tier(tier_id)
+        if not simulated_tier:
+            return summary
+
+        # Override subscription tier info with simulated tier
+        summary["subscription"] = {
+            "tier_name": f"{simulated_tier.name} (Simulated)",
+            "tier_slug": simulated_tier.slug,
+            "status": "simulated",
+            "overage_enabled": simulated_tier.overage_enabled,
+        }
+        summary["tier"] = {
+            "name": f"{simulated_tier.name} (Simulated)",
+            "slug": simulated_tier.slug,
+        }
+        # Override limits with simulated tier's limits
+        summary["posts"]["limit"] = simulated_tier.posts_per_month
+        summary["posts"]["unlimited"] = simulated_tier.posts_per_month == 0
+        summary["storage"]["limit_bytes"] = simulated_tier.storage_gb * 1024 * 1024 * 1024
+        summary["storage"]["limit_gb"] = simulated_tier.storage_gb
+        summary["storage"]["unlimited"] = simulated_tier.storage_gb == 0
+        summary["api_calls"]["limit"] = 10000 if simulated_tier.api_access else 0
+        summary["api_calls"]["unlimited"] = simulated_tier.api_access
+
+        return summary
+
     def create_subscription(
         self,
         workspace_id: UUID,

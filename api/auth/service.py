@@ -483,6 +483,35 @@ class AuthService:
         self._session.commit()
         return True
 
+    def set_view_as_tier(self, user_id: UUID, tier_id: Optional[UUID]) -> User:
+        """Set the tier to simulate for testing (owner feature).
+
+        Args:
+            user_id: User UUID
+            tier_id: Tier UUID to simulate, or None to reset to actual tier
+
+        Returns:
+            Updated User instance
+
+        Raises:
+            ValueError: If user not found or tier doesn't exist
+        """
+        user = self.get_user_by_id(user_id)
+        if not user:
+            raise ValueError("User not found")
+
+        # Validate tier exists if provided
+        if tier_id is not None:
+            tier = self._session.get(SubscriptionTier, tier_id)
+            if not tier:
+                raise ValueError("Tier not found")
+
+        user.view_as_tier_id = tier_id
+        self._session.add(user)
+        self._session.commit()
+        self._session.refresh(user)
+        return user
+
     @property
     def session(self) -> Session:
         """Access to the SQLModel session for route handlers that need it."""

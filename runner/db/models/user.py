@@ -59,6 +59,9 @@ class User(UUIDModel, UserBase, TimestampMixin, table=True):
     # User-level role for feature flags
     role: UserRole = Field(default=UserRole.user)
 
+    # Owner can simulate other tiers for testing (nullable = use actual tier)
+    view_as_tier_id: Optional[UUID] = Field(default=None, foreign_key="subscription_tiers.id")
+
     # Default workspace for individual tier users (hide multi-tenancy UX)
     # When set, API routes can infer workspace without explicit workspace_id in URL
     default_workspace_id: Optional[UUID] = Field(
@@ -82,6 +85,7 @@ class UserRead(UserBase):
     is_active: bool = True
     is_superuser: bool = False
     role: UserRole = UserRole.user
+    view_as_tier_id: Optional[UUID] = None
     default_workspace_id: Optional[UUID] = None
 
 

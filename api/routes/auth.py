@@ -142,12 +142,13 @@ def get_current_user(
 
     return UserRead(
         id=user.id,
-        name=user.name,
+        full_name=user.full_name,
         email=user.email,
         created_at=user.created_at,
         is_active=user.is_active,
         is_superuser=user.is_superuser,
         role=user.role,
+        view_as_tier_id=user.view_as_tier_id,
         default_workspace_id=user.default_workspace_id,
     )
 
@@ -170,6 +171,10 @@ def register(
 
     Creates a new user account and returns access tokens.
     """
+    # Get client info for session tracking
+    user_agent = req.headers.get("user-agent")
+    ip_address = req.client.host if req.client else None
+
     try:
         user = auth_service.register(
             email=request.email,
@@ -181,10 +186,6 @@ def register(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
-
-    # Get client info for session
-    user_agent = req.headers.get("user-agent")
-    ip_address = req.client.host if req.client else None
 
     tokens = auth_service.create_session(
         user_id=user.id,
@@ -349,6 +350,52 @@ def get_my_flags(
     """
     flags = get_flags_for_user(current_user)
     return FlagsResponse(**flags)
+
+
+class ViewAsTierRequest(BaseModel):
+    """Request body for setting view-as-tier (owner testing feature)."""
+
+    tier_id: Optional[UUID] = None  # None resets to actual tier
+
+
+@router.put("/me/view-as-tier", response_model=UserRead)
+def set_view_as_tier(
+    request: ViewAsTierRequest,
+    current_user: UserRead = Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service),
+) -> UserRead:
+    """Set the tier to simulate for testing (owner-only).
+
+    Allows owners to view the application as if they were on a different tier.
+    This affects usage limits and feature visibility without changing the actual subscription.
+
+    Set tier_id to null to reset to the actual subscription tier.
+    """
+    if current_user.role != UserRole.owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only owners can use the view-as-tier feature",
+        )
+
+    try:
+        user = auth_service.set_view_as_tier(current_user.id, request.tier_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e),
+        )
+
+    return UserRead(
+        id=user.id,
+        full_name=user.full_name,
+        email=user.email,
+        created_at=user.created_at,
+        is_active=user.is_active,
+        is_superuser=user.is_superuser,
+        role=user.role,
+        view_as_tier_id=user.view_as_tier_id,
+        default_workspace_id=user.default_workspace_id,
+    )
 
 
 class ForgotPasswordRequest(BaseModel):

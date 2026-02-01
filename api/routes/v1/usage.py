@@ -13,7 +13,7 @@ from api.auth.dependencies import get_current_user, require_scope
 from api.auth.scopes import Scope
 from api.services.usage_service import UsageService
 from api.services.tier_service import tier_service
-from runner.db.models import User
+from runner.db.models import User, UserRole
 
 router = APIRouter(prefix="/v1/w/{workspace_id}/usage", tags=["usage"])
 
@@ -88,9 +88,16 @@ async def get_usage_summary(
     """Get usage summary for the current billing period.
 
     Returns usage stats including credits, features, and tier information.
+
+    If the user is an owner with view_as_tier_id set, the response will
+    show limits as if they were on that tier (for testing/preview purposes).
     """
     summary = usage_service.get_usage_summary(workspace_id)
     features = tier_service.get_features_summary(workspace_id)
+
+    # Owner tier simulation: override tier info in response if view_as_tier_id is set
+    if current_user.role == UserRole.owner and current_user.view_as_tier_id:
+        summary = usage_service.apply_tier_simulation(summary, current_user.view_as_tier_id)
 
     return UsageSummaryResponse(
         period_start=summary["period_start"],
