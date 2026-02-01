@@ -27,6 +27,7 @@ from api.routes.v1.finished_posts import router as finished_posts_router
 from api.routes.v1.transcription import router as transcription_router
 from api.routes.v1.social_auth import router as social_auth_router
 from api.routes.v1.publishing import router as publishing_router
+from api.routes.v1.admin import router as admin_router
 
 __all__ = [
     "workspaces_router",
@@ -48,4 +49,5 @@ __all__ = [
     "transcription_router",
     "social_auth_router",
     "publishing_router",
+    "admin_router",
 ]

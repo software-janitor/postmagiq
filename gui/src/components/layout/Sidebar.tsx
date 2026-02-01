@@ -19,6 +19,7 @@ import {
   LogOut,
   CheckSquare,
   MessageCircle,
+  BarChart3,
 } from 'lucide-react'
 import { clsx } from 'clsx'
 import { useQuery } from '@tanstack/react-query'
@@ -155,6 +156,29 @@ export default function Sidebar() {
         {navItems.map((item) => (
           <ScopedNavLink key={item.path} item={item} />
         ))}
+
+        {/* Admin Section - Owner Only */}
+        {user?.role === 'owner' && (
+          <>
+            <div className="mt-4 mb-2 px-3 text-xs text-zinc-500 uppercase tracking-wide">
+              Admin
+            </div>
+            <NavLink
+              to="/admin/analytics"
+              className={({ isActive }) =>
+                clsx(
+                  'flex items-center gap-3 px-3 py-2 rounded-lg transition-colors',
+                  isActive
+                    ? `bg-gradient-to-r ${theme.gradient} text-white shadow-lg ${theme.shadow}`
+                    : `text-zinc-400 ${theme.bgHover} hover:${theme.textPrimary}`
+                )
+              }
+            >
+              <BarChart3 className="w-5 h-5" />
+              Analytics
+            </NavLink>
+          </>
+        )}
       </nav>
 
       {/* Theme Switcher */}
