@@ -275,6 +275,13 @@ from runner.db.models.social import (
     PublishResult,
 )
 
+# Admin Analytics models
+from runner.db.models.admin_analytics import (
+    WorkspaceDailyCosts,
+    WorkspaceDailyCostsCreate,
+    WorkspaceDailyCostsRead,
+)
+
 # Market Intelligence models (Phase 13)
 from runner.db.models.market_intelligence import (
     EmbeddingSourceType,
@@ -536,6 +543,10 @@ __all__ = [
     "ContentModeration",
     "ContentModerationCreate",
     "ContentModerationRead",
+    # Admin Analytics
+    "WorkspaceDailyCosts",
+    "WorkspaceDailyCostsCreate",
+    "WorkspaceDailyCostsRead",
     # Social Publishing
     "SocialPlatform",
     "ScheduledPostStatus",

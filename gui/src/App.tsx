@@ -18,6 +18,7 @@ import TeamSettings from './pages/TeamSettings'
 import Approvals from './pages/Approvals'
 import WhitelabelSettings from './pages/settings/WhitelabelSettings'
 import PrivacySettings from './pages/settings/PrivacySettings'
+import AdminAnalytics from './pages/admin/Analytics'
 
 // Public pages (no auth required)
 import Privacy from './pages/Privacy'
@@ -102,6 +103,7 @@ function App() {
                   <Route path="/approvals" element={<Approvals />} />
                   <Route path="/settings/whitelabel" element={<WhitelabelSettings />} />
                   <Route path="/settings/privacy" element={<PrivacySettings />} />
+                  <Route path="/admin/analytics" element={<AdminAnalytics />} />
                 </Routes>
               </MainLayout>
             </WorkspaceLoader>
